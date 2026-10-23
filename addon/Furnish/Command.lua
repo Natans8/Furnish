@@ -1,5 +1,6 @@
 -- The /furnish command, /furn for short: what a player types, read into a request for the
--- console, the help that says what can be typed, and the clicks on a list's links.
+-- console, the help that says what can be typed, and the clicks on a list's links. The
+-- command alone is the window's.
 --
 -- The commands and the words are declared once, below, and the help is read off them.
 
@@ -14,6 +15,7 @@ local Chat = Furnish.Chat
 
 --- What can be typed, in the order the help says it.
 Command.USAGE = {
+	{ "/furn help", "this help" },
 	{ "/furn list", "the selected building's sets" },
 	{ "/furn list <entry>", "an object's sets, by the entry on its lookup line" },
 	{ "/furn <set>", "spawn a set on the selected building" },
@@ -49,7 +51,7 @@ local function number(token)
 end
 
 --- What a player typed after the command, as a request; or nil and the way out.
--- @return { action = "help" | "list" | "spawn" | "import" | "stop", and the fields the
+-- @return { action = "window" | "help" | "list" | "spawn" | "import" | "stop", and the fields the
 --   console reads: index, entry, here, group, base, delete }
 function Command.Parse(text)
 	local tokens = {}
@@ -57,7 +59,9 @@ function Command.Parse(text)
 		tokens[#tokens + 1] = token
 	end
 	local head = tokens[1]
-	if head == nil or head == "help" then
+	if head == nil then
+		return { action = "window" }
+	elseif head == "help" then
 		return { action = "help" }
 	end
 	if head == "stop" then
@@ -75,7 +79,7 @@ function Command.Parse(text)
 	elseif number(head) then
 		request, i = { action = "spawn", index = number(head) }, 2
 	else
-		return nil, head .. " is not a Furnish command; /furn shows them"
+		return nil, head .. " is not a Furnish command; /furn help shows them"
 	end
 	local said = {}
 	while tokens[i] do
@@ -99,7 +103,7 @@ function Command.Parse(text)
 		else
 			local word = WORD[token]
 			if not word then
-				return nil, token .. " is not a word Furnish knows; /furn shows them"
+				return nil, token .. " is not a word Furnish knows; /furn help shows them"
 			end
 			if said[word.field] then
 				return nil,
@@ -150,7 +154,10 @@ function Command.Run(text)
 	if not request then
 		return Chat.Say(reason)
 	end
-	if request.action == "help" then
+	if request.action == "window" then
+		-- TODO: open the window, once it is built.
+		Chat.Say("the window is not built yet; /furn help lists the commands")
+	elseif request.action == "help" then
 		for _, line in ipairs(helpLines()) do
 			Chat.Line(line)
 		end

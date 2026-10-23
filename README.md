@@ -10,7 +10,7 @@ every model to the display that spawns it, and writes one SQLite file.
 
 ## Commands
 
-`/furnish`, or `/furn`, alone prints the help.
+The command is `/furnish`, or `/furn` for short, and `/furn help` prints what follows.
 
 | command                    | does                                                              |
 |----------------------------|-------------------------------------------------------------------|

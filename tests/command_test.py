@@ -94,7 +94,7 @@ def shown(lua: lua51.LuaRuntime) -> list[str]:
 @pytest.mark.parametrize(
     ("typed", "request_"),
     [
-        ("", {"action": "help"}),
+        ("", {"action": "window"}),
         ("help me", {"action": "help"}),
         ("list", {"action": "list"}),
         (
@@ -124,8 +124,8 @@ def test_what_is_typed_reads_as_a_request(
 @pytest.mark.parametrize(
     ("typed", "reason"),
     [
-        ("spawn 3", "spawn is not a Furnish command; /furn shows them"),
-        ("3 quickly", "quickly is not a word Furnish knows; /furn shows them"),
+        ("spawn 3", "spawn is not a Furnish command; /furn help shows them"),
+        ("3 quickly", "quickly is not a word Furnish knows; /furn help shows them"),
         ("3 first nogroup", "first and nogroup cannot go together; choose one"),
         ("3 base base", "base and base cannot go together; choose one"),
         ("3 from", "from takes an object's entry, as /furn 3 from <entry>"),
@@ -141,18 +141,24 @@ def test_what_cannot_be_read_says_the_way_out(tmp_path: Path, typed: str, reason
 
 def test_a_refused_command_is_said_once_with_the_prefix(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
-    assert run(lua, "spawn 3") == [PREFIX + "spawn is not a Furnish command; /furn shows them"]
+    assert run(lua, "spawn 3") == [PREFIX + "spawn is not a Furnish command; /furn help shows them"]
     assert sent(lua) == []
 
 
 def test_the_help_names_every_command_and_word(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
-    lines = run(lua, "")
+    lines = run(lua, "help")
     assert lines[0] == "|cffffd100Furnish|r|cff9d9d9d spawns a building's doodad sets as objects|r"
-    assert lines[1] == "  |cffffd100/furn list|r the selected building's sets"
+    assert lines[1] == "  |cffffd100/furn help|r this help"
+    assert lines[2] == "  |cffffd100/furn list|r the selected building's sets"
     assert "  |cffffd100attach|r join the selected building's group" in lines
     assert lines[-1].endswith("click it to spawn it, ctrl-click to spawn it at your feet.|r")
-    assert len(lines) == 1 + 9 + 1 + 4 + 1
+    assert len(lines) == 1 + 10 + 1 + 4 + 1
+
+
+def test_the_command_alone_is_the_windows(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    assert run(lua, "") == [PREFIX + "the window is not built yet; /furn help lists the commands"]
 
 
 # -- Listing -----------------------------------------------------------------------------
