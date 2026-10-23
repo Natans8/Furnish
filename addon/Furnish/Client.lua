@@ -66,6 +66,41 @@ function Client.Selected()
 	return lib.GameObject:GetSelected()
 end
 
+--- Restore the saved copy of a settings table over its defaults, then make the live table
+-- the saved one, so the client writes whatever a surface changes at logout. A saved value
+-- is taken only for a key the defaults declare and only when its type agrees, so a stale
+-- or hand-edited file cannot put a string where a number goes.
+-- @param settings the defaults, which become the live values
+-- @param name the saved variable's global name, as the toc declares it
+function Client.Restore(settings, name)
+	local saved = _G[name]
+	if type(saved) == "table" then
+		for key, default in pairs(settings) do
+			local value = saved[key]
+			if type(value) == type(default) then
+				settings[key] = value
+			end
+		end
+	end
+	_G[name] = settings
+end
+
+--- Call fn once this addon has loaded, which is when its saved variables are readable.
+function Client.OnLoaded(fn)
+	local frame = _G.CreateFrame("Frame")
+	frame:RegisterEvent("ADDON_LOADED")
+	frame:SetScript("OnEvent", function(_, _, addon)
+		if addon == "Furnish" then
+			frame:UnregisterEvent("ADDON_LOADED")
+			Client.Guarded(fn)()
+		end
+	end)
+end
+
+Client.OnLoaded(function()
+	Client.Restore(Furnish.Settings, "FurnishSettings")
+end)
+
 --- The player's position as the server places by, and the map: x, y, z, map. Blizzard's
 -- UnitPosition answers nothing useful on a phase, which is an instanced map.
 function Client.Position()

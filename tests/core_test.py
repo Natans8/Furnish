@@ -61,6 +61,20 @@ def lua_core(tmp_path: Path) -> lua51.LuaRuntime:
         function LibStub:GetLibrary(name, silent) return self.libs[name] end
         PRINTED = {}
         function print(...) PRINTED[#PRINTED + 1] = table.concat({ ... }, " ") end
+        FRAMES = {}
+        function CreateFrame()
+          local frame = { events = {} }
+          function frame:RegisterEvent(event) self.events[event] = true end
+          function frame:UnregisterEvent(event) self.events[event] = nil end
+          function frame:SetScript(_, fn) self.handler = fn end
+          FRAMES[#FRAMES + 1] = frame
+          return frame
+        end
+        function FIRE(event, ...)
+          for _, frame in ipairs(FRAMES) do
+            if frame.events[event] and frame.handler then frame.handler(frame, event, ...) end
+          end
+        end
         """
     )
     lua.execute(LIBDEFLATE.read_text(encoding="utf-8"))
@@ -453,6 +467,29 @@ def test_an_abort_with_cleanup_deletes_what_was_spawned(tmp_path: Path) -> None:
     lua.execute("ANSWER(4, true, {}); ANSWER(5, true, {})")
     result = lua.eval("RESULT")
     assert result.aborted is True and result.deleted == 2 and lua.eval("HANDLE.Done()") is True
+
+
+# -- Settings ---------------------------------------------------------------------------
+
+
+def test_settings_are_restored_from_the_saved_copy_and_then_are_it(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute('FurnishSettings = { marker = 9653, chainedJoin = "yes", stray = 1 }')
+    lua.execute('FIRE("ADDON_LOADED", "Furnish")')
+    settings = lua.eval("Furnish.Settings")
+    # The marker is taken; a value of the wrong type and a key the defaults lack are not.
+    assert (settings.marker, settings.chainedJoin, settings.inFlight) == (9653, False, 4)
+    assert settings.stray is None
+    assert lua.eval("FurnishSettings == Furnish.Settings") is True
+    lua.execute("Furnish.Settings.chainedJoin = true")
+    assert lua.eval("FurnishSettings.chainedJoin") is True
+
+
+def test_settings_stand_on_their_defaults_with_nothing_saved(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute('FIRE("ADDON_LOADED", "Furnish")')
+    assert lua.eval("FurnishSettings == Furnish.Settings") is True
+    assert lua.eval("Furnish.Settings.marker") == 424242
 
 
 # -- Providers --------------------------------------------------------------------------

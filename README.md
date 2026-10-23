@@ -90,7 +90,7 @@ lead to the first doodad.
 
 | file            | role                                                                       |
 |-----------------|----------------------------------------------------------------------------|
-| `Settings.lua`  | the marker display, whether the join is chained onto a spawn, the in-flight width |
+| `Settings.lua`  | the defaults: marker, chained join, in-flight width; `FurnishSettings` keeps changes |
 | `Transform.lua` | the placement maths: `Place(position, rotation, scale, row)`               |
 | `Commands.lua`  | every command spelling and every reply reader                              |
 | `Run.lua`       | any series of commands through `send`, in order, with needs and a width    |

@@ -1,5 +1,7 @@
 -- What a player may change about how the core behaves. Nothing else in the addon holds a
--- tunable value; a surface that offers a setting writes it here.
+-- tunable value; a surface that offers a setting writes it here. The values below are the
+-- defaults; what a player changed is kept across sessions in FurnishSettings, which the
+-- client restores at load, and only a key declared here is taken from it.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
