@@ -14,8 +14,8 @@ Furnish.Settings = {
 	-- first doodad leads instead.
 	marker = 16031,
 
-	--- How many spawns go out at once where no join waits on the selection, which is when
-	-- they go ungrouped. A grouped set goes one object at a time, each spawn followed by the
-	-- join that acts on the selection it left, since the server takes no join on a spawn line.
+	--- How many commands may be out unanswered at once, joins counted. No spawn waits on the
+	-- reply to the one before it; this only bounds how far ahead of the replies a run gets,
+	-- so a stop lands within a few lines, since a line already queued cannot be taken back.
 	inFlight = 4,
 }

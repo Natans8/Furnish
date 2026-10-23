@@ -288,8 +288,9 @@ def test_a_run_in_flight_blocks_another_and_stops_with_its_objects_deleted(tmp_p
         "/furn stop again gives up on a reply that never comes"
     ]
     lua.execute("FLUSH()")
-    assert printed(lua)[-1] == PREFIX + "stopped, and deleted the 1 object it spawned"
-    assert sent(lua)[-1] == "gobject delete 7001"
+    # Both doodads were out before the stop, so both stand and both go.
+    assert printed(lua)[-1] == PREFIX + "stopped, and deleted the 2 objects it spawned"
+    assert sent(lua)[-2:] == ["gobject delete 7001", "gobject delete 7002"]
     assert shown(lua) == []
     assert run(lua, "stop") == [PREFIX + "nothing is spawning"]
 

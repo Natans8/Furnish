@@ -6,9 +6,14 @@
 -- group is a word or a GUID. The kernel turns each row into a world pose, each pose into a
 -- spawn line, adds the joins the group needs, and hands the lines to a run.
 --
--- Who leads is decided by the replies, never in advance: the first command that answers a
--- GUID leads. Under Pivot that is the marker, and when the marker is refused the first
--- doodad leads, which is exactly what First does from the start.
+-- Who leads is decided by the replies, never in advance: of the first two spawns, the first
+-- that answers a GUID leads. Under Pivot that is the marker, and when the marker is refused
+-- the first doodad leads, which is exactly what First does from the start. When both are
+-- refused nothing leads, and the rest stand loose.
+--
+-- A join goes straight behind its spawn and acts on the selection the spawn leaves, since
+-- the server takes no join on a spawn line. It waits for the two that may lead and for
+-- nothing else, so a spawn never waits on the reply to the one before it.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -62,13 +67,13 @@ local function check(rows, position, rotation, scale, group, send)
 	return nil
 end
 
---- The GUID that leads: the one given, else the first reply that named one.
-local function leaderOf(group, results)
+--- The GUID that leads: the one given, else the first of these positions to answer one.
+local function leaderOf(group, results, positions)
 	if not isWord(group) then
 		return tostring(group)
 	end
-	for i = 1, #results do
-		local result = results[i]
+	for _, index in ipairs(positions) do
+		local result = results[index]
 		if result and result.success then
 			local guid = Commands.GuidIn(result.messages)
 			if guid then
@@ -89,7 +94,7 @@ end
 -- @param hooks { progress = function(done, total), finished = function(outcome) }, optional.
 --   The outcome carries total, spawned (GUIDs), refused ({ display, messages }), unjoined
 --   ({ display, guid, messages }: spawned, but the join was refused), leader, joined (how
---   many objects besides the leader are in its group), pivot, aborted and, after a cleanup,
+--   many objects joined the leader's group), pivot, aborted and, after a cleanup,
 --   deleted; a messages list is the server's reply lines as sent.
 -- @return a handle with Abort(cleanup), Done() and total, or nil and the reason
 function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
@@ -102,8 +107,8 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 	local joins = group ~= Group.None
 
 	-- Positions in the series: spawns[i] is the display spawned at i, joined[i] the spawn
-	-- a join at i acts for.
-	local commands, spawns, joined = {}, {}, {}
+	-- a join at i acts for, and leads the spawns that may lead, the first two under a word.
+	local commands, spawns, joined, leads = {}, {}, {}, {}
 	local function spawn(display, pose)
 		local line = Commands.Spawn(display, pose)
 		if #line > Commands.LIMIT then
@@ -116,22 +121,33 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 		local index = #commands + 1
 		spawns[index] = display
 		commands[index] = { text = line }
-		-- The join goes as its own command after the spawn, since the server takes no join
-		-- on a spawn line, and acts on the selection the spawn left.
-		if joins then
-			joined[index + 1] = index
-			commands[index + 1] = {
-				needs = { index },
-				text = function(results)
-					local own = Commands.GuidIn(results[index].messages)
-					local leader = leaderOf(group, results)
-					if not own or not leader or leader == own then
-						return nil
-					end
-					return Commands.Join(leader)
-				end,
-			}
+		if not joins then
+			return nil
 		end
+		if isWord(group) and #leads < 2 then
+			leads[#leads + 1] = index
+		end
+		-- The first that may lead leads if it stands, so it never joins.
+		if index == leads[1] then
+			return nil
+		end
+		local needs = {}
+		for _, lead in ipairs(leads) do
+			if lead < index then
+				needs[#needs + 1] = lead
+			end
+		end
+		joined[index + 1] = index
+		commands[index + 1] = {
+			needs = needs,
+			text = function(results)
+				local leader = leaderOf(group, results, needs)
+				if not leader then
+					return nil
+				end
+				return Commands.Join(leader)
+			end,
+		}
 		return nil
 	end
 
@@ -151,37 +167,38 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 	local cleanup = false
 
 	local function outcome(ended)
-		local spawned, refused, unjoined = {}, {}, {}
+		local results = ended.results
+		local spawned, refused, unjoined, members = {}, {}, {}, 0
 		for index = 1, #commands do
-			local result = ended.results[index]
-			local display, spawnAt = spawns[index], joined[index]
-			if display and result and result.success then
-				spawned[#spawned + 1] = Commands.GuidIn(result.messages)
-			elseif display and result and not result.skipped then
-				refused[#refused + 1] = { display = display, messages = result.messages or {} }
-			elseif spawnAt and result and not result.skipped and not result.success then
-				unjoined[#unjoined + 1] = {
-					display = spawns[spawnAt],
-					guid = Commands.GuidIn(ended.results[spawnAt].messages),
-					messages = result.messages or {},
-				}
+			local result, display, spawnAt = results[index], spawns[index], joined[index]
+			-- A join speaks for its spawn only when that spawn stood; behind a refused one it
+			-- acted on the object before, which is in the group already.
+			local own = spawnAt and results[spawnAt]
+			if result and not result.skipped then
+				if display and result.success then
+					spawned[#spawned + 1] = Commands.GuidIn(result.messages)
+				elseif display then
+					refused[#refused + 1] = { display = display, messages = result.messages or {} }
+				elseif own and own.success and result.success then
+					members = members + 1
+				elseif own and own.success then
+					unjoined[#unjoined + 1] = {
+						display = spawns[spawnAt],
+						guid = Commands.GuidIn(own.messages),
+						messages = result.messages or {},
+					}
+				end
 			end
 		end
-		local first = ended.results[1]
-		local leader = joins and leaderOf(group, ended.results) or nil
-		local members = 0
-		for _, guid in ipairs(spawned) do
-			if tostring(guid) ~= tostring(leader) then
-				members = members + 1
-			end
-		end
+		local first = results[1]
+		local leader = joins and leaderOf(group, results, leads) or nil
 		return {
 			total = #rows,
 			spawned = spawned,
 			refused = refused,
 			unjoined = unjoined,
 			leader = leader,
-			joined = leader and members - #unjoined or 0,
+			joined = members,
 			pivot = marker and first and first.success and Commands.GuidIn(first.messages) or nil,
 			aborted = ended.aborted,
 		}
@@ -220,7 +237,7 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 			end
 		end,
 		finished = finished,
-	}, joins and 1 or settings.inFlight)
+	}, settings.inFlight)
 	if not run then
 		return nil, reason
 	end

@@ -424,6 +424,68 @@ def test_a_refused_join_is_reported_as_unjoined(tmp_path: Path) -> None:
     assert result.unjoined[1].messages[1] == "You cannot edit this group."
 
 
+def held_server(lua: lua51.LuaRuntime) -> Callable[[], list[str]]:
+    """A send() that holds every reply until ANSWER(n) answers the n-th line sent: a spawn
+    with a GUID line, numbered in the order spawns are answered, anything else with success."""
+    lua.execute(
+        """
+        SENT, PENDING, NEXT_GUID = {}, {}, 7000
+        function SEND(text, callback) SENT[#SENT + 1] = text PENDING[#SENT] = callback end
+        function ANSWER(index)
+          local callback = PENDING[index]
+          PENDING[index] = nil
+          if SENT[index]:match("^gobject spawn") then
+            NEXT_GUID = NEXT_GUID + 1
+            callback(true, { "|Hgameobject_GUID:" .. NEXT_GUID .. "|h" .. NEXT_GUID .. "|h" })
+          else
+            callback(true, {})
+          end
+        end
+        """
+    )
+    return lambda: list(lua.eval("SENT").values())
+
+
+def test_a_guid_group_sends_spawns_and_joins_without_waiting_for_a_reply(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    sent = held_server(lua)
+    spawn(lua, rows(lua, 2), "333")
+    assert sent() == [SPAWN_CHAIR, "gobject group add 333", SPAWN_LAMP, "gobject group add 333"]
+
+
+def test_a_word_group_waits_only_for_the_two_that_may_lead(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    sent = held_server(lua)
+    spawn(lua, rows(lua, 2))
+    # The chair goes before the marker answers; its join waits for the marker alone.
+    assert sent() == [SPAWN_MARKER, SPAWN_CHAIR]
+    lua.execute("ANSWER(1)")
+    # The lamp goes before the chair answers; its join waits for the chair as well, which
+    # would lead had the marker been refused.
+    assert sent() == [SPAWN_MARKER, SPAWN_CHAIR, "gobject group add 7001", SPAWN_LAMP]
+    lua.execute("ANSWER(2)")
+    assert sent()[-1] == "gobject group add 7001"
+
+
+def test_a_join_behind_a_refused_spawn_speaks_for_nobody(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    sent = fake_server(lua, refuse=21)
+    result = spawn(lua, rows(lua, 2), "333")
+    # The lamp's join still goes, and acts on the chair, which is in the group already.
+    assert sent() == [SPAWN_CHAIR, "gobject group add 333", SPAWN_LAMP, "gobject group add 333"]
+    assert (result.joined, len(result.unjoined)) == (1, 0)
+    assert result.refused[1].display == 21
+
+
+def test_with_both_that_may_lead_refused_the_rest_stand_loose(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute("Furnish.Settings.marker = 20")
+    sent = fake_server(lua, refuse=20)
+    result = spawn(lua, rows(lua, 2))
+    assert not [line for line in sent() if line.startswith("gobject group")]
+    assert (result.leader, result.joined, len(result.spawned)) == (None, 0, 1)
+
+
 def test_rows_from_two_sets_spawn_as_one_collection(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     sent = fake_server(lua)
@@ -468,15 +530,18 @@ def test_an_abort_with_cleanup_deletes_what_was_spawned(tmp_path: Path) -> None:
     )
     spawn(lua, rows(lua, 2))
     lua.execute('ANSWER(1, true, { "|Hgameobject_GUID:7001|h7001|h" })')
-    lua.execute('ANSWER(2, true, { "|Hgameobject_GUID:7002|h7002|h" })')
     lua.execute("HANDLE.Abort(true)")
+    # Out at the abort: the chair, its join and the lamp. The lamp's join waited for the
+    # chair's reply and never goes; the rest answer, and then everything spawned is deleted.
+    lua.execute('ANSWER(2, true, { "|Hgameobject_GUID:7002|h7002|h" })')
     lua.execute("ANSWER(3, true, {})")
+    lua.execute('ANSWER(4, true, { "|Hgameobject_GUID:7003|h7003|h" })')
     sent = list(lua.eval("SENT").values())
-    assert sent[:3] == [SPAWN_MARKER, SPAWN_CHAIR, "gobject group add 7001"]
-    assert sent[3:] == ["gobject delete 7001", "gobject delete 7002"]
-    lua.execute("ANSWER(4, true, {}); ANSWER(5, true, {})")
+    assert sent[:4] == [SPAWN_MARKER, SPAWN_CHAIR, "gobject group add 7001", SPAWN_LAMP]
+    assert sent[4:] == ["gobject delete 7001", "gobject delete 7002", "gobject delete 7003"]
+    lua.execute("ANSWER(5, true, {}); ANSWER(6, true, {}); ANSWER(7, true, {})")
     result = lua.eval("RESULT")
-    assert result.aborted is True and result.deleted == 2 and lua.eval("HANDLE.Done()") is True
+    assert result.aborted is True and result.deleted == 3 and lua.eval("HANDLE.Done()") is True
 
 
 # -- Settings ---------------------------------------------------------------------------
