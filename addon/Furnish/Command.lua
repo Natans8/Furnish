@@ -1,5 +1,5 @@
--- The /furnish command, /furn for short: what a player types, read into a request for the
--- console, the help that says what can be typed, and the clicks on a list's links. The
+-- The command, its names declared in Chat.lua: what a player types, read into a request for
+-- the console, the help that says what can be typed, and the clicks on a list's links. The
 -- command alone is the window's.
 --
 -- The commands and the words are declared once, below, and the help is read off them.
@@ -13,18 +13,18 @@ local Client = Furnish.Client
 local Console = Furnish.Console
 local Chat = Furnish.Chat
 
---- What can be typed, in the order the help says it.
+--- What can be typed after the command, in the order the help says it.
 Command.USAGE = {
-	{ "/furn help", "this help" },
-	{ "/furn list", "the selected building's sets" },
-	{ "/furn list <entry>", "an object's sets, by the entry on its lookup line" },
-	{ "/furn <set>", "spawn a set on the selected building" },
-	{ "/furn <set> from <entry>", "spawn an object's set on the selected object" },
-	{ "/furn <set> here", "spawn the selected building's set at your feet" },
-	{ "/furn <set> here <entry>", "spawn an object's set at your feet" },
-	{ "/furn import", "import the selected doodad and furnish it, grouped on it" },
-	{ "/furn stop", "stop spawning" },
-	{ "/furn stop delete", "stop, and delete what was spawned" },
+	{ "help", "this help" },
+	{ "list", "the selected building's sets" },
+	{ "list <entry>", "an object's sets, by the entry on its lookup line" },
+	{ "<set>", "spawn a set on the selected building" },
+	{ "<set> from <entry>", "spawn an object's set on the selected object" },
+	{ "<set> here", "spawn the selected building's set at your feet" },
+	{ "<set> here <entry>", "spawn an object's set at your feet" },
+	{ "import", "import the selected doodad and furnish it, grouped on it" },
+	{ "stop", "stop spawning" },
+	{ "stop delete", "stop, and delete what was spawned" },
 }
 
 --- The words that may follow a set, a list or an import, in the order the help says them.
@@ -68,7 +68,7 @@ function Command.Parse(text)
 		if tokens[2] == nil or (tokens[2] == "delete" and tokens[3] == nil) then
 			return { action = "stop", delete = tokens[2] == "delete" }
 		end
-		return nil, "stop takes delete or nothing: /furn stop delete"
+		return nil, "stop takes delete or nothing: " .. Chat.Typed("stop delete")
 	end
 	local request, i
 	if head == "list" then
@@ -79,21 +79,22 @@ function Command.Parse(text)
 	elseif number(head) then
 		request, i = { action = "spawn", index = number(head) }, 2
 	else
-		return nil, head .. " is not a Furnish command; /furn help shows them"
+		return nil, head .. " is not a Furnish command; " .. Chat.Typed("help") .. " shows them"
 	end
 	local said = {}
 	while tokens[i] do
 		local token = tokens[i]
 		if token == "from" or token == "here" then
 			if request.action ~= "spawn" then
-				return nil, ("%s follows a set's number, as /furn 3 %s"):format(token, token)
+				return nil,
+					("%s follows a set's number, as %s"):format(token, Chat.Typed("3 " .. token))
 			end
 			local entry = number(tokens[i + 1])
 			if token == "from" and not entry then
-				return nil, "from takes an object's entry, as /furn 3 from <entry>"
+				return nil, "from takes an object's entry, as " .. Chat.Typed("3 from <entry>")
 			end
 			if entry and request.entry then
-				return nil, "name the object once, as /furn 3 here <entry>"
+				return nil, "name the object once, as " .. Chat.Typed("3 here <entry>")
 			end
 			if token == "here" then
 				request.here = true
@@ -103,7 +104,8 @@ function Command.Parse(text)
 		else
 			local word = WORD[token]
 			if not word then
-				return nil, token .. " is not a word Furnish knows; /furn help shows them"
+				return nil,
+					token .. " is not a word Furnish knows; " .. Chat.Typed("help") .. " shows them"
 			end
 			if said[word.field] then
 				return nil,
@@ -121,7 +123,7 @@ end
 local function helpLines()
 	local lefts = {}
 	for _, row in ipairs(Command.USAGE) do
-		lefts[#lefts + 1] = Chat.GOLD .. row[1] .. Chat.END
+		lefts[#lefts + 1] = Chat.GOLD .. Chat.Typed(row[1]) .. Chat.END
 	end
 	for _, each in ipairs(Command.WORDS) do
 		lefts[#lefts + 1] = Chat.GOLD .. each.word .. Chat.END
@@ -156,7 +158,7 @@ function Command.Run(text)
 	end
 	if request.action == "window" then
 		-- TODO: open the window, once it is built.
-		Chat.Say("the window is not built yet; /furn help lists the commands")
+		Chat.Say("the window is not built yet; " .. Chat.Typed("help") .. " lists the commands")
 	elseif request.action == "help" then
 		for _, line in ipairs(helpLines()) do
 			Chat.Line(line)
@@ -209,7 +211,8 @@ function Command.Hover(words, tooltip)
 	end
 end
 
-_G.SLASH_FURNISH1 = "/furnish"
-_G.SLASH_FURNISH2 = "/furn"
+for i, name in ipairs(Chat.COMMANDS) do
+	_G["SLASH_FURNISH" .. i] = name
+end
 _G.SlashCmdList.FURNISH = Client.Guarded(Command.Run)
 Chat.OnLinks(Command.Click, Command.Hover)

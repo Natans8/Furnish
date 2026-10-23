@@ -59,9 +59,9 @@ end
 --- Why nothing new can start, or nil.
 local function busy()
 	if waiting then
-		return "Furnish is waiting for the imported object; /furn stop ends it"
+		return "Furnish is waiting for the imported object; " .. Chat.Typed("stop") .. " ends it"
 	elseif running and not running.Done() then
-		return "Furnish is still spawning; /furn stop ends it"
+		return "Furnish is still spawning; " .. Chat.Typed("stop") .. " ends it"
 	end
 	return nil
 end
@@ -90,7 +90,7 @@ end
 -- or nil and the way out. Without an entry or a file it is the selected building's own.
 local function rootOf(request, pose)
 	if request.file then
-		return request.file, request.label, "/furn list"
+		return request.file, request.label, Chat.Typed("list")
 	end
 	if request.entry then
 		local file = Sets.OfEntry(request.entry)
@@ -100,9 +100,9 @@ local function rootOf(request, pose)
 					request.entry
 				)
 		end
-		return file, "object " .. request.entry, "/furn list " .. request.entry
+		return file, "object " .. request.entry, Chat.Typed("list " .. request.entry)
 	end
-	return pose.file, pose.name, "/furn list"
+	return pose.file, pose.name, Chat.Typed("list")
 end
 
 --- A root's sets, or nil and the way out.
@@ -207,7 +207,7 @@ function Console.List(request)
 		if not pose then
 			return say(reason)
 		end
-		reason = notBuilding(pose, "/furn list <entry> lists another object's")
+		reason = notBuilding(pose, Chat.Typed("list <entry>") .. " lists another object's")
 		if reason then
 			return say(reason)
 		end
@@ -293,11 +293,14 @@ function Console.Spawn(request)
 			or request.here and "the object whose group to join"
 			or "the object to spawn on"
 		local otherwise = request.here and not named and request.group ~= "attach"
-		pose, reason = selection(what, otherwise and ", or name it, as /furn 3 here <entry>" or nil)
+		pose, reason = selection(
+			what,
+			otherwise and (", or name it, as " .. Chat.Typed("3 here <entry>")) or nil
+		)
 		if not pose then
 			return say(reason)
 		end
-		reason = not named and notBuilding(pose, "name one, as /furn 3 from <entry>")
+		reason = not named and notBuilding(pose, "name one, as " .. Chat.Typed("3 from <entry>"))
 		if reason then
 			return say(reason)
 		end
@@ -420,7 +423,11 @@ function Console.Import(request)
 						model,
 						guid,
 						ids and "the map draws only its base set, which the building shows itself"
-							or "the map placed it with no set Furnish knows; /furn list shows its own"
+							or (
+								"the map placed it with no set Furnish knows; "
+								.. Chat.Typed("list")
+								.. " shows its own"
+							)
 					)
 				)
 			end
@@ -472,10 +479,12 @@ function Console.Stop(delete)
 		say("giving up on the replies still owed")
 	elseif delete then
 		say(
-			"stopping, then deleting what was spawned; /furn stop again gives up on a reply that never comes"
+			"stopping, then deleting what was spawned; "
+				.. Chat.Typed("stop")
+				.. " again gives up on a reply that never comes"
 		)
 	else
-		say("stopping; /furn stop again gives up on a reply that never comes")
+		say("stopping; " .. Chat.Typed("stop") .. " again gives up on a reply that never comes")
 	end
 	stopping = true
 	running.Abort(delete)

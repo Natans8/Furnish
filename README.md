@@ -10,7 +10,8 @@ every model to the display that spawns it, and writes one SQLite file.
 
 ## Commands
 
-The command is `/furnish`, or `/furn` for short, and `/furn help` prints what follows.
+The command is `/furn`, or `/furnish`, and `/furn help` prints what follows. Both names are
+placeholders, declared once as `Chat.COMMANDS` in `Chat.lua`, which every message reads.
 
 | command                    | does                                                              |
 |----------------------------|-------------------------------------------------------------------|

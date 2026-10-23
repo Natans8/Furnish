@@ -19,6 +19,16 @@ Chat.GOLD, Chat.WHITE, Chat.BLUE, Chat.GREY, Chat.PREFIX =
 	"|cffffd100", "|cffffffff", "|cff71d5ff", "|cff9d9d9d", "|cff66ccff"
 Chat.END = "|r"
 
+--- The names the command answers to; the first is the one a message tells the player to
+-- type. Nothing else in the addon spells it.
+-- TODO: placeholders until the command's final name is chosen; renaming it is this line.
+Chat.COMMANDS = { "/furn", "/furnish" }
+
+--- What a player types for an action, as a message spells it: the command and its words.
+function Chat.Typed(words)
+	return Chat.COMMANDS[1] .. " " .. words
+end
+
 --- Print one line, with the prefix that says who wrote it.
 function Chat.Say(text)
 	print(Chat.PREFIX .. "Furnish:" .. Chat.END .. " " .. text)
