@@ -16,4 +16,8 @@ Furnish.Settings = {
 	-- at once. Off until it is seen to work in game: unchained, each spawn is followed by a
 	-- join acting on the selection the spawn left behind, so one object goes at a time.
 	chainedJoin = false,
+
+	--- How many spawns go out at once where no join waits on the selection: ungrouped
+	-- spawns, and chained ones once the leader has answered.
+	inFlight = 4,
 }

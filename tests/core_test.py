@@ -203,17 +203,13 @@ def test_the_widest_spawn_line_stays_under_the_limit(tmp_path: Path) -> None:
     assert len(line) < lua.eval("Furnish.Commands.LIMIT")
 
 
-def test_replies_are_read_and_quoted_plain(tmp_path: Path) -> None:
+def test_replies_are_read_and_stripped_plain(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     commands = lua.eval("Furnish.Commands")
     guid = "Spawned |cff00ff00|Hgameobject_GUID:7001|h7001|h|r"
     assert commands.GuidIn(lua.table(guid)) == "7001"
     assert commands.GuidIn(lua.table("(GUID: |cff00CCFF88|r)")) == "88"
-    assert (
-        commands.DisplayIn(lua.table("Template GameObject DisplayID: |cff00CCFF30262|r")) == 30262
-    )
-    assert commands.Quote(lua.table(guid, "ok")) == '"Spawned 7001 / ok"'
-    assert commands.Quote(lua.table()) == "an empty reply"
+    assert commands.Plain(guid) == "Spawned 7001"
 
 
 def test_a_doodad_select_line_is_read_in_full(tmp_path: Path) -> None:
@@ -354,7 +350,7 @@ def test_a_refused_marker_makes_the_first_doodad_lead(tmp_path: Path) -> None:
     assert sent() == [SPAWN_MARKER, SPAWN_CHAIR, SPAWN_LAMP, "gobject group add 7001"]
     assert result.leader == "7001" and result.pivot is None
     refused = result.refused[1]
-    assert refused.display == 424242 and "doesn't exist" in refused.reason
+    assert refused.display == 424242 and "doesn't exist" in refused.messages[1]
 
 
 def test_no_marker_setting_spawns_none(tmp_path: Path) -> None:
@@ -371,7 +367,30 @@ def test_a_refused_doodad_is_counted_with_the_servers_words(tmp_path: Path) -> N
     result = spawn(lua, rows(lua, 2), "Furnish.Group.First")
     assert len(result.spawned) == 1 and result.leader == "7001"
     assert result.refused[1].display == 20
-    assert result.refused[1].reason == '"the gameobject with displayid -20 doesn\'t exist"'
+    assert result.refused[1].messages[1] == "the gameobject with displayid -20 doesn't exist"
+
+
+def test_a_refused_join_is_reported_as_unjoined(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute(
+        """
+        SENT = {}
+        NEXT_GUID = 7000
+        function SEND(text, callback)
+          SENT[#SENT + 1] = text
+          if text:match("^gobject spawn") then
+            NEXT_GUID = NEXT_GUID + 1
+            callback(true, { "|Hgameobject_GUID:" .. NEXT_GUID .. "|h" .. NEXT_GUID .. "|h" })
+          else
+            callback(false, { "You cannot edit this group." })
+          end
+        end
+        """
+    )
+    result = spawn(lua, rows(lua, 2), "333")
+    assert len(result.spawned) == 2 and len(result.refused) == 0
+    assert [(u.display, u.guid) for u in result.unjoined.values()] == [(20, "7001"), (21, "7002")]
+    assert result.unjoined[1].messages[1] == "You cannot edit this group."
 
 
 def test_chained_joins_go_out_several_at_a_time_after_the_leader(tmp_path: Path) -> None:
@@ -385,6 +404,18 @@ def test_chained_joins_go_out_several_at_a_time_after_the_leader(tmp_path: Path)
         SPAWN_LAMP + " group add 7001",
     ]
     assert len(result.spawned) == 3
+
+
+def test_chained_joins_follow_a_refused_leader_to_the_next(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute("Furnish.Settings.chainedJoin = true")
+    sent = fake_server(lua, refuse=424242)
+    result = spawn(lua, rows(lua, 1, 2))
+    # The marker is refused, the first doodad goes out alone and leads, and every later
+    # doodad chains to it.
+    assert sent()[1] == "gobject spawn -21 posx 14 posy 24 posz 31 face north"
+    assert all(s.endswith(" group add 7001") for s in sent()[2:])
+    assert result.leader == "7001" and result.pivot is None
 
 
 def test_rows_from_two_sets_spawn_as_one_collection(tmp_path: Path) -> None:
@@ -523,13 +554,12 @@ def test_pose_selected_reads_the_record_and_never_selects(tmp_path: Path) -> Non
     )
     lua.execute("SELECTED = 501")
     pose = lua.eval("Furnish.Pose.Selected()")
-    assert pose.empty is True and pose.groupLeader == 333 and round(pose.rotation.turn) == 180
+    assert pose.groupLeader == 333 and round(pose.rotation.turn) == 180
+    assert lua.eval("Furnish.Sets.IsEmptyShell")(pose.name) is True
     lua.execute("SELECTED = nil")
     assert lua.eval("select(2, Furnish.Pose.Selected())") == "no object is selected"
     lua.execute("SELECTED = 'group'")
-    assert (
-        lua.eval("select(2, Furnish.Pose.Selected())") == "a group is selected; select one object"
-    )
+    assert lua.eval("select(2, Furnish.Pose.Selected())") == "a group is selected, not one object"
     assert list(lua.eval("SENT").values()) == []
 
 
@@ -599,9 +629,13 @@ def test_the_console_refuses_with_the_way_out(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     fake_client(lua)
     lua.execute("Furnish.Console.Spawn(1)")
-    assert printed(lua)[-1].endswith("no object is selected; select one object with gobject select <guid>")
+    assert printed(lua)[-1].endswith(
+        "no object is selected; select one object with gobject select <guid>"
+    )
     lua.execute("SELECTED = 'group'; Furnish.Console.Spawn(1)")
-    assert printed(lua)[-1].endswith("a group is selected; select one object; select one object with gobject select <guid>")
+    assert printed(lua)[-1].endswith(
+        "a group is selected, not one object; select one object with gobject select <guid>"
+    )
     lua.execute("SELECTED = 502; Furnish.Console.Spawn(1)")
     assert printed(lua)[-1].endswith(
         "chair.m2 (502) is not a WMO; a set is laid out against a building"

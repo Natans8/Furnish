@@ -33,6 +33,18 @@ local function say(text)
 	print("|cff66ccffFurnish:|r " .. text)
 end
 
+--- The server's reply lines as one quotable string, colour codes and links stripped.
+local function quote(messages)
+	if #messages == 0 then
+		return "an empty reply"
+	end
+	local plain = {}
+	for i, line in ipairs(messages) do
+		plain[i] = Commands.Plain(line)
+	end
+	return '"' .. table.concat(plain, " / ") .. '"'
+end
+
 local function describe(set)
 	if set.name == "" then
 		return ("set %d (default, %d objects)"):format(set.index, set.count)
@@ -63,7 +75,16 @@ local function hooks()
 			end
 			say(text)
 			for _, refusal in ipairs(result.refused) do
-				say(("display %d was refused: %s"):format(refusal.display, refusal.reason))
+				say(("display %d was refused: %s"):format(refusal.display, quote(refusal.messages)))
+			end
+			for _, miss in ipairs(result.unjoined) do
+				say(
+					("%s (display %d) spawned but did not join: %s"):format(
+						miss.guid,
+						miss.display,
+						quote(miss.messages)
+					)
+				)
 			end
 		end,
 	}
@@ -132,8 +153,8 @@ end
 
 --- List the sets of the selected object's root, or of a root by file id.
 function Console.Sets(file)
-	local function list(file, label)
-		local sets, reason = Sets.OfFile(file)
+	local function list(root, label)
+		local sets, reason = Sets.OfFile(root)
 		if not sets then
 			return say(reason)
 		end
@@ -159,36 +180,34 @@ end
 function Console.Spawn(index, options)
 	options = options or {}
 	local pose, reason = selection()
-	do
-		if not pose then
-			return say(reason)
-		end
-		if not pose.wmo then
-			return say(
-				("%s (%d) is not a WMO; a set is laid out against a building"):format(
-					pose.name,
-					pose.guid
-				)
-			)
-		end
-		local function go(file, missing)
-			if not file then
-				return say(missing)
-			end
-			local rows, note = rowsFor(file, index, options.default or pose.empty)
-			if not rows then
-				return say(note)
-			end
-			start(rows, pose, options.group or Group.Pivot, note .. " of root file " .. file)
-		end
-		if options.from then
-			return go(options.from)
-		end
-		if pose.empty then
-			return go(Sets.Original(pose.name))
-		end
-		go(pose.file)
+	if not pose then
+		return say(reason)
 	end
+	if not pose.wmo then
+		return say(
+			("%s (%d) is not a WMO; a set is laid out against a building"):format(
+				pose.name,
+				pose.guid
+			)
+		)
+	end
+	local empty = Sets.IsEmptyShell(pose.name)
+	local file, missing = options.from, nil
+	if not file then
+		if empty then
+			file, missing = Sets.Original(pose.name)
+		else
+			file = pose.file
+		end
+	end
+	if not file then
+		return say(missing)
+	end
+	local rows, note = rowsFor(file, index, options.default or empty)
+	if not rows then
+		return say(note)
+	end
+	start(rows, pose, options.group or Group.Pivot, note .. " of root file " .. file)
 end
 
 --- Spawn a set of a root where the player stands, facing as the player faces.

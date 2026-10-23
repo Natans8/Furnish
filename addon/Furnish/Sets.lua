@@ -54,11 +54,20 @@ function Sets.Pick(file, index)
 		)
 end
 
+--- An emptywmo is a stock root copied with its doodads blanked, named after the original
+-- with this prefix, and Epsilon's own copies carry it after their own `eps_`.
+local EMPTY = "emptywmo_"
+
+--- Whether a model name is an emptywmo's, a shell that draws no default set of its own.
+function Sets.IsEmptyShell(name)
+	return name:find(EMPTY, 1, true) ~= nil
+end
+
 --- The root file a model name spawns, through the client's own display table. Only an
 -- emptywmo's original is reached this way, since a name is a convention and not a key.
 local function fileOfName(name)
+	local found = Client.SearchModels(name)
 	local wanted = Client.ModelName(name)
-	local found = Client.SearchModels(wanted)
 	for _, row in ipairs(found) do
 		if Sets.OfFile(row.file) then
 			return row.file
@@ -75,7 +84,7 @@ end
 
 --- The root file an emptywmo was hollowed from, by its name with the prefix trimmed.
 function Sets.Original(name)
-	local original = name:gsub("^eps_emptywmo_", "eps_"):gsub("^emptywmo_", "")
+	local original = name:gsub("^eps_" .. EMPTY, "eps_"):gsub("^" .. EMPTY, "")
 	local file, reason = fileOfName(original)
 	if not file then
 		return nil, ("%s has no original to borrow from: %s"):format(name, reason)

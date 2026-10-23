@@ -26,15 +26,15 @@ Furnish.Group = {
 }
 local Group = Furnish.Group
 
---- How many spawns go out at once when no join waits on a selection.
-Furnish.WIDTH = 4
-
 local function isWord(group)
 	return group == Group.Pivot or group == Group.First or group == Group.None
 end
 
 --- A placement at the anchor itself, which is where the marker stands.
 local ORIGIN = { x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 }
+
+--- The widest GUID a chained join could append, for the line-length guard.
+local LONGEST_GUID = string.rep("9", 10)
 
 local function check(rows, position, rotation, scale, group, send)
 	if type(rows) ~= "table" or #rows == 0 then
@@ -89,7 +89,10 @@ end
 -- @param scale the anchor's scale, or nil for 1
 -- @param group a Furnish.Group value, or the GUID of the object whose group to join
 -- @param send function(text, callback(success, messages)), the door to the server
--- @param hooks { progress = function(done, total), finished = function(outcome) }, optional
+-- @param hooks { progress = function(done, total), finished = function(outcome) }, optional.
+--   The outcome carries total, spawned (GUIDs), refused ({ display, messages }), unjoined
+--   ({ display, guid, messages }: spawned, but the join was refused), leader, pivot, aborted
+--   and, after a cleanup, deleted; a messages list is the server's reply lines as sent.
 -- @return a handle with Abort(cleanup), Done() and total, or nil and the reason
 function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 	local wrong = check(rows, position, rotation, scale, group, send)
@@ -101,23 +104,33 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 	local chained = settings.chainedJoin
 	local joins = group ~= Group.None
 
-	local commands, spawns = {}, {}
+	-- Positions in the series: spawns[i] is the display spawned at i, joined[i] the spawn
+	-- a join at i acts for.
+	local commands, spawns, joined = {}, {}, {}
 	local function spawn(display, pose)
 		local line = Commands.Spawn(display, pose)
-		if #line > Commands.LIMIT then
+		local longest = chained and joins and Commands.Chained(line, LONGEST_GUID) or line
+		if #longest > Commands.LIMIT then
 			return ("a spawn line is %d characters, over the %d the server takes: %s"):format(
-				#line,
+				#longest,
 				Commands.LIMIT,
-				line
+				longest
 			)
 		end
 		local index = #commands + 1
 		spawns[index] = display
 		if chained and joins then
-			-- The leader's own spawn goes first and alone; every later one waits for it and
-			-- carries the join on its line.
+			-- The leader's own spawn goes first and alone; every later one waits for it, and
+			-- for the second as well, so a refused leader hands the lead over before the
+			-- rest go out several at a time.
+			local needs = nil
+			if index == 2 then
+				needs = { 1 }
+			elseif index > 2 then
+				needs = { 1, 2 }
+			end
 			commands[index] = {
-				needs = index > 1 and { 1 } or nil,
+				needs = needs,
 				text = function(results)
 					local leader = leaderOf(group, results)
 					return leader and Commands.Chained(line, leader) or line
@@ -126,6 +139,7 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 		else
 			commands[index] = { text = line }
 			if joins then
+				joined[index + 1] = index
 				commands[index + 1] = {
 					needs = { index },
 					text = function(results)
@@ -158,14 +172,20 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 	local cleanup = false
 
 	local function outcome(ended)
-		local spawned, refused = {}, {}
+		local spawned, refused, unjoined = {}, {}, {}
 		for index = 1, #commands do
-			local display, result = spawns[index], ended.results[index]
+			local result = ended.results[index]
+			local display, spawnAt = spawns[index], joined[index]
 			if display and result and result.success then
 				spawned[#spawned + 1] = Commands.GuidIn(result.messages)
 			elseif display and result and not result.skipped then
-				refused[#refused + 1] =
-					{ display = display, reason = Commands.Quote(result.messages) }
+				refused[#refused + 1] = { display = display, messages = result.messages or {} }
+			elseif spawnAt and result and not result.skipped and not result.success then
+				unjoined[#unjoined + 1] = {
+					display = spawns[spawnAt],
+					guid = Commands.GuidIn(ended.results[spawnAt].messages),
+					messages = result.messages or {},
+				}
 			end
 		end
 		local first = ended.results[1]
@@ -173,6 +193,7 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 			total = #rows,
 			spawned = spawned,
 			refused = refused,
+			unjoined = unjoined,
 			leader = joins and leaderOf(group, ended.results) or nil,
 			pivot = marker and first and first.success and Commands.GuidIn(first.messages) or nil,
 			aborted = ended.aborted,
@@ -212,7 +233,7 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 			end
 		end,
 		finished = finished,
-	}, (chained or not joins) and Furnish.WIDTH or 1)
+	}, (chained or not joins) and settings.inFlight or 1)
 	if not run then
 		return nil, reason
 	end

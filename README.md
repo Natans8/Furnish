@@ -90,14 +90,14 @@ lead to the first doodad.
 
 | file            | role                                                                       |
 |-----------------|----------------------------------------------------------------------------|
-| `Settings.lua`  | the marker display and whether the join is chained onto a spawn            |
+| `Settings.lua`  | the marker display, whether the join is chained onto a spawn, the in-flight width |
 | `Transform.lua` | the placement maths: `Place(position, rotation, scale, row)`               |
 | `Commands.lua`  | every command spelling and every reply reader                              |
 | `Run.lua`       | any series of commands through `send`, in order, with needs and a width    |
 | `Kernel.lua`    | `Furnish.Spawn` and `Furnish.Group`                                        |
 | `Client.lua`    | the one file naming EpsilonLib and `C_Epsilon`; it reads, and never selects |
 | `Pose.lua`      | where: `At`, `Here`, `Selected`, `OfDoodad(line)`                          |
-| `Sets.lua`      | which: `OfFile`, `Pick`, `Original`, `OfPlacement`                       |
+| `Sets.lua`      | which: `OfFile`, `Pick`, `IsEmptyShell`, `Original`, `OfPlacement`         |
 | `Rows.lua`      | what: `OfSet`, `Union`, `Without`                                          |
 | `Console.lua`   | the `/run` door: `Sets`, `Spawn(index, options)`, `Here(file, index)`, `Abort` |
 

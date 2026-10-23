@@ -38,8 +38,7 @@ end
 
 --- An object's pose from EpsilonLib's record of it. The rotation is the record's own, roll
 -- on x, pitch on y, turn on z, with the server's orientation standing in for the turn where
--- the record carries none. Beside the pose: guid, file, name, wmo, empty, groupLeader,
--- canEdit.
+-- the record carries none. Beside the pose: guid, file, name, wmo, groupLeader, canEdit.
 function Pose.OfRecord(object)
 	local rotation = object.transform and object.transform.rotation or {}
 	local position = object.transform and object.transform.position or {}
@@ -56,7 +55,6 @@ function Pose.OfRecord(object)
 		file = object.fileID,
 		name = name,
 		wmo = object.IsWMO and object:IsWMO() or false,
-		empty = name:find("emptywmo_", 1, true) ~= nil,
 		groupLeader = object.groupLeader or 0,
 		canEdit = object.canEdit,
 	}
@@ -68,7 +66,7 @@ end
 function Pose.Selected()
 	local object = Client.Selected()
 	if object == false then
-		return nil, "a group is selected; select one object"
+		return nil, "a group is selected, not one object"
 	end
 	if not object then
 		return nil, "no object is selected"

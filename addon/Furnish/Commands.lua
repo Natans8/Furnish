@@ -68,10 +68,6 @@ function Commands.Chained(spawn, leader)
 	return spawn .. " group add " .. leader
 end
 
-function Commands.Info(entry)
-	return "gobject info " .. entry
-end
-
 function Commands.Delete(guid)
 	return "gobject delete " .. guid
 end
@@ -87,18 +83,6 @@ function Commands.Plain(text)
 	)
 end
 
---- The reply lines joined into one quotable string, or a word for an empty reply.
-function Commands.Quote(messages)
-	if not messages or #messages == 0 then
-		return "an empty reply"
-	end
-	local plain = {}
-	for i, line in ipairs(messages) do
-		plain[i] = Commands.Plain(line)
-	end
-	return '"' .. table.concat(plain, " / ") .. '"'
-end
-
 --- The GUID a spawn reply names, as a string, or nil.
 function Commands.GuidIn(messages)
 	for _, message in ipairs(messages or {}) do
@@ -106,18 +90,6 @@ function Commands.GuidIn(messages)
 			or message:match("GUID: |c%x%x%x%x%x%x%x%x([0-9]+)")
 		if guid then
 			return guid
-		end
-	end
-	return nil
-end
-
---- The display id a `gobject info` reply names, or nil.
-function Commands.DisplayIn(messages)
-	for _, line in ipairs(messages or {}) do
-		local display = line:match("DisplayID:%s*|c%x%x%x%x%x%x%x%x(%d+)|r")
-			or line:match("DisplayID:%s*(%d+)")
-		if display then
-			return tonumber(display)
 		end
 	end
 	return nil
