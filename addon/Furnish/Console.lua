@@ -87,8 +87,7 @@ local function notBuilding(pose, instead)
 end
 
 --- The root a request names, what to call it, and the list command that shows its sets;
--- or nil and the way out. Without an entry or a file it is the selected building's own, an
--- emptywmo's being its original's.
+-- or nil and the way out. Without an entry or a file it is the selected building's own.
 local function rootOf(request, pose)
 	if request.file then
 		return request.file, request.label, "/furn list"
@@ -102,13 +101,6 @@ local function rootOf(request, pose)
 				)
 		end
 		return file, "object " .. request.entry, "/furn list " .. request.entry
-	end
-	if Sets.IsEmptyShell(pose.name) then
-		local file, reason = Sets.Original(pose.name)
-		if not file then
-			return nil, reason
-		end
-		return file, pose.name, "/furn list"
 	end
 	return pose.file, pose.name, "/furn list"
 end
@@ -334,8 +326,9 @@ function Console.Spawn(request)
 		return say(missing)
 	end
 	local what = ("%s (set %d, %s"):format(setName(set), set.index, objects(#rows))
-	-- An emptywmo draws no base set of its own, so one standing as the target gets it.
-	local base = request.base or (not request.here and Sets.IsEmptyShell(pose.name))
+	-- A building Epsilon emptied draws no base set of its own, so one standing as the target
+	-- gets it.
+	local base = request.base or (not request.here and Sets.IsBlank(pose.file))
 	if base and set.index ~= 0 and sets[1].index == 0 then
 		local under = Rows.OfSet(sets[1].id)
 		rows = Rows.Union(under, rows)

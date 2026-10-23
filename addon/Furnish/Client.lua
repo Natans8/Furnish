@@ -161,22 +161,3 @@ function Client.ModelName(name)
 	name = name:match("([^/\\]+)$") or name
 	return (name:gsub("%.wmo$", ""))
 end
-
---- The rows of the client's display table whose model name matches, through its own search.
--- @param name a model name, with or without folder and extension
--- @return a list of { display, file, name }, the name as ModelName spells it
-function Client.SearchModels(name)
-	local epsilon = _G.C_Epsilon
-	if not (epsilon and epsilon.GODI_Search and epsilon.GODI_RetrieveSearch) then
-		return {}
-	end
-	local wanted = Client.ModelName(name)
-	local found = {}
-	for i = 0, (epsilon.GODI_Search(wanted) or 0) - 1 do
-		local row = epsilon.GODI_RetrieveSearch(i)
-		if row and Client.ModelName(row.name) == wanted then
-			found[#found + 1] = { display = row.displayid, file = row.fileid, name = wanted }
-		end
-	end
-	return found
-end

@@ -33,6 +33,7 @@ FILES = (
 )
 
 HOUSE = 900
+EMPTY_HOUSE = 777
 CHAIR = Placement(1001, (1.5, -2.0, 0.25), (0.0, 0.0, 0.0, 1.0), 1.0)
 LAMP = Placement(1002, (0.0, 0.0, 3.0), (0.0, 0.0, 0.0, 1.0), 0.5)
 GLOW = Placement(1003, (4.0, 4.0, 1.0), (0.0, 0.0, 0.0, 1.0), 1.0)
@@ -49,6 +50,9 @@ def write_database(path: Path) -> None:
         default = db.add_set(None, [(21, GLOW)])
         full = db.add_set("Set_Full", [(20, CHAIR), (21, LAMP)])
         db.add_wmo_sets([(HOUSE, 0, default), (HOUSE, 1, full)])
+        # An emptywmo twin of the house, which the build gives the house's sets.
+        db.add_blank_root(EMPTY_HOUSE)
+        db.add_wmo_sets([(EMPTY_HOUSE, 0, default), (EMPTY_HOUSE, 1, full)])
         db.add_root_displays([(30262, HOUSE)])
         db.add_entries([(817579, HOUSE)])
         db.add_map_sets([(1116, 4242, full)])
@@ -555,13 +559,6 @@ def fake_client(lua: lua51.LuaRuntime) -> None:
         C_Timer = { After = function(_, fn) fn() end }
         C_Epsilon = {
           GetPosition = function() return 1, 2, 3, 1116 end,
-          GODI_Search = function(name) return name == "house" and 2 or 0 end,
-          GODI_RetrieveSearch = function(i)
-            return ({
-              { displayid = 1, fileid = 999, name = "world/wmo/House.wmo" .. string.char(13) },
-              { displayid = 30262, fileid = 900, name = "world/wmo/house.wmo" },
-            })[i + 1]
-          end,
         }
         function GetPlayerFacing() return math.pi / 2 end
         """
@@ -603,7 +600,8 @@ def test_pose_selected_reads_the_record_and_never_selects(tmp_path: Path) -> Non
     lua.execute("SELECTED = 501")
     pose = lua.eval("Furnish.Pose.Selected()")
     assert pose.groupLeader == 333 and round(pose.rotation.turn) == 180
-    assert lua.eval("Furnish.Sets.IsEmptyShell")(pose.name) is True
+    assert lua.eval("Furnish.Sets.IsBlank")(pose.file) is True
+    assert lua.eval("Furnish.Sets.IsBlank")(HOUSE) is False
     lua.execute("SELECTED = nil")
     assert lua.eval("select(2, Furnish.Pose.Selected())") == "no object is selected"
     lua.execute("SELECTED = 'group'")
@@ -646,14 +644,4 @@ def test_sets_name_what_a_root_offers_and_what_it_lacks(tmp_path: Path) -> None:
     assert (
         lua.eval("select(2, Furnish.Sets.OfFile(1))")
         == "the data has no doodad sets for root file 1"
-    )
-
-
-def test_an_emptywmo_borrows_its_originals_sets_through_the_model_search(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    fake_client(lua)
-    original = lua.eval("Furnish.Sets.Original")
-    assert original("emptywmo_house") == HOUSE
-    assert original("eps_emptywmo_barn")[1] == (
-        "eps_emptywmo_barn has no original to borrow from: no model is named eps_barn"
     )

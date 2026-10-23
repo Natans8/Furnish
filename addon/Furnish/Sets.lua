@@ -2,9 +2,9 @@
 --
 -- The data keys sets by the root's file id. A selected object's record carries that id, and
 -- a gameobject entry, the number a lookup line prints, reaches it through the data, which
--- carries every WMO object the server lists. An emptywmo standing in the world gives its
--- original's file through its name, the prefix trimmed and the rest looked up in the
--- client's own display table. A map placement gives the sets the zone chose.
+-- carries every WMO object the server lists. A root Epsilon emptied, an emptywmo twin or one
+-- of its own copies, carries in the data the sets of the building it was emptied from. A map
+-- placement gives the sets the zone chose.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -13,7 +13,6 @@ Furnish.Sets = Sets
 
 local Reader = Furnish.Reader
 local Names = Furnish.Names
-local Client = Furnish.Client
 
 --- The sets a root file offers, in index order, or nil and the reason.
 -- @return a list of { index, id, name, count }; the default set's name is ""
@@ -71,42 +70,10 @@ function Sets.OfEntry(entry)
 	return file
 end
 
---- An emptywmo is a stock root copied with its doodads blanked, named after the original
--- with this prefix, and Epsilon's own copies carry it after their own `eps_`.
-local EMPTY = "emptywmo_"
-
---- Whether a model name is an emptywmo's, a shell that draws no default set of its own.
-function Sets.IsEmptyShell(name)
-	return name:find(EMPTY, 1, true) ~= nil
-end
-
---- The root file a model name spawns, through the client's own display table. Only an
--- emptywmo's original is reached this way, since a name is a convention and not a key.
-local function fileOfName(name)
-	local found = Client.SearchModels(name)
-	local wanted = Client.ModelName(name)
-	for _, row in ipairs(found) do
-		if Sets.OfFile(row.file) then
-			return row.file
-		end
-	end
-	if #found > 0 then
-		return nil,
-			("%s is in the client's model list but the data has no doodad sets for it"):format(
-				wanted
-			)
-	end
-	return nil, ("no model is named %s"):format(wanted)
-end
-
---- The root file an emptywmo was hollowed from, by its name with the prefix trimmed.
-function Sets.Original(name)
-	local original = name:gsub("^eps_" .. EMPTY, "eps_"):gsub("^" .. EMPTY, "")
-	local file, reason = fileOfName(original)
-	if not file then
-		return nil, ("%s has no original to borrow from: %s"):format(name, reason)
-	end
-	return file
+--- Whether a root draws none of its sets itself, Epsilon having emptied it; its sets are
+-- the building's it was emptied from, and the base set goes under any other.
+function Sets.IsBlank(file)
+	return Reader.Load() and Reader.IsBlank(file)
 end
 
 --- The set ids a WMO placed on the map draws, by map and ADT unique id, the number a

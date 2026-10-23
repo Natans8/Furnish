@@ -13,7 +13,7 @@
 -- flag 1, and the scale as a float32 under flag 2. Nothing is rounded: the numbers are the
 -- WMO file's own. The Python side of this is furnish/codec.py.
 
-local FORMAT = 4
+local FORMAT = 5
 local decoded = {}
 
 _G.Furnish = _G.Furnish or {}
@@ -139,6 +139,13 @@ function Reader.Sets(file)
 	return data().wmo[file]
 end
 
+--- Whether a root's own doodads are blanked, every one at scale 0, so it draws none of its
+-- sets itself; its sets are the building's it was emptied from. Load first.
+-- @param file the root's file id
+function Reader.IsBlank(file)
+	return data().blank[file] == true
+end
+
 --- The placements of a set, decoded once and kept.
 -- @param set a set id from Sets or MapSets
 -- @return a list of { display, x, y, z, qx, qy, qz, qw, scale }, positions in yards
@@ -156,7 +163,7 @@ function Reader.Placements(set)
 end
 
 --- The root file a gameobject entry's object is, or nil: no such object, or one whose root
--- has no sets. An emptywmo twin's entry answers its original. Load first.
+-- has no sets. Load first.
 -- @param entry a gameobject entry, as a lookup line prints it
 function Reader.FileOfEntry(entry)
 	return data().entries[entry]

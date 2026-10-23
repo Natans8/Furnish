@@ -134,6 +134,14 @@ class Database:
         """
         self._connected().executemany("INSERT INTO root_displays VALUES (?, ?)", rows)
 
+    def add_blank_root(self, file_id: int) -> None:
+        """Record a root whose own doodads are blanked, so it draws none of its sets itself.
+
+        Args:
+            file_id: The root's file id.
+        """
+        self._connected().execute("INSERT INTO blank_roots VALUES (?)", (file_id,))
+
     def add_entries(self, rows: Iterable[tuple[int, int]]) -> None:
         """Insert ``(entry, file)`` rows, one per gameobject entry that spawns a furnished root.
 

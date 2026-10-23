@@ -31,7 +31,7 @@ A set, list or import takes any of these words after it:
 | `first`   | its first object leads the group, instead of an invisible pivot |
 | `attach`  | join the selected object's group                                |
 | `nogroup` | spawn every object ungrouped                                    |
-| `base`    | lay the base set under it, which an emptywmo always gets        |
+| `base`    | lay the base set under it, as an emptied building always gets   |
 
 Each set in a list is a link: a click spawns it on the selected object, building or not, a
 ctrl-click at your feet, and resting on it says what it is. A run that leaves a group selects that group
@@ -55,14 +55,20 @@ lacks, a private client's own names, plain or gzipped, and may be repeated. The 
 
 ## Tables
 
-| table        | row                                                           |
-|--------------|---------------------------------------------------------------|
-| `meta`       | `format`, `build`                                             |
-| `sets`       | a doodad set and its name, NULL for the default set           |
-| `wmo_sets`   | a root file id, a set index, its set                          |
-| `entries`    | a gameobject entry and the furnished root it spawns           |
-| `placements` | a set's doodad in order: display, position, quaternion, scale |
-| `map_sets`   | a map id and ADT unique id, and a set it draws                |
+| table         | row                                                           |
+|---------------|---------------------------------------------------------------|
+| `meta`        | `format`, `build`                                             |
+| `sets`        | a doodad set and its name, NULL for the default set           |
+| `wmo_sets`    | a root file id, a set index, its set                          |
+| `blank_roots` | a root Epsilon emptied, which draws none of its sets itself   |
+| `entries`     | a gameobject entry and the furnished root it spawns           |
+| `placements`  | a set's doodad in order: display, position, quaternion, scale |
+| `map_sets`    | a map id and ADT unique id, and a set it draws                |
+
+Epsilon empties a building by copying its root with every doodad at scale 0, an emptywmo
+twin's also sunk below the ground. Such a root ships none of its own rows: its `wmo_sets`
+are those of the root that places every doodad at the same x, y and rotation, when every
+root that does holds the same sets, and it has none otherwise.
 
 Floats are the file's own. Rotation is the file's quaternion, converted to the game's
 pitch, roll and turn by the consumer. Set 0 is kept, since a blanked copy of a root draws
@@ -83,7 +89,8 @@ uv run furnish export --db furnish.sqlite --out addon/Furnish_Data/Data.lua
 
 `addon/Furnish_Data` is the data addon: `Data.lua`, generated and not committed, declaring
 `FurnishData` with a `format` number, the `build`, each root file's sets (`wmo`), the root
-each gameobject entry spawns (`entries`), each set's placements as one printable string
+each gameobject entry spawns (`entries`), the roots Epsilon emptied (`blank`), each
+set's placements as one printable string
 (`blobs`) and the sets each map placement draws (`maps`). A root is keyed by its file id,
 which is what a selected object's record reports; an entry, the number a lookup line
 prints, reaches it through `entries`.
@@ -91,7 +98,8 @@ It loads on demand and holds nothing else, so it changes only when the data does
 
 `addon/Furnish/Reader.lua` is the reader and ships with the code, never with the data:
 `Furnish.Reader.Load()` loads the data addon and refuses another format, and `Sets(file)`,
-`Placements(set)`, `FileOfEntry(entry)` and `MapSets(map, uid)` on it answer from the data. A set's string is
+`Placements(set)`, `IsBlank(file)`, `FileOfEntry(entry)` and `MapSets(map, uid)` on it
+answer from the data. A set's string is
 LibDeflate's printable encoding of a raw deflate stream over varints, decoded the first time
 the set is asked for; the layout is documented in `src/furnish/codec.py`. Nothing is
 rounded: a placement ships as the file's own float32 values, so the spawn command can be
@@ -135,7 +143,7 @@ lead to the first doodad.
 | `Kernel.lua`    | `Furnish.Spawn` and `Furnish.Group`                                                  |
 | `Client.lua`    | the one file naming EpsilonLib and `C_Epsilon`; it reads, and never selects          |
 | `Pose.lua`      | where: `At`, `Here`, `Selected`, `OfRecord`                                          |
-| `Sets.lua`      | which: `OfFile`, `Pick`, `OfEntry`, `IsEmptyShell`, `Original`, `OfPlacement`        |
+| `Sets.lua`      | which: `OfFile`, `Pick`, `OfEntry`, `IsBlank`, `OfPlacement`                         |
 | `Rows.lua`      | what: `OfSet`, `Union`, `Without`                                                    |
 | `Chat.lua`      | the prefix, the colours, columns of exact width, and Furnish's links                 |
 | `Console.lua`   | what the commands do: `List`, `Spawn`, `Import`, `Stop`, `Describe`                  |

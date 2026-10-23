@@ -30,6 +30,7 @@ class Sizes:
     """What the file weighs, by part, in bytes."""
 
     wmo: int = 0
+    blank: int = 0
     entries: int = 0
     blobs: int = 0
     maps: int = 0
@@ -53,12 +54,13 @@ def export(database: Path, out: Path) -> Sizes:
     ]
     sizes = Sizes()
     wmo = "".join(_wmo(connection))
+    blank = "".join(_blank(connection))
     entries = "".join(_entries(connection))
     blobs = "".join(_blobs(connection))
     maps = "".join(_maps(connection))
-    sizes.wmo, sizes.entries = len(wmo), len(entries)
+    sizes.wmo, sizes.blank, sizes.entries = len(wmo), len(blank), len(entries)
     sizes.blobs, sizes.maps = len(blobs), len(maps)
-    parts += [wmo, entries, blobs, maps]
+    parts += [wmo, blank, entries, blobs, maps]
     text = "".join(parts)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(text.encode("utf-8"))
@@ -79,6 +81,13 @@ def _wmo(connection: sqlite3.Connection) -> Iterable[str]:
             for _, index, set_id, name, count in group
         )
         yield f"  [{file_id}] = {{{entries} }},\n"
+    yield "}\n"
+
+
+def _blank(connection: sqlite3.Connection) -> Iterable[str]:
+    yield "FurnishData.blank = {\n"
+    for (file_id,) in connection.execute("SELECT file FROM blank_roots ORDER BY file"):
+        yield f"  [{file_id}] = true,\n"
     yield "}\n"
 
 

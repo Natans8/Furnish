@@ -6,7 +6,9 @@ which set each of its WMO placements draws. The tables the join needs are passed
 paths, so the build itself touches no network and a test can hand it small ones.
 """
 
+import hashlib
 import re
+import struct
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -80,6 +82,9 @@ class Report:
     sets: int = 0
     placements: int = 0
     shared_sets: int = 0
+    blank_roots: int = 0
+    blank_unmatched: int = 0
+    blank_ambiguous: int = 0
     blank_slots: int = 0
     models_without_display: int = 0
     entries: int = 0
@@ -129,6 +134,9 @@ def _write_roots(
     report: Report,
 ) -> dict[int, dict[int, int]]:
     sets_by_root: dict[int, dict[int, int]] = {}
+    exact: dict[tuple[int, bytes], list[int]] = {}
+    ground: dict[tuple[int, bytes], list[int]] = {}
+    blanked: list[tuple[int, int, tuple[bytes, bytes]]] = []
     for path in tqdm(sorted(_files(directory, ".wmo")), desc="roots", unit="root"):
         if GROUP_FILE.search(path.name):
             continue
@@ -145,6 +153,11 @@ def _write_roots(
             tqdm.write(f"skipped {path}: {error}")
             report.roots_unreadable += 1
             continue
+        if _blanked(root):
+            # A copy that emptied its base set as well is known by the sets after it.
+            start = 0 if root.sets[0].placements else 1
+            blanked.append((file_id, start, _layouts(root, start)))
+            continue
         kept = _spawnable(root, displays, report)
         if not kept:
             report.roots_without_doodads += 1
@@ -152,9 +165,85 @@ def _write_roots(
         report.roots_read += 1
         set_ids = {index: database.add_set(name, rows) for index, (name, rows) in kept.items()}
         sets_by_root[file_id] = set_ids
+        for start in (0, 1):
+            whole, across = _layouts(root, start)
+            exact.setdefault((start, whole), []).append(file_id)
+            ground.setdefault((start, across), []).append(file_id)
         database.add_wmo_sets((file_id, index, set_id) for index, set_id in set_ids.items())
         database.add_root_displays((display, file_id) for display in spawners[file_id])
+    for file_id, start, (whole, across) in blanked:
+        borrowed = _donor(
+            exact.get((start, whole), []), ground.get((start, across), []), sets_by_root, report
+        )
+        if borrowed is None:
+            continue
+        report.blank_roots += 1
+        sets_by_root[file_id] = borrowed
+        database.add_blank_root(file_id)
+        database.add_wmo_sets((file_id, index, set_id) for index, set_id in borrowed.items())
+        database.add_root_displays((display, file_id) for display in spawners[file_id])
     return sets_by_root
+
+
+def _donor(
+    exact: list[int],
+    ground: list[int],
+    sets_by_root: dict[int, dict[int, int]],
+    report: Report,
+) -> dict[int, int] | None:
+    """The sets a blank root takes from the building it was emptied from, or None.
+
+    The roots that match it exactly, but for the scale, are asked first, and the roots that
+    place its doodads at the same spot across the ground after them; it takes the sets of the
+    first that all hold the same ones. Recolours that share a layout but not their sets, and a
+    twin of a file since changed, are left without, which is no loss: borrowing is a
+    convenience, and a player can always name the original.
+    """
+    for matches in (exact, ground):
+        choices = {tuple(sorted(sets_by_root[d].items())) for d in matches}
+        if len(choices) == 1:
+            return dict(choices.pop())
+    if ground:
+        report.blank_ambiguous += 1
+    else:
+        report.blank_unmatched += 1
+    return None
+
+
+def _blanked(root: Root) -> bool:
+    """Whether every doodad the root places is at scale 0, which draws nothing.
+
+    Epsilon empties a building this way: the file is the original's with every placement's
+    scale set to 0, and in an emptywmo twin its height set below the ground and its models
+    swapped too. The doodads keep their place across the ground and their rotation, so the
+    root's layout says which building it was emptied from, while its own rows spawn nothing.
+    """
+    scales = [p.scale for s in root.sets for p in s.placements]
+    return bool(scales) and all(scale == 0 for scale in scales)
+
+
+_WHOLE_ROW = struct.Struct("<I3f4f")
+_ACROSS_ROW = struct.Struct("<2f4f")
+
+
+def _layouts(root: Root, start: int = 0) -> tuple[bytes, bytes]:
+    """Two fingerprints of where the root places its doodads, set by set from ``start``.
+
+    The scale is left out of both. The first holds everything else: model, position and
+    rotation, to the bit, so a copy emptied by its scales alone matches the building it came
+    from and no recolour of it. The second holds only the place across the ground and the
+    rotation, which an emptywmo twin keeps when it sinks its doodads and swaps their models.
+    """
+    whole = hashlib.blake2b(digest_size=16)
+    across = hashlib.blake2b(digest_size=16)
+    for doodad_set in root.sets[start:]:
+        count = struct.pack("<I", len(doodad_set.placements))
+        whole.update(count)
+        across.update(count)
+        for p in doodad_set.placements:
+            whole.update(_WHOLE_ROW.pack(p.model, *p.position, *p.rotation))
+            across.update(_ACROSS_ROW.pack(*p.position[:2], *p.rotation))
+    return whole.digest(), across.digest()
 
 
 EMPTY_PREFIX = "emptywmo_"
@@ -167,6 +256,20 @@ OBJECT_TAG = re.compile(r"^\[[^\]]*\]\s*")
 def _base_name(path: str) -> str:
     """A root's base name as an object is named after it: lower case, no folder, no extension."""
     return re.sub(r"\.wmo$", "", path_key(path).rsplit("/", 1)[-1])
+
+
+def _originals(name: str) -> tuple[str, ...]:
+    """The names an emptywmo twin's original may carry, its own prefix taken off.
+
+    None for a name that is no twin's.
+    """
+    if EMPTY_PREFIX not in name:
+        return ()
+    return (
+        name.replace("eps_" + EMPTY_PREFIX, "eps_", 1),
+        name.replace("eps_" + EMPTY_PREFIX, "", 1),
+        name.replace(EMPTY_PREFIX, "", 1),
+    )
 
 
 def _write_entries(
@@ -189,12 +292,7 @@ def _write_entries(
     rows = []
     for row in read_csv(objects):
         name = _base_name(OBJECT_TAG.sub("", row["name"]))
-        candidates = (
-            name,
-            name.replace("eps_" + EMPTY_PREFIX, "eps_", 1),
-            name.replace("eps_" + EMPTY_PREFIX, "", 1),
-            name.replace(EMPTY_PREFIX, "", 1),
-        )
+        candidates = (name, *_originals(name))
         found = next((by_base[c] for c in candidates if c in by_base), None)
         if found is None:
             report.entries_unresolved += 1

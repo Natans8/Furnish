@@ -27,6 +27,10 @@ CREATE TABLE root_displays (
     file    INTEGER NOT NULL        -- that root's file id, the key of wmo_sets
 ) WITHOUT ROWID;
 
+CREATE TABLE blank_roots (
+    file INTEGER PRIMARY KEY        -- a root whose every doodad is at scale 0, so it draws none;
+) WITHOUT ROWID;                    -- its wmo_sets are the building's it was emptied from
+
 CREATE TABLE entries (
     entry INTEGER PRIMARY KEY,      -- a gameobject entry whose object is a furnished root
     file  INTEGER NOT NULL          -- that root's file id, the key of wmo_sets; an
