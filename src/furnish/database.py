@@ -30,6 +30,9 @@ class Database:
         """
         self._path = path
         self._connection: sqlite3.Connection | None = None
+        self._sets: dict[tuple[str, tuple[tuple[int, Placement], ...]], int] = {}
+        self.shared_sets = 0
+        """How many sets were asked for that an identical one already answered."""
 
     def __enter__(self) -> Self:
         """Create the file and its schema, and open the one transaction."""
@@ -70,19 +73,33 @@ class Database:
     def add_set(self, name: str, placements: Iterable[tuple[int, Placement]]) -> int:
         """Insert a set and its placements, returning the set's id.
 
+        A set with the same name and the same placements as one already written, in the same
+        order, is not written again: the earlier id is returned, so roots that carry one
+        furnishing share it.
+
         Args:
             name: The set's name.
             placements: ``(display id, placement)`` pairs, already filtered to the spawnable.
         """
+        rows = tuple(placements)
+        key = (name, rows)
+        known = self._sets.get(key)
+        if known is not None:
+            self.shared_sets += 1
+            return known
         connection = self._connected()
         cursor = connection.execute("INSERT INTO sets (name) VALUES (?)", (name,))
         set_id = cursor.lastrowid
         if set_id is None:
             raise RuntimeError("sqlite returned no rowid for a set")
         connection.executemany(
-            "INSERT INTO placements VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            ((set_id, display, *p.position, *p.rotation, p.scale) for display, p in placements),
+            "INSERT INTO placements VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                (set_id, seq, display, *p.position, *p.rotation, p.scale)
+                for seq, (display, p) in enumerate(rows)
+            ),
         )
+        self._sets[key] = set_id
         return set_id
 
     def add_wmo_sets(self, rows: Iterable[tuple[int, int, int]]) -> None:

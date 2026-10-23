@@ -1,6 +1,6 @@
 -- The furnishing database. One row of meta, then four tables: a set is a named list of
--- doodad placements inside one WMO root; a display id reaches the sets of the file it
--- spawns; a map placement names the sets its zone chose.
+-- doodad placements, shared by every root that holds the same one; a display id reaches
+-- the sets of the file it spawns; a map placement names the sets its zone chose.
 
 PRAGMA foreign_keys = ON;
 
@@ -23,6 +23,7 @@ CREATE TABLE wmo_sets (
 
 CREATE TABLE placements (
     "set"   INTEGER NOT NULL REFERENCES sets(id),
+    seq     INTEGER NOT NULL,       -- the placement's position within the set
     display INTEGER NOT NULL,       -- the doodad's display id
     x       REAL NOT NULL,
     y       REAL NOT NULL,
@@ -31,10 +32,9 @@ CREATE TABLE placements (
     qy      REAL NOT NULL,
     qz      REAL NOT NULL,
     qw      REAL NOT NULL,
-    scale   REAL NOT NULL
-);
-
-CREATE INDEX placements_by_set ON placements("set");
+    scale   REAL NOT NULL,
+    PRIMARY KEY ("set", seq)
+) WITHOUT ROWID;                    -- clustered by set, which is the one way it is read
 
 CREATE TABLE map_sets (
     map   INTEGER NOT NULL,         -- the map id the client reports

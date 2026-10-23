@@ -22,18 +22,20 @@ optional and fills `map_sets`. The build fetches the community listfile and wago
 
 ## Tables
 
-| table        | row                                                   |
-|--------------|-------------------------------------------------------|
-| `meta`       | `format`, `build`                                     |
-| `sets`       | one named doodad set of one root                      |
-| `wmo_sets`   | a display id that spawns a root, a set index, its set |
-| `placements` | a set's doodad: display, position, quaternion, scale  |
-| `map_sets`   | a map id and ADT unique id, and a set it draws        |
+| table        | row                                                           |
+|--------------|---------------------------------------------------------------|
+| `meta`       | `format`, `build`                                             |
+| `sets`       | one named doodad set, shared by roots that hold it            |
+| `wmo_sets`   | a display id that spawns a root, a set index, its set         |
+| `placements` | a set's doodad in order: display, position, quaternion, scale |
+| `map_sets`   | a map id and ADT unique id, and a set it draws                |
 
 Floats are the file's own. Rotation is the file's quaternion, converted to the game's
 pitch, roll and turn by the consumer. Set 0 (`Set_$DefaultGlobal`) is kept, since a
 blanked copy of a root draws none of it. Placements whose model slot is blank, or whose
-model no display spawns, are dropped at build.
+model no display spawns, are dropped at build; a set left empty, and a root left with no
+set, get no rows. Two roots holding the same set, name and placements alike, share one
+row of `sets`.
 
 `src/furnish/data/epsilon-displays.csv` carries Epsilon's own display rows for Blizzard's
 model files, read from inside the game, because wago.tools cannot see them and some of

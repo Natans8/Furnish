@@ -30,6 +30,9 @@ def write_inputs(tmp_path: Path) -> Inputs:
     (roots / "world/wmo/bare.wmo").write_bytes(
         wmo_root([("Set_$DefaultGlobal", [BLANK]), ("Set_Nothing", [])], models=[0])
     )
+    (roots / "world/wmo/house_copy.wmo").write_bytes(
+        wmo_root([("Set_$DefaultGlobal", [LAMP]), ("Set_Full", [CHAIR, LAMP])], models=[1001, 1002])
+    )
     maps = tmp_path / "maps"
     (maps / "world/maps/azeroth").mkdir(parents=True)
     (maps / "world/maps/azeroth/azeroth_32_48_obj0.adt").write_bytes(
@@ -40,10 +43,10 @@ def write_inputs(tmp_path: Path) -> Inputs:
     )
     (tmp_path / "listfile.csv").write_text(
         "900;world/wmo/house.wmo\n902;world/wmo/nodisplay.wmo\n903;world/wmo/bare.wmo\n"
-        "1001;world/chair.m2\n"
+        "904;world/wmo/house_copy.wmo\n1001;world/chair.m2\n"
     )
     (tmp_path / "displays.csv").write_text(
-        "ID,FileDataID\n10,900\n11,900\n12,903\n20,1001\n21,1002\n"
+        "ID,FileDataID\n10,900\n11,900\n12,903\n13,904\n20,1001\n21,1002\n"
     )
     (tmp_path / "maps.csv").write_text("ID,Directory\n0,Azeroth\n1,Kalimdor\n")
     return Inputs(
@@ -75,14 +78,17 @@ def test_build_writes_the_four_tables(tmp_path: Path) -> None:
         (10, 1, 2),
         (11, 0, 1),
         (11, 1, 2),
+        (13, 0, 1),
+        (13, 1, 2),
     ]
     rows = db.execute(
-        'SELECT "set", display, x, qz, scale FROM placements ORDER BY "set", display'
+        'SELECT "set", display, x, qz, scale FROM placements ORDER BY "set", seq'
     ).fetchall()
     assert rows[0] == (1, 100_500, 0.0, 0.0, 0.5)
     assert rows[1] == (2, 20, 1.5, 0.5, 1.0)
     assert rows[2] == (2, 100_500, 0.0, 0.0, 0.5)
     assert len(rows) == 3
+    assert report.shared_sets == 2
     assert db.execute('SELECT map, uid, "set" FROM map_sets ORDER BY 2, 3').fetchall() == [
         (0, 4242, 2),
         (0, 4243, 1),
@@ -96,7 +102,7 @@ def test_build_writes_the_four_tables(tmp_path: Path) -> None:
         report.empty_sets,
         report.blank_slots,
         report.models_without_display,
-    ) == (1, 1, 1, 2, 2, 1)
+    ) == (2, 1, 1, 2, 2, 1)
     assert (report.tiles_read, report.map_rows, report.map_rows_unresolved) == (1, 3, 1)
 
 

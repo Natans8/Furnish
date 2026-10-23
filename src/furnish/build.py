@@ -62,6 +62,7 @@ class Report:
     roots_unresolved: int = 0
     empty_sets: int = 0
     sets: int = 0
+    shared_sets: int = 0
     placements: int = 0
     blank_slots: int = 0
     models_without_display: int = 0
@@ -88,6 +89,7 @@ def build(inputs: Inputs, out: Path) -> Report:
         if inputs.maps is not None:
             maps = {row["Directory"].lower(): int(row["ID"]) for row in read_csv(inputs.map_table)}
             _write_maps(inputs.maps, path_to_id, maps, sets_by_root, database, report)
+        report.shared_sets = database.shared_sets
     return report
 
 
