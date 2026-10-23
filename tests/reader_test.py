@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 from lupa import lua51
 
-from furnish.codec import IDENTITY, Row, encode
 from furnish.database import Database
 from furnish.export import export
 from furnish.wmo import Placement
@@ -96,4 +95,3 @@ def test_lua_varints_match_python(tmp_path: Path, value: int) -> None:
     assert lua.eval("Furnish.Load()") is True
     row = lua.eval("Furnish.Placements(1)[1]")
     assert (row.display, row.x) == (value or 1, float(value))
-    assert encode([Row(value or 1, (value * 100, 0, 0), IDENTITY, 1000)])

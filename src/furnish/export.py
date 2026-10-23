@@ -15,7 +15,7 @@ from pathlib import Path
 from tqdm import tqdm
 
 from furnish import FORMAT
-from furnish.codec import chunked, encode, quantise
+from furnish.codec import Row, chunked, encode
 
 LINE_WIDTH = 4000
 """How wide a blob's lines are; Lua reads a long string whatever its line breaks."""
@@ -89,7 +89,7 @@ def _blobs(connection: sqlite3.Connection) -> Iterable[str]:
             (set_id,),
         )
         blob = encode(
-            quantise(d, (x, y, z), (qx, qy, qz, qw), s) for d, x, y, z, qx, qy, qz, qw, s in rows
+            Row(d, (x, y, z), (qx, qy, qz, qw), s) for d, x, y, z, qx, qy, qz, qw, s in rows
         )
         yield f"  [{set_id}] = [[\n" + "\n".join(chunked(blob, LINE_WIDTH)) + "]],\n"
     yield "}\n"

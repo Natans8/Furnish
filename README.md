@@ -56,9 +56,9 @@ It loads on demand and holds nothing else, so it changes only when the data does
 `Furnish.Load()` loads the data addon and refuses another format, `Furnish.Sets(display)`,
 `Furnish.Placements(set)` and `Furnish.MapSets(map, uid)` answer from it. A set's string is
 LibDeflate's printable encoding of a raw deflate stream over varints, decoded the first time
-the set is asked for; the layout is documented in `src/furnish/codec.py` and is lossy to the
-grain a spawn command takes: centimetres, a quaternion in ten-thousandths, a scale in
-thousandths. On the 9.2.7 data the file is 14 MB and loads to an 18.6 MB Lua heap.
+the set is asked for; the layout is documented in `src/furnish/codec.py`. Nothing is
+rounded: a placement ships as the file's own float32 values, so the spawn command can be
+given every digit the server keeps.
 
 ## Develop
 

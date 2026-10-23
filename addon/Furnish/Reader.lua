@@ -7,10 +7,11 @@
 -- one table and a format number. The reader loads it on demand and refuses any other
 -- format, so a player on an old data folder is told once rather than fed wrong rows.
 --
--- A set blob is LibDeflate's printable encoding of a raw deflate stream over varints:
--- version, row count, a delta-coded list of display ids, then per row the model index,
--- x y z in centimetres, a flags byte, a quaternion in ten-thousandths under flag 1, and a
--- scale in thousandths under flag 2. The Python side of this is furnish/codec.py.
+-- A set blob is LibDeflate's printable encoding of a raw deflate stream: a version byte,
+-- a varint row count, a delta-coded varint list of display ids, then per row the model
+-- index as a varint, x y z as float32, a flags byte, the quaternion as four float32 under
+-- flag 1, and the scale as a float32 under flag 2. Nothing is rounded: the numbers are the
+-- WMO file's own. The Python side of this is furnish/codec.py.
 
 local FORMAT = 1
 local decoded = {}
@@ -39,8 +40,6 @@ function Reader.Load()
 end
 
 local VERSION = 1
-local POSITION_UNIT, ROTATION_UNIT, SCALE_UNIT = 100, 10000, 1000
-local FLAG_ROTATION, FLAG_SCALE = 1, 2
 
 local function deflate()
   local lib = LibStub and LibStub:GetLibrary("LibDeflate", true)
@@ -73,12 +72,19 @@ local function decodeBlob(text)
     end
   end
 
-  local function zigzag()
-    local value = varint()
-    if value % 2 == 0 then
-      return value / 2
+  -- A little-endian IEEE 754 single, by arithmetic: Lua 5.1 has no string.unpack.
+  local function f32()
+    local b1, b2, b3, b4 = bytes:byte(at, at + 3)
+    at = at + 4
+    local sign = b4 >= 128 and -1 or 1
+    local exponent = (b4 % 128) * 2 + math.floor(b3 / 128)
+    local mantissa = (b3 % 128) * 65536 + b2 * 256 + b1
+    if exponent == 0 then
+      return sign * mantissa * 2 ^ -149
+    elseif exponent == 255 then
+      return mantissa == 0 and sign * math.huge or 0 / 0
     end
-    return -(value + 1) / 2
+    return sign * (1 + mantissa / 8388608) * 2 ^ (exponent - 127)
   end
 
   if u8() ~= VERSION then
@@ -93,16 +99,15 @@ local function decodeBlob(text)
   local rows = {}
   for i = 1, count do
     local row = { display = models[varint() + 1] }
-    row.x, row.y, row.z = zigzag() / POSITION_UNIT, zigzag() / POSITION_UNIT, zigzag() / POSITION_UNIT
+    row.x, row.y, row.z = f32(), f32(), f32()
     local flags = u8()
     if flags % 2 >= 1 then
-      row.qx, row.qy, row.qz, row.qw =
-        zigzag() / ROTATION_UNIT, zigzag() / ROTATION_UNIT, zigzag() / ROTATION_UNIT, zigzag() / ROTATION_UNIT
+      row.qx, row.qy, row.qz, row.qw = f32(), f32(), f32(), f32()
     else
       row.qx, row.qy, row.qz, row.qw = 0, 0, 0, 1
     end
     if flags % 4 >= 2 then
-      row.scale = varint() / SCALE_UNIT
+      row.scale = f32()
     else
       row.scale = 1
     end
