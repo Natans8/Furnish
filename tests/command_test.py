@@ -493,8 +493,7 @@ BUILDING_LINE = (
 
 
 def shown_line(lua: lua51.LuaRuntime, line: str) -> Any:
-    """The line as the chat frame would show it once the filters have run, at login."""
-    lua.execute('FIRE("PLAYER_LOGIN")')
+    """The line as the chat frame would show it once the filters have run."""
     out = line
     for fn in lua.eval("FILTERS").values():
         answer = fn(None, "CHAT_MSG_SYSTEM", out)

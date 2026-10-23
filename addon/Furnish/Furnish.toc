@@ -3,6 +3,7 @@
 ## Notes: Spawns a WMO's doodad sets as gameobjects on Epsilon. Reads Furnish_Data.
 ## Version: 0.1.0
 ## Dependencies: EpsilonLib
+## OptionalDeps: GLink
 ## SavedVariables: FurnishSettings
 ## X-License: AGPL-3.0-or-later
 

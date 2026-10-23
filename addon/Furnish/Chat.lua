@@ -129,8 +129,10 @@ end
 
 --- Add text to the end of the server's lines: append(line) answers what to add, or nil to
 -- leave the line as it came. The client runs a filter once for each chat frame showing a
--- line, so the answer for the last line is kept. It is added at login, after the addons that
--- add their own buttons at load, so what Furnish adds comes after theirs.
+-- line, so the answer for the last line is kept. Filters run in the order they were added,
+-- each adding to what the one before it left: this one is added as Furnish loads, after
+-- GLink's, which the toc loads first, and before Glimpse's, which is added at login, so the
+-- server's own buttons come first, then Furnish's, then the preview.
 function Chat.OnServerLines(append)
 	local last, shown
 	local filter = Furnish.Client.Guarded(function(_, _, message, ...)
@@ -147,12 +149,7 @@ function Chat.OnServerLines(append)
 		end
 		return false, shown, ...
 	end)
-	local frame = _G.CreateFrame("Frame")
-	frame:RegisterEvent("PLAYER_LOGIN")
-	frame:SetScript("OnEvent", function()
-		frame:UnregisterEvent("PLAYER_LOGIN")
-		_G.ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", filter)
-	end)
+	_G.ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", filter)
 end
 
 --- Act on Furnish's links: onClick(words, modifier) when one is clicked, where modifier is
