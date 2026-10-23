@@ -356,10 +356,14 @@ def test_an_import_furnishes_the_object_with_the_sets_the_map_placed(tmp_path: P
     lines = run(lua, "import")
     assert sent(lua)[:2] == ["doodad import", "gobject select 500"]
     assert lines == [
-        PREFIX + "spawning Full (set 1, 2 objects) on house, led by an invisible pivot",
+        PREFIX + "spawning Full (set 1, 2 objects) on house, joining house's group",
         PREFIX + "done: 2 of 2 spawned",
     ]
-    assert shown(lua) == ["gobject group select 7001"]
+    assert "gobject group add 500" in sent(lua)
+    assert shown(lua) == ["gobject group select 500"]
+    # A word still decides who leads.
+    run(lua, "import first")
+    assert shown(lua)[-1] == "gobject group select 7003"
 
 
 def test_an_import_the_map_did_not_furnish_spawns_nothing(tmp_path: Path) -> None:
@@ -405,8 +409,7 @@ def test_a_set_at_the_feet_with_nothing_selected_offers_naming_it(tmp_path: Path
 def test_an_import_with_base_lays_the_base_set_the_map_did_not_name(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     assert run(lua, "import base")[0] == (
-        PREFIX
-        + "spawning Base and Full (sets 0 and 1, 3 objects) on house, led by an invisible pivot"
+        PREFIX + "spawning Base and Full (sets 0 and 1, 3 objects) on house, joining house's group"
     )
 
 

@@ -362,7 +362,8 @@ local function placed(pose, ids, base)
 	return chosen
 end
 
---- Import the selected map doodad, then spawn on it the sets the map placed it with.
+--- Import the selected map doodad, then spawn on it the sets the map placed it with,
+-- grouped on the building it now is unless a word says otherwise.
 -- @param request group and base, as for a spawn
 function Console.Import(request)
 	local blocked = busy()
@@ -434,7 +435,7 @@ function Console.Import(request)
 				table.concat(indexes, " and "),
 				objects(#rows)
 			)
-			local group, lead = groupOf(request, pose)
+			local group, lead = groupOf({ group = request.group or "attach" }, pose)
 			start(rows, pose, group, what, "on " .. pose.name, lead)
 		end)
 		if not stopWaiting then

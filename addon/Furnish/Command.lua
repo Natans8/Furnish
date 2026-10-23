@@ -22,7 +22,7 @@ Command.USAGE = {
 	{ "/furn <set> from <entry>", "spawn an object's set on the selected object" },
 	{ "/furn <set> here", "spawn the selected building's set at your feet" },
 	{ "/furn <set> here <entry>", "spawn an object's set at your feet" },
-	{ "/furn import", "import the selected doodad and furnish it as the map does" },
+	{ "/furn import", "import the selected doodad and furnish it, grouped on it" },
 	{ "/furn stop", "stop spawning" },
 	{ "/furn stop delete", "stop, and delete what was spawned" },
 }
