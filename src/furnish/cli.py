@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from furnish.build import Inputs, build
-from furnish.displays import vendored_overlay
+from furnish.displays import vendored_objects, vendored_overlay
 from furnish.export import export
 from furnish.sources import listfile, wago_table
 
@@ -28,6 +28,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     builder.add_argument(
         "--maps", type=Path, help="a directory of ADT files at their listfile paths"
+    )
+    builder.add_argument(
+        "--objects",
+        type=Path,
+        default=vendored_objects(),
+        help="a CSV of the server's WMO gameobjects, entry and name, for entries",
     )
     builder.add_argument(
         "--build", default=DEFAULT_BUILD, help="the client build whose tables to fetch"
@@ -67,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
     inputs = Inputs(
         roots=args.roots,
         maps=args.maps,
+        objects=args.objects,
         listfile=listfile(args.cache),
         extra_listfiles=args.listfile_extra,
         display_table=wago_table("GameObjectDisplayInfo", args.build, args.cache),

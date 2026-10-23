@@ -134,6 +134,14 @@ class Database:
         """
         self._connected().executemany("INSERT INTO root_displays VALUES (?, ?)", rows)
 
+    def add_entries(self, rows: Iterable[tuple[int, int]]) -> None:
+        """Insert ``(entry, file)`` rows, one per gameobject entry that spawns a furnished root.
+
+        Args:
+            rows: The entries and the root file each resolves to.
+        """
+        self._connected().executemany("INSERT INTO entries VALUES (?, ?)", rows)
+
     def add_map_sets(self, rows: Iterable[tuple[int, int, int]]) -> None:
         """Insert ``(map, uid, set)`` rows, ignoring exact repeats.
 

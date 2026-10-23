@@ -23,6 +23,7 @@ def write_database(path: Path) -> None:
         full = db.add_set("Set_Full", [(20, CHAIR), (21, LAMP)])
         db.add_wmo_sets([(900, 0, default), (900, 1, full)])
         db.add_root_displays([(10, 900), (11, 900)])
+        db.add_entries([(817579, 900)])
         db.add_map_sets([(0, 4242, full), (0, 4243, default), (0, 4243, full)])
 
 
@@ -61,6 +62,8 @@ def test_reader_loads_and_answers(tmp_path: Path) -> None:
     assert lua.eval("Furnish.Reader.Placements(2) == Furnish.Reader.Placements(2)") is True
     assert list(lua.eval("Furnish.Reader.MapSets(0, 4243)").values()) == [1, 2]
     assert lua.eval("Furnish.Reader.MapSets(1, 4243)") is None
+    assert lua.eval("Furnish.Reader.FileOfEntry(817579)") == 900
+    assert lua.eval("Furnish.Reader.FileOfEntry(1)") is None
     assert lua.eval("Furnish.Reader.Sets(999)") is None
 
 

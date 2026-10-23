@@ -47,6 +47,7 @@ def write_database(path: Path) -> None:
         full = db.add_set("Set_Full", [(20, CHAIR), (21, LAMP)])
         db.add_wmo_sets([(HOUSE, 0, default), (HOUSE, 1, full)])
         db.add_root_displays([(30262, HOUSE)])
+        db.add_entries([(817579, HOUSE)])
         db.add_map_sets([(1116, 4242, full)])
 
 
@@ -590,6 +591,14 @@ def test_pose_here_reads_the_servers_position_and_the_facing(tmp_path: Path) -> 
     assert round(pose.rotation.turn) == 90 and pose.scale == 1
 
 
+def test_an_entry_resolves_from_the_data(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    assert lua.eval("Furnish.Sets.OfEntry(817579)") == HOUSE
+    assert lua.eval("select(2, Furnish.Sets.OfEntry(5))") == (
+        "entry 5 is no WMO object the data knows, or its root has no doodad sets"
+    )
+
+
 def test_a_map_placement_names_the_sets_its_zone_drew(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     assert list(lua.eval("Furnish.Sets.OfPlacement(1116, 4242)").values()) == [2]
@@ -675,7 +684,7 @@ def test_another_objects_root_comes_from_its_record(tmp_path: Path) -> None:
     fake_client(lua)
     # Object 501 is an emptywmo; the set comes from the root file given, with no select sent.
     lua.execute(
-        "SELECTED = 501; Furnish.Console.Spawn(1, { from = 900, group = Furnish.Group.None })"
+        "SELECTED = 501; Furnish.Console.Spawn(1, { from = 817579, group = Furnish.Group.None })"
     )
     sent = list(lua.eval("SENT").values())
     assert all(s.startswith("gobject spawn") for s in sent)
@@ -685,13 +694,13 @@ def test_another_objects_root_comes_from_its_record(tmp_path: Path) -> None:
 def test_the_console_spawns_at_the_player_and_lists_sets(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     fake_client(lua)
-    lua.execute(f"Furnish.Console.Here({HOUSE}, 0, {{ group = Furnish.Group.First }})")
+    lua.execute("Furnish.Console.Here(817579, 0, { group = Furnish.Group.First })")
     assert list(lua.eval("SENT").values()) == [
         "gobject spawn -21 posx -3 posy 6 posz 4 face north turn 90"
     ]
-    lua.execute(f"Furnish.Console.Sets({HOUSE})")
+    lua.execute("Furnish.Console.Sets(817579)")
     assert printed(lua)[-3:] == [
-        "|cff66ccffFurnish:|r root file 900 offers 2 sets:",
+        "|cff66ccffFurnish:|r entry 817579 offers 2 sets:",
         "|cff66ccffFurnish:|r   set 0 (default, 1 objects)",
         "|cff66ccffFurnish:|r   set 1 Set_Full (2 objects)",
     ]

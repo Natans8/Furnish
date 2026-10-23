@@ -49,9 +49,14 @@ def write_inputs(tmp_path: Path) -> Inputs:
         "ID,FileDataID\n10,900\n11,900\n12,903\n13,904\n20,1001\n21,1002\n"
     )
     (tmp_path / "maps.csv").write_text("ID,Directory\n0,Azeroth\n1,Kalimdor\n")
+    (tmp_path / "objects.csv").write_text(
+        "entry,name\n817579,house.wmo\n817580,[9270100] HOUSE.wmo\n817581,emptywmo_house.wmo\n"
+        "817582,eps_emptywmo_house.wmo\n817583,bare.wmo\n817584,nothing.wmo\n"
+    )
     return Inputs(
         roots=roots,
         maps=maps,
+        objects=tmp_path / "objects.csv",
         listfile=tmp_path / "listfile.csv",
         display_table=tmp_path / "displays.csv",
         map_table=tmp_path / "maps.csv",
@@ -60,13 +65,13 @@ def write_inputs(tmp_path: Path) -> Inputs:
     )
 
 
-def test_build_writes_the_four_tables(tmp_path: Path) -> None:
+def test_build_writes_the_five_tables(tmp_path: Path) -> None:
     out = tmp_path / "furnish.sqlite"
     inputs = write_inputs(tmp_path)
     report = build(inputs, out)
     db = sqlite3.connect(out)
     assert dict(db.execute("SELECT key, value FROM meta")) == {
-        "format": "3",
+        "format": "4",
         "build": "9.2.7.45745",
     }
     assert db.execute("SELECT name FROM sets ORDER BY id").fetchall() == [(None,), ("Set_Full",)]
@@ -95,6 +100,15 @@ def test_build_writes_the_four_tables(tmp_path: Path) -> None:
         (11, 900),
         (13, 904),
     ]
+    # Named directly, tagged, and as a twin, an entry reaches the furnished root; a root
+    # without sets or a name no root carries does not.
+    assert db.execute("SELECT entry, file FROM entries ORDER BY 1").fetchall() == [
+        (817579, 900),
+        (817580, 900),
+        (817581, 900),
+        (817582, 900),
+    ]
+    assert (report.entries, report.entries_unresolved) == (4, 2)
     assert (
         report.roots_read,
         report.roots_without_display,

@@ -5,7 +5,7 @@ build reads those files, resolves each model to the gameobject display that spaw
 and writes one SQLite database that an addon can be ported from.
 """
 
-FORMAT = 3
+FORMAT = 4
 """The database layout's version, written to the ``meta`` table.
 
 Bumped when a table, a column or a meaning changes, so a reader built against one layout

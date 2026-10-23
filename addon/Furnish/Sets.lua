@@ -1,10 +1,10 @@
 -- Which sets: the ways a root file is found, and the sets it offers.
 --
--- The data keys sets by the root's file id, and a selected object's record carries that id:
--- the record is the key, and another root is another object selected. The one root never
--- standing in the world is an emptywmo's original, which its name gives by construction,
--- the prefix trimmed and the rest looked up in the client's own display table. A map
--- placement gives the sets the zone chose.
+-- The data keys sets by the root's file id. A selected object's record carries that id, and
+-- a gameobject entry, the number a lookup line prints, reaches it through the data, which
+-- carries every WMO object the server lists. An emptywmo standing in the world gives its
+-- original's file through its name, the prefix trimmed and the rest looked up in the
+-- client's own display table. A map placement gives the sets the zone chose.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -51,6 +51,22 @@ function Sets.Pick(file, index)
 			tostring(index),
 			table.concat(offered, ", ")
 		)
+end
+
+--- The root file a gameobject entry's object is, or nil and the reason.
+function Sets.OfEntry(entry)
+	local loaded, reason = Reader.Load()
+	if not loaded then
+		return nil, reason
+	end
+	local file = Reader.FileOfEntry(entry)
+	if not file then
+		return nil,
+			("entry %s is no WMO object the data knows, or its root has no doodad sets"):format(
+				tostring(entry)
+			)
+	end
+	return file
 end
 
 --- An emptywmo is a stock root copied with its doodads blanked, named after the original

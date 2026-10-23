@@ -39,6 +39,9 @@ class Inputs:
     Attributes:
         roots: A directory of WMO files, each at its listfile path or named ``<id>.wmo``.
         maps: A directory of ADT files at their listfile paths, or None to skip ``map_sets``.
+        objects: A CSV of the server's WMO gameobjects, ``entry`` and ``name``, or None to
+            skip ``entries``. A name is the object's as the server prints it, a model's base
+            name with or without a leading tag.
         listfile: The community listfile.
         extra_listfiles: More listfiles in the same shape, a private client's own names.
         display_table: wago's ``GameObjectDisplayInfo`` CSV.
@@ -52,6 +55,7 @@ class Inputs:
     listfile: Path
     display_table: Path
     map_table: Path
+    objects: Path | None = None
     extra_listfiles: list[Path] = field(default_factory=list)
     overlay: list[tuple[int, int]] = field(default_factory=list)
     build: str = ""
@@ -78,6 +82,9 @@ class Report:
     shared_sets: int = 0
     blank_slots: int = 0
     models_without_display: int = 0
+    entries: int = 0
+    entries_unresolved: int = 0
+    entries_ambiguous: int = 0
     tiles_read: int = 0
     tiles_without_map: int = 0
     map_rows: int = 0
@@ -102,6 +109,8 @@ def build(inputs: Inputs, out: Path) -> Report:
     with Database(out) as database:
         database.meta({"build": inputs.build})
         sets_by_root = _write_roots(inputs.roots, path_to_id, displays, spawnable, database, report)
+        if inputs.objects is not None:
+            _write_entries(inputs.objects, path_to_id, sets_by_root, database, report)
         if inputs.maps is not None:
             maps = {row["Directory"].lower(): int(row["ID"]) for row in read_csv(inputs.map_table)}
             _write_maps(inputs.maps, path_to_id, maps, sets_by_root, database, report)
@@ -146,6 +155,55 @@ def _write_roots(
         database.add_wmo_sets((file_id, index, set_id) for index, set_id in set_ids.items())
         database.add_root_displays((display, file_id) for display in spawners[file_id])
     return sets_by_root
+
+
+EMPTY_PREFIX = "emptywmo_"
+"""An emptywmo is a root copied with its doodads blanked, named after the original."""
+
+OBJECT_TAG = re.compile(r"^\[[^\]]*\]\s*")
+"""A tag the server prints in front of some object names, such as ``[9270100]``."""
+
+
+def _base_name(path: str) -> str:
+    """A root's base name as an object is named after it: lower case, no folder, no extension."""
+    return re.sub(r"\.wmo$", "", path_key(path).rsplit("/", 1)[-1])
+
+
+def _write_entries(
+    objects: Path,
+    path_to_id: dict[str, int],
+    sets_by_root: dict[int, dict[int, int]],
+    database: Database,
+    report: Report,
+) -> None:
+    """Every entry whose object is a furnished root, resolved by the root's name.
+
+    An object is named after its model, so its name finds the root; an emptywmo twin's name,
+    the original's with the prefix, finds the original, whose sets are what the twin draws.
+    A name two furnished roots share is left unresolved rather than guessed.
+    """
+    by_base: dict[str, list[int]] = {}
+    for path, file_id in path_to_id.items():
+        if file_id in sets_by_root:
+            by_base.setdefault(_base_name(path), []).append(file_id)
+    rows = []
+    for row in read_csv(objects):
+        name = _base_name(OBJECT_TAG.sub("", row["name"]))
+        candidates = (
+            name,
+            name.replace("eps_" + EMPTY_PREFIX, "eps_", 1),
+            name.replace("eps_" + EMPTY_PREFIX, "", 1),
+            name.replace(EMPTY_PREFIX, "", 1),
+        )
+        found = next((by_base[c] for c in candidates if c in by_base), None)
+        if found is None:
+            report.entries_unresolved += 1
+        elif len(found) > 1:
+            report.entries_ambiguous += 1
+        else:
+            rows.append((int(row["entry"]), found[0]))
+    database.add_entries(rows)
+    report.entries = len(rows)
 
 
 def _spawnable(

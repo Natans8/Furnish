@@ -18,6 +18,8 @@ EPSILON_FLOOR = 100_000
 """Display ids at or above this are Epsilon's own rows."""
 
 OVERLAY = "epsilon-displays.csv"
+OBJECTS = "epsilon-objects.csv"
+"""The server's WMO gameobjects, entry and name, read off its own list in game."""
 """The vendored Epsilon rows: ``file_id,display`` for Blizzard files Epsilon re-registered."""
 
 
@@ -56,3 +58,8 @@ def vendored_overlay() -> list[tuple[int, int]]:
 
 def _rank(display: int) -> tuple[int, int]:
     return (0 if display >= EPSILON_FLOOR else 1, display)
+
+
+def vendored_objects() -> Path:
+    """Where the vendored objects list is, beside the display overlay."""
+    return Path(__file__).parent / "data" / OBJECTS

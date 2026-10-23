@@ -1,6 +1,7 @@
--- The furnishing database. One row of meta, then four tables: a set is a named list of
--- doodad placements, shared by every root that holds the same one; a display id reaches
--- the sets of the file it spawns; a map placement names the sets its zone chose.
+-- The furnishing database. One row of meta, then five tables: a set is a named list of
+-- doodad placements, shared by every root that holds the same one; a display id and a
+-- gameobject entry each reach the sets of the file they spawn; a map placement names the
+-- sets its zone chose.
 
 PRAGMA foreign_keys = ON;
 
@@ -25,6 +26,11 @@ CREATE TABLE root_displays (
     display INTEGER PRIMARY KEY,    -- a gameobject display that spawns a furnished root
     file    INTEGER NOT NULL        -- that root's file id, the key of wmo_sets
 ) WITHOUT ROWID;
+
+CREATE TABLE entries (
+    entry INTEGER PRIMARY KEY,      -- a gameobject entry whose object is a furnished root
+    file  INTEGER NOT NULL          -- that root's file id, the key of wmo_sets; an
+) WITHOUT ROWID;                    -- emptywmo twin's entry names its original
 
 CREATE TABLE placements (
     "set"   INTEGER NOT NULL REFERENCES sets(id),
