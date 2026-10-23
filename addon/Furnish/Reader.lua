@@ -67,7 +67,13 @@ end
 
 local function decodeBlob(text)
 	local lib = deflate()
-	local bytes = lib:DecompressDeflate(lib:DecodeForPrint(text))
+	-- The exporter breaks a long set's string across lines, and the encoding has no line
+	-- break in its alphabet, so the breaks go before it is decoded.
+	local printable = lib:DecodeForPrint((text:gsub("\n", "")))
+	if not printable then
+		error("Furnish_Data: a set's string does not decode; reinstall Furnish_Data")
+	end
+	local bytes = lib:DecompressDeflate(printable)
 	local at = 1
 
 	local function u8()

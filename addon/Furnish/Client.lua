@@ -11,22 +11,38 @@ Furnish.Client = Client
 
 local send
 
---- A function whose fault reaches the client's error handler, traceback and all, instead
--- of dying in silence. Every boundary a command reply or a timer crosses is wrapped, since
--- AddonCommands swallows an error thrown inside its callback. The handler is the client's
--- own, so BugSack and the error frame show it the way they show any addon's.
+local reported = {}
+
+--- Report a fault: in chat, once for each, since a client with its Lua errors switched off
+-- shows nothing at all; and to the client's own error handler, so BugSack and the error
+-- frame keep it the way they keep any addon's.
+function Client.Fault(message)
+	local text = tostring(message)
+	if not reported[text] then
+		reported[text] = true
+		print("|cff66ccffFurnish:|r |cffff2020stopped by an error: " .. text .. "|r")
+	end
+	local handler = _G.geterrorhandler and _G.geterrorhandler()
+	if handler then
+		handler(message)
+	end
+	return message
+end
+
+--- A function whose fault is reported rather than dying in silence. Every door the client
+-- opens is wrapped, the command, a click, a hover and a chat filter, and so is every reply
+-- and timer callback, since AddonCommands swallows an error thrown inside one.
 function Client.Guarded(fn)
 	if fn == nil then
 		return nil
 	end
 	return function(...)
-		local handler = _G.geterrorhandler and _G.geterrorhandler() or print
 		local count, arguments = select("#", ...), { ... }
 		return select(
 			2,
 			xpcall(function()
 				return fn(unpack(arguments, 1, count))
-			end, handler)
+			end, Client.Fault)
 		)
 	end
 end

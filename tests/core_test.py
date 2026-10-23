@@ -653,3 +653,11 @@ def test_sets_name_what_a_root_offers_and_what_it_lacks(tmp_path: Path) -> None:
         lua.eval("select(2, Furnish.Sets.OfFile(1))")
         == "the data has no doodad sets for root file 1"
     )
+
+
+def test_a_fault_is_said_in_chat_once(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute("BROKEN = Furnish.Client.Guarded(function() error('the reader broke', 0) end)")
+    lua.execute("BROKEN(); BROKEN()")
+    faults = [line for line in printed(lua) if "stopped by an error" in line]
+    assert faults == ["|cff66ccffFurnish:|r |cffff2020stopped by an error: the reader broke|r"]

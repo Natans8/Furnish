@@ -1,4 +1,8 @@
-from furnish.codec import IDENTITY, Row, decode, encode, for_print, from_print, varint
+import pytest
+
+from furnish.codec import IDENTITY, Row, chunked, decode, encode, for_print, from_print, varint
+from furnish.export import LINE_WIDTH
+from tests.files import varied_placements
 
 
 def test_varints_round_small_and_large() -> None:
@@ -30,3 +34,26 @@ def test_a_set_round_trips_exactly_sorted_by_model() -> None:
 
 def test_the_empty_set_round_trips() -> None:
     assert decode(encode([])) == []
+
+
+@pytest.mark.parametrize("count", [1, 7, 300])
+def test_varied_sets_round_trip_exactly(count: int) -> None:
+    rows = [Row(d, p.position, p.rotation, p.scale) for d, p in varied_placements(count, count)]
+    assert sorted(decode(encode(rows)), key=repr) == sorted(rows, key=repr)
+
+
+@pytest.mark.parametrize(
+    "length", [0, 1, LINE_WIDTH - 1, LINE_WIDTH, LINE_WIDTH + 1, 3 * LINE_WIDTH + 17]
+)
+def test_chunked_lines_join_back_and_none_is_wider(length: int) -> None:
+    text = "".join("abc"[i % 3] for i in range(length))
+    lines = list(chunked(text, LINE_WIDTH))
+    assert "".join(lines) == text
+    assert all(0 < len(line) <= LINE_WIDTH for line in lines)
+    assert len(lines) == -(-length // LINE_WIDTH)
+
+
+def test_a_line_break_is_no_letter_of_the_print_alphabet() -> None:
+    # The exporter breaks a long string across lines, so a reader drops the breaks first.
+    with pytest.raises(KeyError):
+        from_print(for_print(b"furnish") + "\n")

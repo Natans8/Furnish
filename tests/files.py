@@ -4,6 +4,7 @@ They produce exactly the chunks the readers look at, in the layouts the readers 
 so a test states a file in terms of sets and placements rather than bytes.
 """
 
+import random
 import struct
 from collections.abc import Iterable, Sequence
 
@@ -89,3 +90,37 @@ def adt_object(
         out += chunk("MWDS", struct.pack(f"<{len(flat)}H", *flat))
         out += chunk("MWDR", b"".join(struct.pack("<II", b, e) for b, e in spans))
     return out + chunk("MODF", modf)
+
+
+def float32(value: float) -> float:
+    """The float32 nearest ``value``, as a file stores it."""
+    result: float = struct.unpack("<f", struct.pack("<f", value))[0]
+    return result
+
+
+IDENTITY = (0.0, 0.0, 0.0, 1.0)
+
+
+def varied_placements(count: int, seed: int) -> list[tuple[int, Placement]]:
+    """Rows of exact float32 values that reach the edges, the same for a seed.
+
+    The smallest and largest display ids, negative, zero and negative zero coordinates,
+    identity and turned rotations, and scales of one and others.
+    """
+    pick = random.Random(seed)
+
+    def coordinate() -> float:
+        return float32(pick.uniform(-5000, 5000))
+
+    rows = []
+    for i in range(count):
+        display = (1, 2**31, 16384)[i] if i < 3 else pick.randint(1, 2**31)
+        position = (-0.0, 0.0, -5000.5) if i == 0 else (coordinate(), coordinate(), coordinate())
+        rotation = IDENTITY
+        if i % 5:
+            x, y, z, w = (pick.uniform(-1, 1) for _ in range(4))
+            norm = (x * x + y * y + z * z + w * w) ** 0.5
+            rotation = (float32(x / norm), float32(y / norm), float32(z / norm), float32(w / norm))
+        scale = float32(pick.choice((1.0, 1.0, 0.5, 1.25, 3.7)))
+        rows.append((display, Placement(display, position, rotation, scale)))
+    return rows

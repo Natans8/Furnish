@@ -22,7 +22,8 @@ from furnish import FORMAT
 from furnish.codec import Row, chunked, encode
 
 LINE_WIDTH = 4000
-"""How wide a blob's lines are; Lua reads a long string whatever its line breaks."""
+"""How wide a blob's lines are. Lua keeps the breaks inside a long string, and the encoding
+has none in its alphabet, so the reader drops them before it decodes."""
 
 
 @dataclass(slots=True)

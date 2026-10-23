@@ -1,13 +1,16 @@
 """The Lua reader against a real Lua 5.1 and the real LibDeflate, over a database it exports."""
 
+import random
 from pathlib import Path
 
 import pytest
 from lupa import lua51
 
+from furnish.codec import decode, for_print
 from furnish.database import Database
-from furnish.export import export
+from furnish.export import LINE_WIDTH, export
 from furnish.wmo import Placement
+from tests.files import varied_placements
 
 LIBDEFLATE = Path(__file__).parent / "lua" / "LibDeflate.lua"
 READER = Path(__file__).parents[1] / "addon" / "Furnish" / "Reader.lua"
@@ -100,3 +103,49 @@ def test_lua_reads_large_display_ids_and_their_floats(tmp_path: Path, value: int
     assert lua.eval("Furnish.Reader.Load()") is True
     row = lua.eval("Furnish.Reader.Placements(1)[1]")
     assert (row.display, row.x) == (value or 1, float(value))
+
+
+@pytest.mark.parametrize("count", [1, 40, 400, 3000])
+def test_every_row_comes_back_bit_for_bit_through_the_exporter_and_the_reader(
+    tmp_path: Path, count: int
+) -> None:
+    rows = varied_placements(count, count)
+    with Database(tmp_path / "f.sqlite") as db:
+        db.meta({"build": "9.2.7.45745"})
+        set_id = db.add_set("Set_Varied", rows)
+        db.add_wmo_sets([(900, 1, set_id)])
+    export(tmp_path / "f.sqlite", tmp_path / "Data.lua")
+    lua = lua_with(tmp_path / "Data.lua")
+    lua.execute("Furnish.Reader.Load()")
+    stored = lua.eval(f"FurnishData.blobs[{set_id}]")
+    # The exporter breaks a long string into lines of LINE_WIDTH, the first after the opener.
+    lines = stored.split("\n")
+    assert all(len(line) <= LINE_WIDTH for line in lines)
+    joined = "".join(lines)
+    expected = sorted((d, *p.position, *p.rotation, p.scale) for d, p in rows)
+    read = lua.eval(f"Furnish.Reader.Placements({set_id})")
+    assert (
+        sorted(
+            (row.display, row.x, row.y, row.z, row.qx, row.qy, row.qz, row.qw, row.scale)
+            for row in read.values()
+        )
+        == expected
+    )
+    # The Python codec reads the same string to the same rows.
+    assert (
+        sorted((r.display, *r.position, *r.rotation, r.scale) for r in decode(joined)) == expected
+    )
+
+
+def test_the_print_encoding_is_libdeflates(tmp_path: Path) -> None:
+    """The exporter's printable encoding against the library the game decodes with."""
+    lua = lua_with(tmp_path / "absent.lua")
+    encode_for_print = lua.eval(
+        "function(s) return LibStub:GetLibrary('LibDeflate'):EncodeForPrint(s) end"
+    )
+    pick = random.Random(7)
+    samples = [bytes(pick.randrange(256) for _ in range(n)) for n in range(65)]
+    samples.append(bytes(pick.randrange(256) for _ in range(20000)))
+    for data in samples:
+        expected = encode_for_print(data) if data else ""
+        assert for_print(data) == (expected or "")
