@@ -2,8 +2,9 @@
 --
 -- This is the surface, not the API. It holds the one run, reads `attach` off the selection,
 -- and closes a grouped run by selecting the group in the player's sight, so the next group
--- command acts on it; the API selects nothing. Every line it prints says what was asked and
--- what was found, and a refusal says the way out.
+-- command acts on it; the API selects nothing. That group then stands for the object the run
+-- was anchored on, so the next set needs no reselecting by hand. Every line it prints says
+-- what was asked and what was found, and a refusal says the way out.
 --
 -- A request is plain data, as the command line and a list link both give it:
 --   index   the set's index, as a list prints it
@@ -31,9 +32,10 @@ local Chat = Furnish.Chat
 
 local say = Chat.Say
 
---- The run going on, if any, whether it was asked to stop, and the way to stop an import
--- still waiting for its object.
-local running, stopping, waiting
+--- The run going on, if any, and whether it was asked to stop. A wait for an object's record:
+-- { what it waits for, what a stop leaves standing or nil, stop }. The group the last run
+-- selected and the object that run was anchored on: { leader, guid }.
+local running, stopping, waiting, anchored
 
 --- A set's name as a line shows it; the base set has none of its own.
 local function setName(set)
@@ -64,7 +66,7 @@ end
 --- Why nothing new can start, or nil.
 local function busy()
 	if waiting then
-		return "Furnish is waiting for the imported object; " .. Chat.Typed("stop") .. " ends it"
+		return ("Furnish is waiting for %s; %s ends it"):format(waiting.what, Chat.Typed("stop"))
 	elseif running and not running.Done() then
 		return "Furnish is still spawning; " .. Chat.Typed("stop") .. " ends it"
 	end
@@ -81,6 +83,51 @@ local function selection(what, otherwise)
 			("%s; select %s first, as with .gob select%s"):format(reason, what, otherwise or "")
 	end
 	return pose
+end
+
+--- Call fn with the selected object's pose, or say the way out. The group the last run
+-- selected stands for the object that run was anchored on: Furnish selects that object again
+-- and reads its record fresh, since moving the group may have moved it.
+local function withSelection(what, otherwise, fn)
+	local pose, reason = selection(what, otherwise)
+	if pose then
+		return fn(pose)
+	end
+	if not (anchored and Client.SelectedGroup() == anchored.leader) then
+		return say(reason)
+	end
+	local blocked = busy()
+	if blocked then
+		return say(blocked)
+	end
+	local send
+	send, reason = Client.Send()
+	if not send then
+		return say(reason)
+	end
+	local guid = anchored.guid
+	local stopAwaiting
+	stopAwaiting, reason = Client.AwaitRecord(guid, function(record)
+		waiting = nil
+		fn(Pose.OfRecord(record))
+	end)
+	if not stopAwaiting then
+		return say(reason)
+	end
+	waiting = { what = "object " .. guid, stop = stopAwaiting }
+	send(Commands.Select(guid), function(selected, replies)
+		if not selected and waiting then
+			waiting.stop()
+			waiting, anchored = nil, nil
+			say(
+				("the group stands for object %s, but selecting it was refused: %s; select %s first"):format(
+					guid,
+					quote(replies),
+					what
+				)
+			)
+		end
+	end)
 end
 
 --- Why an object's own sets cannot be read, or nil when it is a building that has them.
@@ -134,8 +181,8 @@ local function groupOf(request, pose)
 end
 
 --- Report a finished run, how long it took, and select its group so the next group
--- command acts on it.
-local function finish(result, started)
+-- command acts on it, the group standing for the object the run was anchored on, if any.
+local function finish(result, started, anchor)
 	local doodads = #result.spawned - (result.pivot and 1 or 0)
 	if result.deleted == #result.spawned then
 		say(("stopped, and deleted the %s it spawned"):format(objects(result.deleted)))
@@ -165,10 +212,12 @@ local function finish(result, started)
 	end
 	if result.joined > 0 and not result.deleted then
 		Client.Send()(Commands.SelectGroup(result.leader), nil, true)
+		anchored = anchor and { leader = tostring(result.leader), guid = tostring(anchor.guid) }
+			or nil
 	end
 end
 
-local function hooks()
+local function hooks(anchor)
 	local last, started = 0, Client.Now()
 	return {
 		progress = function(done, total)
@@ -178,7 +227,7 @@ local function hooks()
 			end
 		end,
 		finished = function(result)
-			finish(result, started)
+			finish(result, started, anchor)
 		end,
 	}
 end
@@ -187,45 +236,29 @@ end
 -- @param what the set as a line names it
 -- @param where "on <building>" or "at your feet"
 -- @param lead how the group is led, as groupOf says it
-local function start(rows, pose, group, what, where, lead)
+-- @param anchor the selected object the run is anchored on, or nil
+local function start(rows, pose, group, what, where, lead, anchor)
 	local send, reason = Client.Send()
 	if not send then
 		return say(reason)
 	end
 	say(("spawning %s %s, %s"):format(what, where, lead))
 	local handle, refused =
-		Furnish.Spawn(rows, pose.position, pose.rotation, pose.scale, group, send, hooks())
+		Furnish.Spawn(rows, pose.position, pose.rotation, pose.scale, group, send, hooks(anchor))
 	if not handle then
 		return say("nothing was sent: " .. refused)
 	end
 	running, stopping = handle, false
 end
 
---- Print a root's sets, each a link that spawns it.
--- @param request { entry } for an object's sets, or {} for the selected building's; group
---   and base ride along on every link
-function Console.List(request)
-	local loaded, reason = Reader.Load()
-	if not loaded then
-		return say(reason)
-	end
-	local pose
-	if not request.entry then
-		pose, reason = selection("the building")
-		if not pose then
-			return say(reason)
-		end
-		reason = notBuilding(pose, Chat.Typed("list <entry>") .. " lists another object's")
-		if reason then
-			return say(reason)
-		end
-	end
+--- Print a root's sets, each a link that spawns it; pose is the selected building's, or nil
+-- where the request names an entry.
+local function list(request, pose)
 	local file, label = rootOf(request, pose)
 	if not file then
 		return say(label)
 	end
-	local sets
-	sets, reason = setsOf(file, label)
+	local sets, reason = setsOf(file, label)
 	if not sets then
 		return say(reason)
 	end
@@ -247,6 +280,26 @@ function Console.List(request)
 				.. Chat.END
 		)
 	end
+end
+
+--- Print a root's sets, each a link that spawns it.
+-- @param request { entry } for an object's sets, or {} for the selected building's; group
+--   and base ride along on every link
+function Console.List(request)
+	local loaded, reason = Reader.Load()
+	if not loaded then
+		return say(reason)
+	end
+	if request.entry then
+		return list(request, nil)
+	end
+	withSelection("the building", nil, function(pose)
+		local wrong = notBuilding(pose, Chat.Typed("list <entry>") .. " lists another object's")
+		if wrong then
+			return say(wrong)
+		end
+		list(request, pose)
+	end)
 end
 
 --- Fill a tooltip for a list link's set: its name, what it is, and what a click does.
@@ -290,43 +343,10 @@ function Console.DescribeImport(tooltip)
 	)
 end
 
---- Spawn a set on the selected object, or at the player.
--- @param request as the head of this file describes it
-function Console.Spawn(request)
-	local blocked = busy()
-	if blocked then
-		return say(blocked)
-	end
-	if not Client.CanSpawn() then
-		return
-	end
-	local loaded, reason = Reader.Load()
-	if not loaded then
-		return say(reason)
-	end
-	-- The selected object is the target unless the set goes at the player, and any object
-	-- will do. It must be a building only where the set is its own, read off it because
-	-- neither a link nor an entry names one; and it leads the group a set attaches to.
-	local named = request.entry or request.file
-	local pose, target
-	if not request.here or not named or request.group == "attach" then
-		local what = not named and "the building"
-			or request.here and "the object whose group to join"
-			or "the object to spawn on"
-		local otherwise = request.here and not named and request.group ~= "attach"
-		pose, reason = selection(
-			what,
-			otherwise and (", or name it, as " .. Chat.Typed("3 here <entry>")) or nil
-		)
-		if not pose then
-			return say(reason)
-		end
-		reason = not named and notBuilding(pose, "name one, as " .. Chat.Typed("3 from <entry>"))
-		if reason then
-			return say(reason)
-		end
-		target = pose
-	end
+--- Spawn a set; pose is the selected object's, or nil where the set goes at the player from a
+-- named root and joins no object's group.
+local function spawnOn(request, pose)
+	local target, reason = pose, nil
 	if request.here then
 		target, reason = Pose.Here()
 		if not target then
@@ -367,7 +387,54 @@ function Console.Spawn(request)
 		what = label .. "'s " .. what
 	end
 	local group, lead = groupOf(request, pose)
-	start(rows, target, group, what, request.here and "at your feet" or ("on " .. pose.name), lead)
+	start(
+		rows,
+		target,
+		group,
+		what,
+		request.here and "at your feet" or ("on " .. pose.name),
+		lead,
+		pose
+	)
+end
+
+--- Spawn a set on the selected object, or at the player.
+-- @param request as the head of this file describes it
+function Console.Spawn(request)
+	local blocked = busy()
+	if blocked then
+		return say(blocked)
+	end
+	if not Client.CanSpawn() then
+		return
+	end
+	local loaded, reason = Reader.Load()
+	if not loaded then
+		return say(reason)
+	end
+	-- The selected object is the target unless the set goes at the player, and any object
+	-- will do. It must be a building only where the set is its own, read off it because
+	-- neither a link nor an entry names one; and it leads the group a set attaches to.
+	local named = request.entry or request.file
+	if request.here and named and request.group ~= "attach" then
+		return spawnOn(request, nil)
+	end
+	local what = not named and "the building"
+		or request.here and "the object whose group to join"
+		or "the object to spawn on"
+	local otherwise = request.here and not named and request.group ~= "attach"
+	withSelection(
+		what,
+		otherwise and (", or name it, as " .. Chat.Typed("3 here <entry>")) or nil,
+		function(pose)
+			local wrong = not named
+				and notBuilding(pose, "name one, as " .. Chat.Typed("3 from <entry>"))
+			if wrong then
+				return say(wrong)
+			end
+			spawnOn(request, pose)
+		end
+	)
 end
 
 --- The sets of an imported building the map placed it with, beyond the base set it shows
@@ -413,13 +480,17 @@ function Console.Import(request)
 	-- silences both.
 	local stopped, heard = false, false
 	local stopHearing, stopAwaiting
-	waiting = function()
-		stopped = true
-		stopHearing()
-		if stopAwaiting then
-			stopAwaiting()
-		end
-	end
+	waiting = {
+		what = "the imported object",
+		left = "an import already sent stands",
+		stop = function()
+			stopped = true
+			stopHearing()
+			if stopAwaiting then
+				stopAwaiting()
+			end
+		end,
+	}
 
 	local function furnish(record, ids, guid, model)
 		local pose = Pose.OfRecord(record)
@@ -458,7 +529,7 @@ function Console.Import(request)
 			objects(#rows)
 		)
 		local group, lead = groupOf({ group = request.group or "attach" }, pose)
-		start(rows, pose, group, what, "on " .. pose.name, lead)
+		start(rows, pose, group, what, "on " .. pose.name, lead, pose)
 	end
 
 	-- The import selects the object but pushes no record of it, and the record carries the
@@ -480,7 +551,7 @@ function Console.Import(request)
 		end
 		send(Commands.Select(guid), function(selected, replies)
 			if not selected and waiting then
-				waiting()
+				waiting.stop()
 				waiting = nil
 				say(
 					("imported %s as object %s, but selecting it was refused: %s"):format(
@@ -511,7 +582,7 @@ function Console.Import(request)
 			return imported(uid, guid, model)
 		end
 		if not success then
-			waiting()
+			waiting.stop()
 			waiting = nil
 			say("nothing was imported: " .. quote(messages))
 		end
@@ -521,9 +592,10 @@ end
 --- Stop spawning. With delete, also delete what the run spawned.
 function Console.Stop(delete)
 	if waiting then
-		waiting()
+		local left = waiting.left
+		waiting.stop()
 		waiting = nil
-		return say("stopped; nothing was spawned, and an import already sent stands")
+		return say("stopped; nothing was spawned" .. (left and ", and " .. left or ""))
 	end
 	if not (running and not running.Done()) then
 		return say("nothing is spawning")

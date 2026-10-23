@@ -658,11 +658,16 @@ def fake_client(lua: lua51.LuaRuntime) -> None:
                                   rotation = { x = 0, y = 0, z = 0 } },
                     groupLeader = 0, canEdit = false, IsWMO = function() return false end },
         }
-        SELECTED = nil
+        SELECTED, GROUP_LEADER = nil, nil
         EpsilonLib = {
           GameObject = {
             IsGroupSelected = function() return SELECTED == "group" end,
-            GetSelected = function() return RECORDS[SELECTED] end,
+            GetSelected = function()
+              if SELECTED == "group" then
+                return { isGroup = true, leaderGUID = GROUP_LEADER }
+              end
+              return RECORDS[SELECTED]
+            end,
             CanSpawn = function(vocal)
               if NO_PERMISSION and vocal then
                 print("You do not have permission to spawn objects here.")
@@ -688,8 +693,10 @@ def fake_client(lua: lua51.LuaRuntime) -> None:
         function SEND(text, callback)
           local guid = text:match("^gobject select (%d+)")
           local entry = text:match("^gobject info (%d+)")
+          local leader = text:match("^gobject group select (%d+)")
           if guid or entry then SENT[#SENT + 1] = text end
           if guid then SELECTED = tonumber(guid) return callback(true, {}) end
+          if leader then SELECTED, GROUP_LEADER = "group", tonumber(leader) end
           if entry == "817579" then
             return callback(true, { "Entry: |cff00CCFF817579|r",
                                     "Template GameObject DisplayID: |cff00CCFF30262|r" })

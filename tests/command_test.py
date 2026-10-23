@@ -278,6 +278,66 @@ def test_a_spawn_refuses_with_the_way_out(tmp_path: Path) -> None:
     assert sent(lua) == []
 
 
+GROUP_REFUSED = (
+    "a group is selected, not one object; select the building first, as with .gob select"
+)
+
+
+def test_the_group_a_run_selected_stands_for_its_building_read_fresh(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("SELECTED = 500")
+    run(lua, "1")
+    assert lua.eval("Furnish.Client.SelectedGroup()") == "7001"
+    # The group moved the building after the run; the next set goes where it stands now.
+    lua.execute("RECORDS[500].transform.position.x = 99")
+    before = len(sent(lua))
+    assert run(lua, "1")[0] == (
+        PREFIX + "spawning Full (set 1, 2 objects) on house, led by an invisible pivot"
+    )
+    assert sent(lua)[before : before + 2] == [
+        "gobject select 500",
+        "gobject spawn -424242 posx 99 posy 20 posz 30 face north turn 90",
+    ]
+    assert run(lua, "list")[0] == PREFIX + "house has 2 sets:"
+
+
+def test_a_group_no_run_selected_is_still_refused(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("SELECTED = 500")
+    run(lua, "1")
+    lua.execute("GROUP_LEADER = 12345")
+    assert run(lua, "1")[0].endswith(GROUP_REFUSED)
+
+
+def test_a_building_that_cannot_be_selected_again_says_so_and_is_forgotten(
+    tmp_path: Path,
+) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("SELECTED = 500")
+    run(lua, "1")
+    lua.execute("SELECT_REFUSED = true")
+    assert run(lua, "1") == [
+        PREFIX + "the group stands for object 500, but selecting it was refused: "
+        '"Object not found"; select the building first'
+    ]
+    assert run(lua, "1")[0].endswith(GROUP_REFUSED)
+
+
+def test_a_wait_for_the_building_blocks_another_and_stops_with_nothing_spawned(
+    tmp_path: Path,
+) -> None:
+    lua = command_lua(tmp_path, deferred=True)
+    lua.execute("SELECTED = 500")
+    run(lua, "1")
+    lua.execute("FLUSH()")
+    run(lua, "1")
+    assert run(lua, "1") == [PREFIX + "Furnish is waiting for object 500; /furn stop ends it"]
+    assert run(lua, "stop") == [PREFIX + "stopped; nothing was spawned"]
+    before = len(sent(lua))
+    lua.execute("FLUSH()")
+    assert not [line for line in sent(lua)[before:] if line.startswith("gobject spawn")]
+
+
 def test_a_run_in_flight_blocks_another_and_stops_with_its_objects_deleted(tmp_path: Path) -> None:
     lua = command_lua(tmp_path, deferred=True)
     lua.execute("SELECTED = 500")
