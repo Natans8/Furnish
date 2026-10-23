@@ -127,6 +127,34 @@ local function wordsOf(link)
 	return link:match("^" .. LINK .. ":(.*)$")
 end
 
+--- Add text to the end of the server's lines: append(line) answers what to add, or nil to
+-- leave the line as it came. The client runs a filter once for each chat frame showing a
+-- line, so the answer for the last line is kept. It is added at login, after the addons that
+-- add their own buttons at load, so what Furnish adds comes after theirs.
+function Chat.OnServerLines(append)
+	local last, shown
+	local filter = Furnish.Client.Guarded(function(_, _, message, ...)
+		if type(message) ~= "string" then
+			return false
+		end
+		if message ~= last then
+			last = message
+			local extra = append(message)
+			shown = extra and message .. extra or nil
+		end
+		if not shown then
+			return false
+		end
+		return false, shown, ...
+	end)
+	local frame = _G.CreateFrame("Frame")
+	frame:RegisterEvent("PLAYER_LOGIN")
+	frame:SetScript("OnEvent", function()
+		frame:UnregisterEvent("PLAYER_LOGIN")
+		_G.ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", filter)
+	end)
+end
+
 --- Act on Furnish's links: onClick(words, modifier) when one is clicked, where modifier is
 -- "share" for the client's chat-link click, "ctrl" for a control-click and nil for a plain
 -- one; onEnter(words, tooltip) when the pointer rests on one, with the tooltip owned and

@@ -33,7 +33,7 @@ def command_lua(tmp_path: Path, deferred: bool = False) -> lua51.LuaRuntime:
         }
         local server = SEND
         local function answer(text, callback)
-          if text == "doodad import" then
+          if text:match("^doodad import") then
             SENT[#SENT + 1] = text
             local uid, guid = IMPORT_UID or 4242, IMPORT_GUID or 500
             return callback(true, { "Successfully imported [house.wmo - 817579] (UniqueId: "
@@ -152,8 +152,8 @@ def test_the_help_names_every_command_and_word(tmp_path: Path) -> None:
     assert lines[1] == "  |cffffd100/furn help|r this help"
     assert lines[2] == "  |cffffd100/furn list|r the selected building's sets"
     assert "  |cffffd100attach|r join the selected object's group" in lines
-    assert lines[-1].endswith("click it to spawn it, ctrl-click to spawn it at your feet.|r")
-    assert len(lines) == 1 + 10 + 1 + 4 + 1
+    assert lines[-2].endswith("click it to spawn it, ctrl-click to spawn it at your feet.|r")
+    assert len(lines) == 1 + 10 + 1 + 4 + 2
 
 
 def test_the_command_alone_is_the_windows(tmp_path: Path) -> None:
@@ -360,6 +360,7 @@ def test_an_import_furnishes_the_object_with_the_sets_the_map_placed(tmp_path: P
         PREFIX + "done: 2 of 2 spawned",
     ]
     assert "gobject group add 500" in sent(lua)
+    assert len(lines) == 2
     assert shown(lua) == ["gobject group select 500"]
     # A word still decides who leads.
     run(lua, "import first")
@@ -483,3 +484,41 @@ def test_nothing_is_sent_where_the_player_may_not_spawn(tmp_path: Path) -> None:
 def test_the_command_answers_to_both_its_names(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     assert list(lua.eval("SLASH_FURNISH1, SLASH_FURNISH2")) == ["/furn", "/furnish"]
+
+
+BUILDING_LINE = (
+    "Selected doodad |Hdoodad_uid:4242:0|h[6dr_draenei_house2.wmo - 830385]|h (UID: 4242) "
+    "at X: 1 Y: 2 Z: 3 on map 1116 with scale: 1.000000."
+)
+
+
+def shown_line(lua: lua51.LuaRuntime, line: str) -> Any:
+    """The line as the chat frame would show it once the filters have run, at login."""
+    lua.execute('FIRE("PLAYER_LOGIN")')
+    out = line
+    for fn in lua.eval("FILTERS").values():
+        answer = fn(None, "CHAT_MSG_SYSTEM", out)
+        hidden, changed = answer if isinstance(answer, tuple) else (answer, None)
+        assert hidden is False
+        out = changed or out
+    return out
+
+
+def test_a_buildings_doodad_line_carries_a_button_that_imports_and_furnishes_it(
+    tmp_path: Path,
+) -> None:
+    lua = command_lua(tmp_path)
+    line = shown_line(lua, BUILDING_LINE)
+    assert line == BUILDING_LINE + " - |cff71d5ff|Hgarrmission:furnish:import:4242|h[Furnish]|h|r"
+    lua.globals().HOOKS.SetItemRef("garrmission:furnish:import:4242")
+    assert sent(lua)[:2] == ["doodad import 4242", "gobject select 500"]
+    assert printed(lua)[-2] == (
+        PREFIX + "spawning Full (set 1, 2 objects) on house, joining house's group"
+    )
+
+
+def test_a_models_doodad_line_is_left_as_it_came(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    model_line = BUILDING_LINE.replace("6dr_draenei_house2.wmo", "6dr_draenei_bottle02.m2")
+    assert shown_line(lua, model_line) == model_line
+    assert shown_line(lua, "You have mounted 17697.") == "You have mounted 17697."

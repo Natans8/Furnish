@@ -269,6 +269,19 @@ function Console.Describe(request, tooltip)
 	tooltip:AddLine("Ctrl-click: spawn it at your feet", 1, 1, 1)
 end
 
+--- Fill a tooltip for the button on a building's doodad line.
+-- @param tooltip a tooltip owned and empty
+function Console.DescribeImport(tooltip)
+	tooltip:SetText("Furnish", 1, 1, 1)
+	tooltip:AddLine(
+		"Import this building and spawn the sets the map placed it with, grouped on it",
+		0.62,
+		0.62,
+		0.62,
+		true
+	)
+end
+
 --- Spawn a set on the selected object, or at the player.
 -- @param request as the head of this file describes it
 function Console.Spawn(request)
@@ -365,9 +378,10 @@ local function placed(pose, ids, base)
 	return chosen
 end
 
---- Import the selected map doodad, then spawn on it the sets the map placed it with,
--- grouped on the building it now is unless a word says otherwise.
--- @param request group and base, as for a spawn
+--- Import a map doodad, then spawn on it the sets the map placed it with, grouped on the
+-- building it now is unless a word says otherwise.
+-- @param request uid, the doodad's unique id, or nil for the selected doodad; group and
+--   base, as for a spawn
 function Console.Import(request)
 	local blocked = busy()
 	if blocked then
@@ -393,7 +407,7 @@ function Console.Import(request)
 			stopWaiting()
 		end
 	end
-	send(Commands.IMPORT, function(_, messages)
+	send(Commands.Import(request.uid), function(_, messages)
 		if stopped then
 			return
 		end

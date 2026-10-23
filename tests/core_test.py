@@ -82,6 +82,8 @@ def lua_core(tmp_path: Path) -> lua51.LuaRuntime:
         HOOKS = {}
         function hooksecurefunc(name, fn) HOOKS[name] = fn end
         NUM_CHAT_WINDOWS = 0
+        FILTERS = {}
+        function ChatFrame_AddMessageEventFilter(event, fn) FILTERS[#FILTERS + 1] = fn end
         function FIRE(event, ...)
           for _, frame in ipairs(FRAMES) do
             if frame.events[event] and frame.handler then frame.handler(frame, event, ...) end

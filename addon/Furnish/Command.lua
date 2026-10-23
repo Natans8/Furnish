@@ -146,6 +146,9 @@ local function helpLines()
 	lines[#lines + 1] = Chat.GREY
 		.. "A set in a list is a link: click it to spawn it, ctrl-click to spawn it at your feet."
 		.. Chat.END
+	lines[#lines + 1] = Chat.GREY
+		.. "A building's doodad line carries a [Furnish] button: it imports the building and furnishes it."
+		.. Chat.END
 	return lines
 end
 
@@ -189,11 +192,15 @@ local function fromLink(words)
 end
 
 --- A click on a list link spawns its set: plainly on the selected object, with ctrl at
--- the player's feet.
+-- the player's feet. A click on a doodad line's button imports that building and furnishes it.
 function Command.Click(words, modifier)
 	-- TODO: a shift-click shares the set, once what a shared set carries is decided.
 	if modifier == "share" then
 		return
+	end
+	local uid = words:match("^import:(%d+)$")
+	if uid then
+		return Console.Import({ uid = uid })
 	end
 	local request = fromLink(words)
 	if request then
@@ -202,8 +209,12 @@ function Command.Click(words, modifier)
 	end
 end
 
---- What resting on a list link shows: the set, then what a click and a ctrl-click do.
+--- What resting on one of Furnish's links shows: a set and its clicks, or what the
+-- doodad line's button does.
 function Command.Hover(words, tooltip)
+	if words:match("^import:%d+$") then
+		return Console.DescribeImport(tooltip)
+	end
 	local request = fromLink(words)
 	if request then
 		Console.Describe(request, tooltip)
@@ -216,3 +227,19 @@ _G.SLASH_FURNISH1 = "/furn"
 _G.SLASH_FURNISH2 = "/furnish"
 _G.SlashCmdList.FURNISH = Client.Guarded(Command.Run)
 Chat.OnLinks(Command.Click, Command.Hover)
+
+--- The unique id of the map doodad a server line names by its link, where it is a building.
+function Command.PlacedBuilding(line)
+	local uid, name = line:match("|Hdoodad_uid:(%d+):[^|]*|h%[(.-) %- %d+%]|h")
+	if uid and name:lower():find("%.wmo$") then
+		return uid
+	end
+	return nil
+end
+
+-- A building's doodad line, from a select or a near, gets a button that imports and
+-- furnishes it, beside the server's own.
+Chat.OnServerLines(function(line)
+	local uid = Command.PlacedBuilding(line)
+	return uid and " - " .. Chat.Link("import:" .. uid, "Furnish") or nil
+end)

@@ -37,7 +37,9 @@ A set, list or import takes any of these words after it:
 
 Each set in a list is a link: a click spawns it on the selected object, building or not, a
 ctrl-click at your feet, and resting on it says what it is. A run that leaves a group selects that group
-when it ends, in the chat as if typed, so `.gob group` commands act on it next.
+when it ends, in the chat as if typed, so `.gob group` commands act on it next. A building's
+doodad line, from `.doodad select` or `.doodad near`, carries a `[Furnish]` button that imports that
+building by its unique id and furnishes it as `/furn import` does.
 
 ## Build
 
