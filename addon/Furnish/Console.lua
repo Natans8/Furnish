@@ -400,66 +400,73 @@ function Console.Import(request)
 		return say(reason)
 	end
 	local _, _, _, map = Client.Position()
-	local stopped, stopWaiting = false, nil
+
+	-- What may still answer: the import's line and the record of the object it made. A stop
+	-- silences both.
+	local stopped, heard = false, false
+	local stopHearing, stopAwaiting
 	waiting = function()
 		stopped = true
-		if stopWaiting then
-			stopWaiting()
+		stopHearing()
+		if stopAwaiting then
+			stopAwaiting()
 		end
 	end
-	send(Commands.Import(request.uid), function(_, messages)
-		if stopped then
+
+	local function furnish(record, ids, guid, model)
+		local pose = Pose.OfRecord(record)
+		if not pose.wmo then
+			return say(
+				("imported %s as object %s; it is not a building, so it has no sets"):format(
+					model,
+					guid
+				)
+			)
+		end
+		local chosen = ids and placed(pose, ids, request.base) or {}
+		if #chosen == 0 then
+			return say(
+				("imported %s as object %s; %s"):format(
+					model,
+					guid,
+					ids and "the map draws only its base set, which the building shows itself"
+						or (
+							"the map placed it with no set Furnish knows; "
+							.. Chat.Typed("list")
+							.. " shows its own"
+						)
+				)
+			)
+		end
+		local rows, names, indexes = {}, {}, {}
+		for i, set in ipairs(chosen) do
+			rows = Rows.Union(rows, Rows.OfSet(set.id))
+			names[i], indexes[i] = setName(set), set.index
+		end
+		local what = ("%s (%s %s, %s)"):format(
+			table.concat(names, " and "),
+			#chosen == 1 and "set" or "sets",
+			table.concat(indexes, " and "),
+			objects(#rows)
+		)
+		local group, lead = groupOf({ group = request.group or "attach" }, pose)
+		start(rows, pose, group, what, "on " .. pose.name, lead)
+	end
+
+	-- The import selects the object but pushes no record of it, and the record carries the
+	-- pose; selecting it again has the server push one.
+	local function imported(uid, guid, model)
+		if stopped or heard then
 			return
 		end
-		local uid, guid, model = Commands.Imported(messages)
-		if not uid then
-			waiting = nil
-			return say("nothing was imported: " .. quote(messages))
-		end
+		heard = true
+		stopHearing()
 		local ids = Sets.OfPlacement(map, tonumber(uid))
-		-- The import selects the object but pushes no record of it, and the record carries
-		-- the pose; selecting it again has the server push one.
-		stopWaiting, reason = Client.AwaitRecord(guid, function(record)
+		stopAwaiting, reason = Client.AwaitRecord(guid, function(record)
 			waiting = nil
-			local pose = Pose.OfRecord(record)
-			if not pose.wmo then
-				return say(
-					("imported %s as object %s; it is not a building, so it has no sets"):format(
-						model,
-						guid
-					)
-				)
-			end
-			local chosen = ids and placed(pose, ids, request.base) or {}
-			if #chosen == 0 then
-				return say(
-					("imported %s as object %s; %s"):format(
-						model,
-						guid,
-						ids and "the map draws only its base set, which the building shows itself"
-							or (
-								"the map placed it with no set Furnish knows; "
-								.. Chat.Typed("list")
-								.. " shows its own"
-							)
-					)
-				)
-			end
-			local rows, names, indexes = {}, {}, {}
-			for i, set in ipairs(chosen) do
-				rows = Rows.Union(rows, Rows.OfSet(set.id))
-				names[i], indexes[i] = setName(set), set.index
-			end
-			local what = ("%s (%s %s, %s)"):format(
-				table.concat(names, " and "),
-				#chosen == 1 and "set" or "sets",
-				table.concat(indexes, " and "),
-				objects(#rows)
-			)
-			local group, lead = groupOf({ group = request.group or "attach" }, pose)
-			start(rows, pose, group, what, "on " .. pose.name, lead)
+			furnish(record, ids, guid, model)
 		end)
-		if not stopWaiting then
+		if not stopAwaiting then
 			waiting = nil
 			return say(reason)
 		end
@@ -476,6 +483,30 @@ function Console.Import(request)
 				)
 			end
 		end)
+	end
+
+	-- The server names the object an import made in one line, sent in the command's reply or
+	-- as a plain system line after it, so both are heard and the first is taken. An import by
+	-- unique id takes only its own doodad's line.
+	stopHearing = Client.OnSystemLine(function(line)
+		local uid, guid, model = Commands.Imported({ line })
+		if uid and (request.uid == nil or uid == tostring(request.uid)) then
+			imported(uid, guid, model)
+		end
+	end)
+	send(Commands.Import(request.uid), function(success, messages)
+		if stopped or heard then
+			return
+		end
+		local uid, guid, model = Commands.Imported(messages)
+		if uid then
+			return imported(uid, guid, model)
+		end
+		if not success then
+			waiting()
+			waiting = nil
+			say("nothing was imported: " .. quote(messages))
+		end
 	end)
 end
 

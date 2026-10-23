@@ -36,8 +36,17 @@ def command_lua(tmp_path: Path, deferred: bool = False) -> lua51.LuaRuntime:
           if text:match("^doodad import") then
             SENT[#SENT + 1] = text
             local uid, guid = IMPORT_UID or 4242, IMPORT_GUID or 500
-            return callback(true, { "Successfully imported [house.wmo - 817579] (UniqueId: "
-              .. uid .. ") as GUID " .. guid .. "." })
+            local line = "Successfully imported [house.wmo - 817579] (UniqueId: "
+              .. uid .. ") as GUID " .. guid .. "."
+            if not IMPORT_APART then
+              return callback(true, { line })
+            end
+            -- As Epsilon sends it: the command answers nothing, and the line comes after as
+            -- a plain system line, behind another import's.
+            callback(true, {})
+            FIRE("CHAT_MSG_SYSTEM",
+              "Successfully imported [barn.wmo - 1] (UniqueId: 99) as GUID 999.")
+            return FIRE("CHAT_MSG_SYSTEM", line)
           end
           if SELECT_REFUSED and text:match("^gobject select") then
             SENT[#SENT + 1] = text
@@ -524,3 +533,13 @@ def test_a_line_whose_entry_is_no_furnished_building_is_left_as_it_came(tmp_path
     )
     assert shown_line(lua, model_line) == model_line
     assert shown_line(lua, "You have mounted 17697.") == "You have mounted 17697."
+
+
+def test_an_import_hears_its_line_when_the_server_sends_it_apart(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("IMPORT_APART = true")
+    lua.globals().HOOKS.SetItemRef("garrmission:furnish:import:4242")
+    assert sent(lua)[:2] == ["doodad import 4242", "gobject select 500"]
+    assert printed(lua)[-2] == (
+        PREFIX + "spawning Full (set 1, 2 objects) on house, joining house's group"
+    )

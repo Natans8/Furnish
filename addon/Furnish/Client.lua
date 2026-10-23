@@ -120,6 +120,31 @@ function Client.AwaitRecord(guid, fn)
 	return stop
 end
 
+local systemFrame, systemListener
+
+--- Hear every system line the server prints: fn(line) for each, until the function returned
+-- is called. One listener at a time, since one import waits at a time.
+function Client.OnSystemLine(fn)
+	if not systemFrame then
+		systemFrame = _G.CreateFrame("Frame")
+		systemFrame:RegisterEvent("CHAT_MSG_SYSTEM")
+		systemFrame:SetScript(
+			"OnEvent",
+			Client.Guarded(function(_, _, line)
+				if systemListener then
+					systemListener(line)
+				end
+			end)
+		)
+	end
+	systemListener = fn
+	return function()
+		if systemListener == fn then
+			systemListener = nil
+		end
+	end
+end
+
 --- Restore the saved copy of a settings table over its defaults, then make the live table
 -- the saved one, so the client writes whatever a surface changes at logout. A saved value
 -- is taken only for a key the defaults declare and only when its type agrees, so a stale
