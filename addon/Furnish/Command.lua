@@ -228,10 +228,13 @@ _G.SLASH_FURNISH2 = "/furnish"
 _G.SlashCmdList.FURNISH = Client.Guarded(Command.Run)
 Chat.OnLinks(Command.Click, Command.Hover)
 
---- The unique id of the map doodad a server line names by its link, where it is a building.
+--- The unique id of the map doodad a server line names by its link, where it is a building
+-- Furnish has sets for. The number after the name in the link is the object's gameobject
+-- entry, and the data answers for it; the name is never read, since many a building's
+-- name has no `.wmo` in it. The first such line loads the data.
 function Command.PlacedBuilding(line)
-	local uid, name = line:match("|Hdoodad_uid:(%d+):[^|]*|h%[(.-) %- %d+%]|h")
-	if uid and name:lower():find("%.wmo$") then
+	local uid, entry = line:match("|Hdoodad_uid:(%d+):[^|]*|h%[.- %- (%d+)%]|h")
+	if uid and Furnish.Sets.OfEntry(tonumber(entry)) then
 		return uid
 	end
 	return nil

@@ -487,7 +487,7 @@ def test_the_command_answers_to_both_its_names(tmp_path: Path) -> None:
 
 
 BUILDING_LINE = (
-    "Selected doodad |Hdoodad_uid:4242:0|h[6dr_draenei_house2.wmo - 830385]|h (UID: 4242) "
+    "Selected doodad |Hdoodad_uid:4242:0|h[6dr_draenei_house2 - 817579]|h (UID: 4242) "
     "at X: 1 Y: 2 Z: 3 on map 1116 with scale: 1.000000."
 )
 
@@ -517,8 +517,11 @@ def test_a_buildings_doodad_line_carries_a_button_that_imports_and_furnishes_it(
     )
 
 
-def test_a_models_doodad_line_is_left_as_it_came(tmp_path: Path) -> None:
+def test_a_line_whose_entry_is_no_furnished_building_is_left_as_it_came(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
-    model_line = BUILDING_LINE.replace("6dr_draenei_house2.wmo", "6dr_draenei_bottle02.m2")
+    # Named like a building, but an entry the data has no sets for.
+    model_line = BUILDING_LINE.replace(
+        "6dr_draenei_house2 - 817579", "6dr_draenei_house2.wmo - 717747"
+    )
     assert shown_line(lua, model_line) == model_line
     assert shown_line(lua, "You have mounted 17697.") == "You have mounted 17697."
