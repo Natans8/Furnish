@@ -14,8 +14,9 @@ Furnish.Settings = {
 	-- first doodad leads instead.
 	marker = 16031,
 
-	--- How many commands may be out unanswered at once, joins counted. No spawn waits on the
-	-- reply to the one before it; this only bounds how far ahead of the replies a run gets,
-	-- so a stop lands within a few lines, since a line already queued cannot be taken back.
+	--- How many commands may be out unanswered at once, joins counted, though a spawn and its
+	-- join always go together. No spawn waits on the reply to the one before it; this only
+	-- bounds how far ahead of the replies a run gets, so a stop lands within a few lines,
+	-- since a line already queued cannot be taken back.
 	inFlight = 4,
 }

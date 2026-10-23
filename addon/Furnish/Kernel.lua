@@ -11,8 +11,10 @@
 -- the first doodad leads, which is exactly what First does from the start. When both are
 -- refused nothing leads, and the rest stand loose.
 --
--- A join goes straight behind its spawn and acts on the selection the spawn leaves, since
--- the server takes no join on a spawn line. It waits for the two that may lead and for
+-- A join is glued to its spawn and acts on the selection the spawn leaves, since the server
+-- takes no join on a spawn line. Glued, the two leave in the same breath: EpsilonLib answers
+-- every join by reselecting the group, and a reselect landing between a spawn and its join
+-- would leave the join acting on the leader. A pair waits for the two that may lead and for
 -- nothing else, so a spawn never waits on the reply to the one before it.
 
 _G.Furnish = _G.Furnish or {}
@@ -139,6 +141,7 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 		end
 		joined[index + 1] = index
 		commands[index + 1] = {
+			glued = true,
 			needs = needs,
 			text = function(results)
 				local leader = leaderOf(group, results, needs)

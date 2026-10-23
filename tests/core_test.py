@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import pytest
 from lupa import lua51
 
 from furnish.database import Database
@@ -310,6 +311,46 @@ def test_width_bounds_what_is_in_flight(tmp_path: Path) -> None:
     )
 
 
+def test_a_glued_command_goes_with_the_one_before_it_or_not_at_all(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute(
+        """
+        SENT, PENDING = {}, {}
+        function SEND(text, callback) SENT[#SENT + 1] = text PENDING[#SENT] = callback end
+        function ANSWER(index) local cb = PENDING[index] PENDING[index] = nil cb(true, {}) end
+        """
+    )
+    # b waits for c, glued to it, which waits for a; the width of one never parts them.
+    start_run(
+        lua,
+        '{ { text = "a" }, { text = "b" }, { glued = true, needs = { 1 }, text = "c" },'
+        ' { text = "d" } }',
+        width=1,
+    )
+    assert list(lua.eval("SENT").values()) == ["a"]
+    lua.execute("ANSWER(1)")
+    assert list(lua.eval("SENT").values()) == ["a", "b", "c"]
+    lua.execute("ANSWER(2)")
+    assert list(lua.eval("SENT").values()) == ["a", "b", "c"]
+    lua.execute("ANSWER(3)")
+    assert list(lua.eval("SENT").values()) == ["a", "b", "c", "d"]
+
+
+@pytest.mark.parametrize(
+    "commands",
+    [
+        '{ { glued = true, text = "a" } }',
+        '{ { text = "a" }, { glued = true, needs = { 1 }, text = "b" } }',
+    ],
+)
+def test_a_glued_run_that_could_never_go_is_refused(tmp_path: Path, commands: str) -> None:
+    lua = lua_core(tmp_path)
+    sent = fake_server(lua)
+    start_run(lua, commands)
+    assert lua.eval("HANDLE") is None and "glued" in lua.eval("REASON")
+    assert sent() == []
+
+
 def test_a_second_abort_gives_up_on_the_replies_still_owed(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     lua.execute(
@@ -457,14 +498,42 @@ def test_a_word_group_waits_only_for_the_two_that_may_lead(tmp_path: Path) -> No
     lua = lua_core(tmp_path)
     sent = held_server(lua)
     spawn(lua, rows(lua, 2))
-    # The chair goes before the marker answers; its join waits for the marker alone.
-    assert sent() == [SPAWN_MARKER, SPAWN_CHAIR]
+    # The chair goes with its join, and the join waits for the marker.
+    assert sent() == [SPAWN_MARKER]
     lua.execute("ANSWER(1)")
-    # The lamp goes before the chair answers; its join waits for the chair as well, which
-    # would lead had the marker been refused.
-    assert sent() == [SPAWN_MARKER, SPAWN_CHAIR, "gobject group add 7001", SPAWN_LAMP]
+    # The lamp's join waits for the chair as well, which would lead had the marker been
+    # refused; nothing waits on the reply to the join before it.
+    assert sent() == [SPAWN_MARKER, SPAWN_CHAIR, "gobject group add 7001"]
     lua.execute("ANSWER(2)")
-    assert sent()[-1] == "gobject group add 7001"
+    assert sent()[3:] == [SPAWN_LAMP, "gobject group add 7001"]
+
+
+def test_a_reselect_sent_on_a_joins_reply_never_parts_a_spawn_from_its_join(
+    tmp_path: Path,
+) -> None:
+    lua = lua_core(tmp_path)
+    sent = held_server(lua)
+    # As EpsilonLib does: the reply to a join sends a reselect of the group, which moves the
+    # server's selection to the leader.
+    lua.execute(
+        """
+        local answer = ANSWER
+        function ANSWER(index)
+          local leader = SENT[index]:match("^gobject group add (%d+)")
+          if leader then SEND("gobject group sel " .. leader, function() end) end
+          answer(index)
+        end
+        """
+    )
+    spawn(lua, rows(lua, 2))
+    lua.execute("ANSWER(1); ANSWER(3); ANSWER(2)")
+    lines = sent()
+    assert "gobject group sel 7001" in lines
+    assert all(
+        lines[i - 1].startswith("gobject spawn")
+        for i, line in enumerate(lines)
+        if line.startswith("gobject group add")
+    )
 
 
 def test_a_join_behind_a_refused_spawn_speaks_for_nobody(tmp_path: Path) -> None:
@@ -531,17 +600,16 @@ def test_an_abort_with_cleanup_deletes_what_was_spawned(tmp_path: Path) -> None:
     spawn(lua, rows(lua, 2))
     lua.execute('ANSWER(1, true, { "|Hgameobject_GUID:7001|h7001|h" })')
     lua.execute("HANDLE.Abort(true)")
-    # Out at the abort: the chair, its join and the lamp. The lamp's join waited for the
-    # chair's reply and never goes; the rest answer, and then everything spawned is deleted.
+    # Out at the abort: the chair and its join. The lamp went with its join, which waited
+    # for the chair, so neither goes; the rest answer, and then everything spawned is deleted.
     lua.execute('ANSWER(2, true, { "|Hgameobject_GUID:7002|h7002|h" })')
     lua.execute("ANSWER(3, true, {})")
-    lua.execute('ANSWER(4, true, { "|Hgameobject_GUID:7003|h7003|h" })')
     sent = list(lua.eval("SENT").values())
-    assert sent[:4] == [SPAWN_MARKER, SPAWN_CHAIR, "gobject group add 7001", SPAWN_LAMP]
-    assert sent[4:] == ["gobject delete 7001", "gobject delete 7002", "gobject delete 7003"]
-    lua.execute("ANSWER(5, true, {}); ANSWER(6, true, {}); ANSWER(7, true, {})")
+    assert sent[:3] == [SPAWN_MARKER, SPAWN_CHAIR, "gobject group add 7001"]
+    assert sent[3:] == ["gobject delete 7001", "gobject delete 7002"]
+    lua.execute("ANSWER(4, true, {}); ANSWER(5, true, {})")
     result = lua.eval("RESULT")
-    assert result.aborted is True and result.deleted == 3 and lua.eval("HANDLE.Done()") is True
+    assert result.aborted is True and result.deleted == 2 and lua.eval("HANDLE.Done()") is True
 
 
 # -- Settings ---------------------------------------------------------------------------
