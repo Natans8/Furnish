@@ -18,10 +18,11 @@ Furnish.Plan = Plan
 local Transform = Furnish.Transform
 
 --- The display spawned as a set's invisible leader at the house's origin. A setting, with a
--- default that is Blizzard's, invisible and nobody's signature: an invisible stalker variant
--- no builder reaches for, so a later attach can tell our pivot from a player's own marker by
--- its file. Spawned by display like every doodad, so no entry is involved.
-Plan.MARKER = 47846
+-- default chosen by scanning every gameobject model: of 17,239, seven draw nothing, light
+-- nothing, emit nothing and collide with nothing, and the firewood pile is the one that reads
+-- as a word in every list. Spawned by display like every doodad, so no entry is involved,
+-- and the record's file tells our pivot from a player's own marker.
+Plan.MARKER = 9653
 
 --- Whether `gobject group add` may be chained onto a spawn, which lets the spawns go out
 -- several at a time. Until it is seen to work in game, each doodad is spawned and then
