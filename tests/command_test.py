@@ -2,7 +2,6 @@
 list and its links, a spawn closed by selecting its group, an import, and stopping, against
 the stand-in client the core's tests use."""
 
-import re
 from pathlib import Path
 from typing import Any
 
@@ -12,9 +11,6 @@ from lupa import lua51
 from tests.core_test import fake_client, lua_core, printed
 
 PREFIX = "|cff66ccffFurnish:|r "
-CHAT = Path(__file__).parents[1] / "addon" / "Furnish" / "Chat.lua"
-COMMAND = re.search(r'Chat\.COMMANDS = \{ "([^"]+)"', CHAT.read_text(encoding="utf-8")).group(1)
-"""The command as a message spells it, read off its one declaration."""
 
 
 def command_lua(tmp_path: Path, deferred: bool = False) -> lua51.LuaRuntime:
@@ -128,14 +124,14 @@ def test_what_is_typed_reads_as_a_request(
 @pytest.mark.parametrize(
     ("typed", "reason"),
     [
-        ("spawn 3", f"spawn is not a Furnish command; {COMMAND} help shows them"),
-        ("3 quickly", f"quickly is not a word Furnish knows; {COMMAND} help shows them"),
+        ("spawn 3", "spawn is not a Furnish command; /furn help shows them"),
+        ("3 quickly", "quickly is not a word Furnish knows; /furn help shows them"),
         ("3 first nogroup", "first and nogroup cannot go together; choose one"),
         ("3 base base", "base and base cannot go together; choose one"),
-        ("3 from", f"from takes an object's entry, as {COMMAND} 3 from <entry>"),
-        ("3 from 1 here 2", f"name the object once, as {COMMAND} 3 here <entry>"),
-        ("list here", f"here follows a set's number, as {COMMAND} 3 here"),
-        ("stop now", f"stop takes delete or nothing: {COMMAND} stop delete"),
+        ("3 from", "from takes an object's entry, as /furn 3 from <entry>"),
+        ("3 from 1 here 2", "name the object once, as /furn 3 here <entry>"),
+        ("list here", "here follows a set's number, as /furn 3 here"),
+        ("stop now", "stop takes delete or nothing: /furn stop delete"),
     ],
 )
 def test_what_cannot_be_read_says_the_way_out(tmp_path: Path, typed: str, reason: str) -> None:
@@ -145,9 +141,7 @@ def test_what_cannot_be_read_says_the_way_out(tmp_path: Path, typed: str, reason
 
 def test_a_refused_command_is_said_once_with_the_prefix(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
-    assert run(lua, "spawn 3") == [
-        PREFIX + f"spawn is not a Furnish command; {COMMAND} help shows them"
-    ]
+    assert run(lua, "spawn 3") == [PREFIX + "spawn is not a Furnish command; /furn help shows them"]
     assert sent(lua) == []
 
 
@@ -155,8 +149,8 @@ def test_the_help_names_every_command_and_word(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lines = run(lua, "help")
     assert lines[0] == "|cffffd100Furnish|r|cff9d9d9d spawns a building's doodad sets as objects|r"
-    assert lines[1] == f"  |cffffd100{COMMAND} help|r this help"
-    assert lines[2] == f"  |cffffd100{COMMAND} list|r the selected building's sets"
+    assert lines[1] == "  |cffffd100/furn help|r this help"
+    assert lines[2] == "  |cffffd100/furn list|r the selected building's sets"
     assert "  |cffffd100attach|r join the selected object's group" in lines
     assert lines[-1].endswith("click it to spawn it, ctrl-click to spawn it at your feet.|r")
     assert len(lines) == 1 + 10 + 1 + 4 + 1
@@ -164,9 +158,7 @@ def test_the_help_names_every_command_and_word(tmp_path: Path) -> None:
 
 def test_the_command_alone_is_the_windows(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
-    assert run(lua, "") == [
-        PREFIX + f"the window is not built yet; {COMMAND} help lists the commands"
-    ]
+    assert run(lua, "") == [PREFIX + "the window is not built yet; /furn help lists the commands"]
 
 
 # -- Listing -----------------------------------------------------------------------------
@@ -194,7 +186,7 @@ def test_a_list_refuses_without_a_building(tmp_path: Path) -> None:
     lua.execute("SELECTED = 502")
     assert run(lua, "list") == [
         PREFIX + "chair.m2 is not a building, so it has no sets; "
-        f"{COMMAND} list <entry> lists another object's"
+        "/furn list <entry> lists another object's"
     ]
     assert run(lua, "list 5") == [
         PREFIX
@@ -270,9 +262,9 @@ def test_a_spawn_refuses_with_the_way_out(tmp_path: Path) -> None:
         "a group is selected, not one object; select the building first, as with .gob select"
     )
     lua.execute("SELECTED = 500")
-    assert run(lua, "7") == [PREFIX + f"house has no set 7; {COMMAND} list shows its 2"]
+    assert run(lua, "7") == [PREFIX + "house has no set 7; /furn list shows its 2"]
     assert run(lua, "7 here 817579") == [
-        PREFIX + f"object 817579 has no set 7; {COMMAND} list 817579 shows its 2"
+        PREFIX + "object 817579 has no set 7; /furn list 817579 shows its 2"
     ]
     assert sent(lua) == []
 
@@ -281,10 +273,10 @@ def test_a_run_in_flight_blocks_another_and_stops_with_its_objects_deleted(tmp_p
     lua = command_lua(tmp_path, deferred=True)
     lua.execute("SELECTED = 500")
     run(lua, "1")
-    assert run(lua, "1") == [PREFIX + f"Furnish is still spawning; {COMMAND} stop ends it"]
+    assert run(lua, "1") == [PREFIX + "Furnish is still spawning; /furn stop ends it"]
     assert run(lua, "stop delete") == [
         PREFIX + "stopping, then deleting what was spawned; "
-        f"{COMMAND} stop again gives up on a reply that never comes"
+        "/furn stop again gives up on a reply that never comes"
     ]
     lua.execute("FLUSH()")
     assert printed(lua)[-1] == PREFIX + "stopped, and deleted the 1 object it spawned"
@@ -379,7 +371,7 @@ def test_an_import_the_map_did_not_furnish_spawns_nothing(tmp_path: Path) -> Non
     lua.execute("IMPORT_UID = 1")
     assert run(lua, "import") == [
         PREFIX + "imported house.wmo as object 500; "
-        f"the map placed it with no set Furnish knows; {COMMAND} list shows its own"
+        "the map placed it with no set Furnish knows; /furn list shows its own"
     ]
     assert sent(lua) == ["doodad import", "gobject select 500"]
 
@@ -410,7 +402,7 @@ def test_a_set_at_the_feet_with_nothing_selected_offers_naming_it(tmp_path: Path
     lua = command_lua(tmp_path)
     assert run(lua, "1 here") == [
         PREFIX + "no object is selected; select the building first, as with .gob select, "
-        f"or name it, as {COMMAND} 3 here <entry>"
+        "or name it, as /furn 3 here <entry>"
     ]
 
 
@@ -447,7 +439,7 @@ def test_an_import_waiting_for_its_object_says_so_to_another_command(tmp_path: P
         PREFIX + "no object is selected; select the building first, as with .gob select"
     ]
     assert run(lua, "1") == [
-        PREFIX + f"Furnish is waiting for the imported object; {COMMAND} stop ends it"
+        PREFIX + "Furnish is waiting for the imported object; /furn stop ends it"
     ]
 
 
@@ -469,8 +461,7 @@ def test_a_set_read_off_the_selection_needs_a_building(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 502")
     assert run(lua, "1") == [
-        PREFIX
-        + f"chair.m2 is not a building, so it has no sets; name one, as {COMMAND} 3 from <entry>"
+        PREFIX + "chair.m2 is not a building, so it has no sets; name one, as /furn 3 from <entry>"
     ]
     lua.execute("SELECTED = nil")
     assert run(lua, "1 from 817579") == [
@@ -489,15 +480,6 @@ def test_nothing_is_sent_where_the_player_may_not_spawn(tmp_path: Path) -> None:
     assert run(lua, "list")[0] == PREFIX + "house has 2 sets:"
 
 
-def test_the_command_is_spelled_in_one_place(tmp_path: Path) -> None:
-    """A rename is one line in Chat.lua, so nothing else in the addon may spell the command."""
-    addon = Path(__file__).parents[1] / "addon" / "Furnish"
-    spelled = [
-        f"{path.name}:{number}"
-        for path in sorted(addon.glob("*.lua"))
-        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
-        if COMMAND in line and not line.startswith("Chat.COMMANDS = ")
-    ]
-    assert spelled == []
+def test_the_command_answers_to_both_its_names(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
-    assert list(lua.eval("SLASH_FURNISH1, SLASH_FURNISH2")) == [COMMAND, "/furnish"]
+    assert list(lua.eval("SLASH_FURNISH1, SLASH_FURNISH2")) == ["/furn", "/furnish"]

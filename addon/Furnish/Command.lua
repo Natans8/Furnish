@@ -1,5 +1,4 @@
--- The command, its names declared in Chat.lua: what a player types, read into a request for
--- the console, the help that says what can be typed, and the clicks on a list's links. The
+-- The command: what a player types, read into a request for the console, the help that says what can be typed, and the clicks on a list's links. The
 -- command alone is the window's.
 --
 -- The commands and the words are declared once, below, and the help is read off them.
@@ -211,8 +210,9 @@ function Command.Hover(words, tooltip)
 	end
 end
 
-for i, name in ipairs(Chat.COMMANDS) do
-	_G["SLASH_FURNISH" .. i] = name
-end
+-- TODO: both names are placeholders until the command's final name is chosen. Messages
+-- read the first through Chat.Typed, so a rename is these two lines.
+_G.SLASH_FURNISH1 = "/furn"
+_G.SLASH_FURNISH2 = "/furnish"
 _G.SlashCmdList.FURNISH = Client.Guarded(Command.Run)
 Chat.OnLinks(Command.Click, Command.Hover)
