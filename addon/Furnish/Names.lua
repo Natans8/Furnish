@@ -1,7 +1,9 @@
 -- How a set's name reads to a player. The data keeps every name as the WMO spells it, since
 -- that spelling is the key a tooltip shows and a lookup goes back to, and this file turns it
 -- into words wherever it is drawn: a leading "Set_" dropped, underscores, hyphens and case
--- humps split, every word title-cased, and a word already in capitals kept as it is.
+-- humps split, and every word title-cased. A word in capitals is an acronym and kept as it is,
+-- but only in a name that also holds lower case: a name written wholly in capitals says
+-- nothing through its case, so every word of it is title-cased.
 --
 -- Every function is pure, so the whole file runs outside the client.
 
@@ -35,9 +37,9 @@ local function boundary(before, here, after)
 	return isDigit(before)
 end
 
---- A word as it is drawn: capitals stay capitals, anything else is title-cased.
-local function cased(word)
-	if word:match("^%u+$") then
+--- A word as it is drawn: an acronym stays in capitals, anything else is title-cased.
+local function cased(word, shouted)
+	if not shouted and word:match("^%u+$") then
 		return word
 	end
 	return word:sub(1, 1):upper() .. word:sub(2):lower()
@@ -47,6 +49,7 @@ end
 -- that is nothing but its prefix is drawn as spelled.
 function Names.Set(name)
 	local rest = name:gsub("^%s+", ""):gsub("%s+$", ""):gsub("^[Ss][Ee][Tt]_", "")
+	local shouted = not rest:find("%l")
 	local words = {}
 	local word = ""
 	local before = ""
@@ -54,12 +57,12 @@ function Names.Set(name)
 		local here = rest:sub(i, i)
 		if here:match("[_%-%s]") then
 			if word ~= "" then
-				words[#words + 1] = cased(word)
+				words[#words + 1] = cased(word, shouted)
 			end
 			word = ""
 		else
 			if word ~= "" and boundary(before, here, rest:sub(i + 1, i + 1)) then
-				words[#words + 1] = cased(word)
+				words[#words + 1] = cased(word, shouted)
 				word = ""
 			end
 			word = word .. here
@@ -67,7 +70,7 @@ function Names.Set(name)
 		before = here
 	end
 	if word ~= "" then
-		words[#words + 1] = cased(word)
+		words[#words + 1] = cased(word, shouted)
 	end
 	if #words == 0 then
 		return name

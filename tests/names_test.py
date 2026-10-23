@@ -36,6 +36,11 @@ def pretty() -> lua51.LuaFunction:
         ("set_garrison_magict", "Garrison Magict"),
         ("Set_B", "B"),
         ("set_1", "1"),
+        ("ARDENWEALD", "Ardenweald"),
+        ("SET_CARGOSHIP_NORM", "Cargoship Norm"),
+        ("SET_KTPIG_WH_LINK03", "Ktpig Wh Link 03"),
+        ("SET_MURLOCHUT01VAR1", "Murlochut 01 Var 1"),
+        ("SET_7NB_LOUNGEBOAT", "7 Nb Loungeboat"),
     ],
 )
 def test_a_set_name_reads_as_words(pretty: lua51.LuaFunction, spelled: str, read: str) -> None:
