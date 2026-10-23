@@ -12,7 +12,8 @@ import struct
 from collections.abc import Iterator
 from dataclasses import dataclass
 
-from furnish.chunks import chunk_map
+from furnish.chunks import chunk_map, records
+from furnish.sources import path_key
 
 _ENTRY = struct.Struct("<II12f4H")
 _RANGE = struct.Struct("<II")
@@ -53,7 +54,7 @@ def read_placements(raw: bytes, path_to_id: dict[str, int] | None = None) -> Ite
         return
     names = _Names(found, path_to_id or {})
     ranges = _ranges(found)
-    for row in _ENTRY.iter_unpack(payload[: len(payload) - len(payload) % _ENTRY.size]):
+    for row in records(_ENTRY, payload):
         name_id, unique_id, flags, doodad_set = row[0], row[1], row[14], row[15]
         model = name_id if flags & FLAG_FILE_ID else names.resolve(name_id)
         sets = (
@@ -69,11 +70,7 @@ def _ranges(found: dict[bytes, memoryview]) -> dict[int, tuple[int, ...]]:
     sets = struct.unpack_from(f"<{len(sets_payload) // 2}H", sets_payload)
     ranges_payload = found[b"MWDR"]
     out = {}
-    for index, (begin, end) in enumerate(
-        _RANGE.iter_unpack(
-            ranges_payload[: len(ranges_payload) - len(ranges_payload) % _RANGE.size]
-        )
-    ):
+    for index, (begin, end) in enumerate(records(_RANGE, ranges_payload)):
         out[index] = tuple(sets[begin : end + 1])
     return out
 
@@ -89,4 +86,4 @@ class _Names:
         if index >= len(self._offsets):
             return 0
         name = self._names[self._offsets[index] :].split(b"\0", 1)[0].decode("latin-1")
-        return self._path_to_id.get(name.lower().replace("\\", "/"), 0)
+        return self._path_to_id.get(path_key(name), 0)

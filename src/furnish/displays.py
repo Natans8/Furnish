@@ -8,7 +8,7 @@ they can be read only from inside the game.
 """
 
 import csv
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from importlib import resources
 from pathlib import Path
 
@@ -21,39 +21,31 @@ OVERLAY = "epsilon-displays.csv"
 """The vendored Epsilon rows: ``file_id,display`` for Blizzard files Epsilon re-registered."""
 
 
-def display_map(table: Path, overlay: Iterable[tuple[int, int]] = ()) -> dict[int, int]:
-    """Model file id to the display id that spawns it.
-
-    Where a file has several displays, an Epsilon row wins over a Blizzard row and the lowest
-    id wins within a tier, so a build is deterministic.
+def spawners(table: Path, overlay: Iterable[tuple[int, int]] = ()) -> dict[int, tuple[int, ...]]:
+    """Every display id that spawns each file, ascending, for the files that have one.
 
     Args:
         table: wago's ``GameObjectDisplayInfo`` CSV.
         overlay: Extra ``(file id, display)`` rows, Epsilon's by convention.
     """
-    chosen: dict[int, int] = {}
+    out: dict[int, set[int]] = {}
     rows = ((int(row["FileDataID"]), int(row["ID"])) for row in read_csv(table))
     for file_id, display in (*rows, *overlay):
-        if file_id == 0:
-            continue
-        held = chosen.get(file_id)
-        if held is None or _rank(display) < _rank(held):
-            chosen[file_id] = display
-    return chosen
+        if file_id:
+            out.setdefault(file_id, set()).add(display)
+    return {file_id: tuple(sorted(ids)) for file_id, ids in out.items()}
 
 
-def displays_of(table: Path) -> Mapping[int, tuple[int, ...]]:
-    """Every display id that spawns each file, ascending, for the files that have one.
+def preferred(displays: Iterable[int]) -> int:
+    """The display the server will spawn, out of the ones that name a file.
+
+    An Epsilon row wins over a Blizzard row, since the server refuses some of Blizzard's, and
+    the lowest id wins within a tier, so a build is deterministic.
 
     Args:
-        table: wago's ``GameObjectDisplayInfo`` CSV.
+        displays: The display ids naming one file.
     """
-    out: dict[int, list[int]] = {}
-    for row in read_csv(table):
-        file_id = int(row["FileDataID"])
-        if file_id:
-            out.setdefault(file_id, []).append(int(row["ID"]))
-    return {file_id: tuple(sorted(ids)) for file_id, ids in out.items()}
+    return min(displays, key=_rank)
 
 
 def vendored_overlay() -> list[tuple[int, int]]:

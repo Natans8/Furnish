@@ -7,6 +7,7 @@ the format readers do.
 
 import struct
 from collections.abc import Iterator
+from typing import Any
 
 _HEADER = struct.Struct("<4sI")
 
@@ -27,6 +28,18 @@ def chunks(raw: bytes) -> Iterator[tuple[bytes, memoryview]]:
         offset += _HEADER.size
         yield tag[::-1], view[offset : offset + size]
         offset += size
+
+
+def records(layout: struct.Struct, payload: memoryview | bytes) -> Iterator[tuple[Any, ...]]:
+    """Unpack every whole record of ``layout`` in ``payload``, ignoring a trailing partial one.
+
+    The tuple's fields are whatever the layout names, which is ``struct``'s own untyped answer.
+
+    Args:
+        layout: The record's struct.
+        payload: The chunk holding the records back to back.
+    """
+    return layout.iter_unpack(payload[: len(payload) - len(payload) % layout.size])
 
 
 def chunk_map(raw: bytes) -> dict[bytes, memoryview]:

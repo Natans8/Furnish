@@ -69,6 +69,15 @@ def wago_table(table: str, build: str, cache: Path) -> Path:
     return fetch(WAGO_CSV_URL.format(table=table, build=build), cache / build / f"{table}.csv")
 
 
+def path_key(path: str) -> str:
+    """The spelling a path is looked up by: lower case, forward slashes.
+
+    Args:
+        path: A path as a file or a listfile spells it.
+    """
+    return path.lower().replace(chr(92), "/")
+
+
 def read_listfile(path: Path) -> Iterator[tuple[int, str]]:
     """Yield ``(file id, path)`` from a listfile, paths as written.
 

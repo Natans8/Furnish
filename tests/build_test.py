@@ -2,7 +2,7 @@ import sqlite3
 from pathlib import Path
 
 from furnish.build import Inputs, build
-from furnish.displays import display_map
+from furnish.displays import preferred, spawners
 from furnish.wmo import Placement
 from tests.files import adt_object, wmo_root
 
@@ -103,8 +103,11 @@ def test_build_writes_the_four_tables(tmp_path: Path) -> None:
     assert (report.tiles_read, report.map_rows, report.map_rows_unresolved) == (1, 3, 1)
 
 
-def test_display_map_prefers_an_epsilon_row_then_the_lowest(tmp_path: Path) -> None:
+def test_spawners_merge_the_overlay_and_preferred_picks_epsilon_then_lowest(tmp_path: Path) -> None:
     table = tmp_path / "displays.csv"
     table.write_text("ID,FileDataID\n58035,5\n58036,5\n7,6\n")
-    assert display_map(table) == {5: 58035, 6: 7}
-    assert display_map(table, [(5, 116638), (5, 116000)]) == {5: 116000, 6: 7}
+    assert spawners(table) == {5: (58035, 58036), 6: (7,)}
+    merged = spawners(table, [(5, 116638), (5, 116000)])
+    assert merged[5] == (58035, 58036, 116000, 116638)
+    assert preferred(merged[5]) == 116000
+    assert preferred(merged[6]) == 7

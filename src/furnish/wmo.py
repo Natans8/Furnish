@@ -16,7 +16,8 @@ import struct
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from furnish.chunks import chunk_map
+from furnish.chunks import chunk_map, records
+from furnish.sources import path_key
 
 _SET = struct.Struct("<20sII4x")
 _PLACEMENT = struct.Struct("<I3f4ff4B")
@@ -96,7 +97,7 @@ def read_root(raw: bytes, path_to_id: dict[str, int] | None = None) -> Root:
 
 def _sets(payload: memoryview) -> list[tuple[str, int, int]]:
     out = []
-    for name, start, count in _SET.iter_unpack(payload[: len(payload) - len(payload) % _SET.size]):
+    for name, start, count in records(_SET, payload):
         out.append((name.split(b"\0", 1)[0].decode("latin-1"), start, count))
     return out
 
@@ -111,8 +112,7 @@ def _models(found: dict[bytes, memoryview], path_to_id: dict[str, int]) -> Calla
 
 def _placements(payload: memoryview, resolve: Callable[[int], int]) -> tuple[Placement, ...]:
     out = []
-    usable = payload[: len(payload) - len(payload) % _PLACEMENT.size]
-    for head, x, y, z, qx, qy, qz, qw, scale, _b, _g, _r, _a in _PLACEMENT.iter_unpack(usable):
+    for head, x, y, z, qx, qy, qz, qw, scale, _b, _g, _r, _a in records(_PLACEMENT, payload):
         out.append(Placement(resolve(head & MODEL_INDEX_MASK), (x, y, z), (qx, qy, qz, qw), scale))
     return tuple(out)
 
@@ -126,6 +126,6 @@ def _by_name(names: bytes, path_to_id: dict[str, int]) -> Callable[[int], int]:
         if reference >= len(names):
             return 0
         name = names[reference:].split(b"\0", 1)[0].decode("latin-1")
-        return path_to_id.get(name.lower().replace("\\", "/"), 0)
+        return path_to_id.get(path_key(name), 0)
 
     return resolve

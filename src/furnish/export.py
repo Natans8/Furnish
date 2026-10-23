@@ -10,6 +10,8 @@ asked for. ``maps`` says which sets each map placement draws, by map id and uniq
 import sqlite3
 from collections.abc import Iterable
 from dataclasses import dataclass
+from itertools import groupby
+from operator import itemgetter
 from pathlib import Path
 
 from tqdm import tqdm
@@ -66,16 +68,12 @@ def _wmo(connection: sqlite3.Connection) -> Iterable[str]:
         ' (SELECT count(*) FROM placements p WHERE p."set" = w."set")'
         ' FROM wmo_sets w JOIN sets s ON s.id = w."set" ORDER BY w.display, w."index"'
     )
-    current: int | None = None
-    for display, index, set_id, name, count in rows:
-        if display != current:
-            if current is not None:
-                yield " },\n"
-            yield f"  [{display}] = {{"
-            current = display
-        yield f" {{{index},{set_id},{_string(name or '')},{count}}},"
-    if current is not None:
-        yield " },\n"
+    for display, group in groupby(rows, key=itemgetter(0)):
+        entries = "".join(
+            f" {{{index},{set_id},{_string(name or '')},{count}}},"
+            for _, index, set_id, name, count in group
+        )
+        yield f"  [{display}] = {{{entries} }},\n"
     yield "}\n"
 
 
@@ -97,22 +95,12 @@ def _blobs(connection: sqlite3.Connection) -> Iterable[str]:
 def _maps(connection: sqlite3.Connection) -> Iterable[str]:
     yield "FurnishData.maps = {\n"
     rows = connection.execute('SELECT map, uid, "set" FROM map_sets ORDER BY map, uid, "set"')
-    current_map: int | None = None
-    current_uid: int | None = None
-    for map_id, uid, set_id in rows:
-        if map_id != current_map:
-            if current_map is not None:
-                yield " },\n  },\n"
-            yield f"  [{map_id}] = {{\n"
-            current_map, current_uid = map_id, None
-        if uid != current_uid:
-            if current_uid is not None:
-                yield " },\n"
-            yield f"    [{uid}] = {{"
-            current_uid = uid
-        yield f" {set_id},"
-    if current_map is not None:
-        yield " },\n  },\n"
+    for map_id, by_map in groupby(rows, key=itemgetter(0)):
+        yield f"  [{map_id}] = {{\n"
+        for uid, by_uid in groupby(by_map, key=itemgetter(1)):
+            sets = "".join(f" {set_id}," for _, _, set_id in by_uid)
+            yield f"    [{uid}] = {{{sets} }},\n"
+        yield "  },\n"
     yield "}\n"
 
 

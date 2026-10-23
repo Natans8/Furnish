@@ -15,8 +15,8 @@ from tqdm import tqdm
 
 from furnish.adt import read_placements
 from furnish.database import Database
-from furnish.displays import display_map, displays_of
-from furnish.sources import read_csv, read_listfile
+from furnish.displays import preferred, spawners
+from furnish.sources import path_key, read_csv, read_listfile
 from furnish.wmo import Placement, Root, read_root
 
 GROUP_FILE = re.compile(r"_\d{3}(_lod\d)?\.wmo$", re.IGNORECASE)
@@ -90,12 +90,12 @@ def build(inputs: Inputs, out: Path) -> Report:
         out: The database path; an existing file is replaced.
     """
     report = Report()
-    path_to_id = {path.lower(): file_id for file_id, path in read_listfile(inputs.listfile)}
-    displays = display_map(inputs.display_table, inputs.overlay)
-    spawners = _spawners(inputs.display_table, inputs.overlay)
+    path_to_id = {path_key(path): file_id for file_id, path in read_listfile(inputs.listfile)}
+    spawnable = spawners(inputs.display_table, inputs.overlay)
+    displays = {file_id: preferred(ids) for file_id, ids in spawnable.items()}
     with Database(out) as database:
         database.meta({"build": inputs.build})
-        sets_by_root = _write_roots(inputs.roots, path_to_id, displays, spawners, database, report)
+        sets_by_root = _write_roots(inputs.roots, path_to_id, displays, spawnable, database, report)
         if inputs.maps is not None:
             maps = {row["Directory"].lower(): int(row["ID"]) for row in read_csv(inputs.map_table)}
             _write_maps(inputs.maps, path_to_id, maps, sets_by_root, database, report)
@@ -103,13 +103,6 @@ def build(inputs: Inputs, out: Path) -> Report:
         report.placements = database.placements
         report.shared_sets = database.shared_sets
     return report
-
-
-def _spawners(table: Path, overlay: list[tuple[int, int]]) -> dict[int, tuple[int, ...]]:
-    merged: dict[int, set[int]] = {file_id: set(ids) for file_id, ids in displays_of(table).items()}
-    for file_id, display in overlay:
-        merged.setdefault(file_id, set()).add(display)
-    return {file_id: tuple(sorted(ids)) for file_id, ids in merged.items()}
 
 
 def _write_roots(
@@ -191,13 +184,13 @@ def _write_maps(
     for path in tqdm(sorted(_files(directory, ".adt")), desc="tiles", unit="tile"):
         if not OBJECT_FILE.search(path.name):
             continue
-        relative = path.relative_to(directory).as_posix().lower()
-        match = MAP_DIRECTORY.search(relative)
-        if match is None or match.group(1) not in maps:
+        match = MAP_DIRECTORY.search(path.as_posix())
+        directory_name = match.group(1).lower() if match else None
+        if directory_name is None or directory_name not in maps:
             report.tiles_without_map += 1
             continue
         report.tiles_read += 1
-        map_id = maps[match.group(1)]
+        map_id = maps[directory_name]
         rows: list[tuple[int, int, int]] = []
         for placement in read_placements(path.read_bytes(), path_to_id):
             set_ids = sets_by_root.get(placement.model)
@@ -222,4 +215,4 @@ def _files(directory: Path, suffix: str) -> Iterator[Path]:
 def _file_id(path: Path, directory: Path, path_to_id: dict[str, int]) -> int | None:
     if path.stem.isdigit():
         return int(path.stem)
-    return path_to_id.get(path.relative_to(directory).as_posix().lower())
+    return path_to_id.get(path_key(path.relative_to(directory).as_posix()))
