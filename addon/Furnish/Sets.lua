@@ -1,11 +1,10 @@
 -- Which sets: the ways a root file is found, and the sets it offers.
 --
 -- The data keys sets by the root's file id. A selected object gives that file directly. An
--- object a player names without selecting it is a `.lookup` line, an entry and a name
--- together: a stock entry is in the data, and Epsilon's own entry is in no table, so the
--- name the line prints resolves it through the client's own display table. An emptywmo
--- gives its original's file through the same table; a map placement gives the sets the
--- zone chose.
+-- object nobody selected is named by one thing off its `.lookup` line: a stock object by its
+-- entry, which the data knows, and one of Epsilon's own by the model name printed beside
+-- the entry, since no table carries those entries. An emptywmo gives its original's file
+-- through the same name route; a map placement gives the sets the zone chose.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -100,40 +99,21 @@ function Sets.Original(name)
 	return file
 end
 
---- The root file an object spawns, from what a `.lookup` line gives: the entry where the
--- data knows it, else the name. A bare number is an entry, a bare string a name.
--- @param object { entry, name }, an entry, or a name
+--- The root file an object spawns, by the one thing a player has for it: a number is a
+-- gameobject entry, which the data knows for stock objects; a string is a model name, the
+-- word Epsilon prints beside the entry, which the client's display table resolves.
 -- @return the file id, or nil and the reason
 function Sets.OfObject(object)
-	local entry, name
-	if type(object) == "table" then
-		entry, name = object.entry, object.name
-	elseif type(object) == "number" then
-		entry = object
-	elseif type(object) == "string" then
-		name = object
-	end
-	if entry == nil and name == nil then
-		return nil, "an object is { entry, name }, an entry, or a model name"
-	end
-	local byEntry, entryReason = nil, nil
-	if entry ~= nil then
-		byEntry, entryReason = Sets.OfEntry(entry)
-		if byEntry then
-			return byEntry
+	if type(object) == "number" then
+		local file, reason = Sets.OfEntry(object)
+		if not file then
+			return nil, reason .. "; for one of Epsilon's own, give its model name instead"
 		end
+		return file
+	elseif type(object) == "string" then
+		return Sets.OfName(object)
 	end
-	if name == nil then
-		return nil, entryReason .. "; give its model name too, the word .lookup prints beside it"
-	end
-	local byName, nameReason = Sets.OfName(name)
-	if byName then
-		return byName
-	end
-	if entryReason then
-		return nil, entryReason .. ", and " .. nameReason
-	end
-	return nil, nameReason
+	return nil, ("an object is an entry or a model name, not a %s"):format(type(object))
 end
 
 --- The set ids a WMO placed on the map draws, by map and ADT unique id; or nil and the

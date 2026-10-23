@@ -3,16 +3,16 @@
 -- This is a surface, not the API: it holds the one running run, picks defaults, and prints.
 -- Every line it prints says what was asked, what was found and, on a refusal, the way out.
 --
--- An object nobody has selected is what its `.lookup` line gives, the entry and the name
--- beside it: `{ entry = 817579, name = "6dr_draenei_house2.wmo" }`. A stock entry alone is
--- enough; Epsilon's own needs the name, since no table carries its entries.
+-- An object nobody has selected is one value off its `.lookup` line: a stock object's entry,
+-- or the model name Epsilon prints beside its own objects' entries.
 --
 --   /run Furnish.Console.Sets()                      the selected object's sets
---   /run Furnish.Console.Sets({ entry = 817579, name = "6dr_draenei_house2.wmo" })
+--   /run Furnish.Console.Sets(20668)                 a stock object's sets
+--   /run Furnish.Console.Sets("6dr_draenei_house2")  an Epsilon object's sets
 --   /run Furnish.Console.Spawn(1)                    set 1 of the selected object's root, on it
---   /run Furnish.Console.Spawn(1, { from = 20668 })  a stock object's set 1, on the selection
+--   /run Furnish.Console.Spawn(1, { from = "6dr_draenei_house2" })   that root's set 1, on it
 --   /run Furnish.Console.Spawn(1, { group = Furnish.Group.First })
---   /run Furnish.Console.Here({ entry = 817579, name = "6dr_draenei_house2.wmo" }, 1)
+--   /run Furnish.Console.Here("6dr_draenei_house2", 1)   that root's set 1, at the player
 --   /run Furnish.Console.Abort(true)                 stop, and delete what was spawned
 
 _G.Furnish = _G.Furnish or {}
@@ -38,14 +38,6 @@ local function describe(set)
 		return ("set %d (default, %d objects)"):format(set.index, set.count)
 	end
 	return ("set %d %s (%d objects)"):format(set.index, set.name, set.count)
-end
-
---- How an object given to the console is named back in a line.
-local function label(object)
-	if type(object) == "table" then
-		return tostring(object.name or object.entry)
-	end
-	return tostring(object)
 end
 
 local function hooks()
@@ -141,7 +133,7 @@ local function start(rows, pose, group, note)
 end
 
 --- List the sets of the selected object's root, or of the root an object spawns.
--- @param object { entry, name }, an entry, or a model name; nil for the selection
+-- @param object an entry or a model name; nil for the selection
 function Console.Sets(object)
 	local function list(file, label)
 		local sets, reason = Sets.OfFile(file)
@@ -158,7 +150,7 @@ function Console.Sets(object)
 		if not file then
 			return say(reason)
 		end
-		return list(file, ("%s (root file %s)"):format(label(object), tostring(file)))
+		return list(file, ("%s (root file %s)"):format(tostring(object), tostring(file)))
 	end
 	selection(function(pose, reason)
 		if not pose then
@@ -207,7 +199,7 @@ end
 
 --- Spawn a set of the root an object spawns, where the player stands, facing as the
 -- player faces.
--- @param object { entry, name }, an entry, or a model name
+-- @param object an entry or a model name
 -- @param index the set's index
 -- @param options { group = a Furnish.Group value or GUID, default = true, scale = number }
 function Console.Here(object, index, options)

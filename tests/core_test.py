@@ -571,23 +571,20 @@ def test_sets_name_what_a_root_offers_and_what_it_lacks(tmp_path: Path) -> None:
     )
 
 
-def test_an_object_resolves_by_its_entry_then_by_its_name(tmp_path: Path) -> None:
+def test_an_object_is_an_entry_or_a_name(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     fake_client(lua)
     of_object = lua.eval("Furnish.Sets.OfObject")
     assert of_object(20668) == HOUSE
-    assert of_object("house.wmo") == HOUSE
-    assert of_object(lua.table(entry=817579, name="world/wmo/house.wmo")) == HOUSE
-    assert of_object(lua.table(entry=20668, name="nothing")) == HOUSE
+    assert of_object("world/wmo/House.wmo") == HOUSE
     assert of_object(817579)[1] == (
-        "entry 817579 is not a stock object with doodad sets; give its model name too,"
-        " the word .lookup prints beside it"
+        "entry 817579 is not a stock object with doodad sets; for one of Epsilon's own, give"
+        " its model name instead"
     )
-    assert of_object(lua.table(entry=817579, name="barn"))[1] == (
-        "entry 817579 is not a stock object with doodad sets, and no model is named barn;"
-        " the name is what .lookup gobject prints"
+    assert of_object("barn")[1] == (
+        "no model is named barn; the name is what .lookup gobject prints"
     )
-    assert of_object(lua.table())[1] == "an object is { entry, name }, an entry, or a model name"
+    assert of_object(lua.table())[1] == "an object is an entry or a model name, not a table"
 
 
 def test_an_emptywmo_borrows_its_originals_sets_through_the_model_search(tmp_path: Path) -> None:
@@ -658,10 +655,7 @@ def test_the_console_lays_an_emptywmo_out_with_the_default_set_from_its_original
 def test_the_console_spawns_at_the_player_and_lists_sets(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     fake_client(lua)
-    lua.execute(
-        "Furnish.Console.Here({ entry = 817579, name = 'house.wmo' }, 0,"
-        " { group = Furnish.Group.First })"
-    )
+    lua.execute("Furnish.Console.Here('house.wmo', 0, { group = Furnish.Group.First })")
     assert list(lua.eval("SENT").values()) == [
         "gobject spawn -21 posx -3 posy 6 posz 4 face north turn 90"
     ]
