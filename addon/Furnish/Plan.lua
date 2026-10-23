@@ -17,10 +17,11 @@ Furnish.Plan = Plan
 
 local Transform = Furnish.Transform
 
---- The gameobject entry spawned as a set's invisible leader at the house's origin.
--- TODO: the entry Epsilon builders use as a marker; until it is set, a plan that needs a
--- pivot is refused.
-Plan.MARKER = nil
+--- The display spawned as a set's invisible leader at the house's origin. A setting, with a
+-- default that is Blizzard's, invisible and nobody's signature: an invisible stalker variant
+-- no builder reaches for, so a later attach can tell our pivot from a player's own marker by
+-- its file. Spawned by display like every doodad, so no entry is involved.
+Plan.MARKER = 47846
 
 --- Whether `gobject group add` may be chained onto a spawn, which lets the spawns go out
 -- several at a time. Until it is seen to work in game, each doodad is spawned and then
@@ -89,7 +90,7 @@ function Plan.Build(house, index, options)
 		leader = "first"
 	else
 		if not Plan.MARKER then
-			return nil, "no marker entry is set for the pivot; say nopivot or attach"
+			return nil, "no marker is set for the pivot; say nopivot or attach"
 		end
 		leader = "pivot"
 	end
@@ -110,10 +111,8 @@ function Plan.Build(house, index, options)
 			{ x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 }
 		)
 		origin.scale = 1
-		commands[#commands + 1] = {
-			role = "pivot",
-			text = Transform.SpawnCommand(Plan.MARKER, origin):gsub("spawn %-", "spawn ", 1),
-		}
+		commands[#commands + 1] =
+			{ role = "pivot", text = Transform.SpawnCommand(Plan.MARKER, origin) }
 	end
 	local placements = rows(sets, chosen, twin or options.default)
 	for _, row in ipairs(placements) do

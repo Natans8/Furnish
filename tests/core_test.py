@@ -139,7 +139,7 @@ def test_a_plan_spawns_a_pivot_then_the_set(tmp_path: Path) -> None:
     plan = lua.eval(f"Furnish.Plan.Build({STOCK}, 1, {{}})")
     assert plan.leader == "pivot" and plan.doodads == 2 and plan.set.name == "Set_Full"
     commands = [(c.role, c.text) for c in plan.commands.values()]
-    assert commands[0] == ("pivot", "gobject spawn 424242 posx 10 posy 20 posz 30 face north")
+    assert commands[0] == ("pivot", "gobject spawn -424242 posx 10 posy 20 posz 30 face north")
     assert commands[1] == ("doodad", "gobject spawn -20 posx 11.5 posy 18 posz 30.25 face north")
     assert commands[2] == (
         "doodad",
@@ -159,7 +159,8 @@ def test_a_plan_refuses_what_it_must(tmp_path: Path) -> None:
     build = lua.eval("Furnish.Plan.Build")
     assert build(lua.eval(STOCK), 0, lua.table())[1].startswith("the shell already draws")
     assert build(lua.eval(STOCK), 7, lua.table())[1] == "this WMO has no set 7"
-    assert build(lua.eval(STOCK), 1, lua.table())[1].startswith("no marker entry")
+    lua.execute("Furnish.Plan.MARKER = nil")
+    assert build(lua.eval(STOCK), 1, lua.table())[1].startswith("no marker is set")
     assert (
         build(lua.eval(STOCK.replace("canEdit = true", "canEdit = false")), 1, lua.table())[1]
         == "you cannot edit this object"
@@ -222,7 +223,7 @@ def test_a_run_spawns_the_pivot_first_and_joins_every_doodad_to_it(tmp_path: Pat
     sent = fake_server(lua)
     result = run(lua, f"Furnish.Plan.Build({STOCK}, 1, {{}})")
     assert sent() == [
-        "gobject spawn 424242 posx 10 posy 20 posz 30 face north",
+        "gobject spawn -424242 posx 10 posy 20 posz 30 face north",
         "gobject spawn -20 posx 11.5 posy 18 posz 30.25 face north",
         "gobject group add 7001",
         "gobject spawn -21 scale 0.5 posx 10 posy 20 posz 33 face north",
@@ -259,7 +260,7 @@ def test_chained_joins_go_out_several_at_a_time(tmp_path: Path) -> None:
     sent = fake_server(lua)
     result = run(lua, f"Furnish.Plan.Build({STOCK}, 1, {{}})")
     assert sent() == [
-        "gobject spawn 424242 posx 10 posy 20 posz 30 face north",
+        "gobject spawn -424242 posx 10 posy 20 posz 30 face north",
         "gobject spawn -20 posx 11.5 posy 18 posz 30.25 face north group add 7001",
         "gobject spawn -21 scale 0.5 posx 10 posy 20 posz 33 face north group add 7001",
     ]
@@ -284,7 +285,7 @@ def test_an_abort_with_cleanup_deletes_what_was_spawned(tmp_path: Path) -> None:
     lua.execute("ANSWER(3, true, {})")
     sent = list(lua.eval("SENT").values())
     assert sent[:3] == [
-        "gobject spawn 424242 posx 10 posy 20 posz 30 face north",
+        "gobject spawn -424242 posx 10 posy 20 posz 30 face north",
         "gobject spawn -20 posx 11.5 posy 18 posz 30.25 face north",
         "gobject group add 7001",
     ]
