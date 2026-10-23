@@ -18,6 +18,7 @@ ADDON = Path(__file__).parents[1] / "addon" / "Furnish"
 FILES = (
     "Settings.lua",
     "Reader.lua",
+    "Names.lua",
     "Transform.lua",
     "Commands.lua",
     "Run.lua",
@@ -613,7 +614,7 @@ def test_sets_name_what_a_root_offers_and_what_it_lacks(tmp_path: Path) -> None:
     assert [(s.index, s.name, s.count) for s in sets.values()] == [(0, "", 1), (1, "Set_Full", 2)]
     assert lua.eval(f"Furnish.Sets.Pick({HOUSE}, 1)").id == 2
     assert lua.eval(f"select(2, Furnish.Sets.Pick({HOUSE}, 7))") == (
-        "root file 900 has no set 7; it has 0, 1 Set_Full"
+        "root file 900 has no set 7; it has 0, 1 Full"
     )
     assert (
         lua.eval("select(2, Furnish.Sets.OfFile(1))")
@@ -643,7 +644,7 @@ def test_the_console_spawns_the_selections_set_with_a_pivot_and_says_so(tmp_path
     assert len(sent) == 5
     lines = printed(lua)
     assert lines[0] == (
-        "|cff66ccffFurnish:|r spawning 2 objects, set 1 Set_Full (2 objects) of root file 900,"
+        "|cff66ccffFurnish:|r spawning 2 objects, set 1 Full (2 objects) of root file 900,"
         " at 10 20 30, an invisible pivot leading"
     )
     assert lines[-1] == "|cff66ccffFurnish:|r done: 2 of 2 spawned, group led by 7001"
@@ -665,7 +666,7 @@ def test_the_console_refuses_with_the_way_out(tmp_path: Path) -> None:
         "chair.m2 (502) is not a WMO; a set is laid out against a building"
     )
     lua.execute("SELECTED = 500; Furnish.Console.Spawn(7)")
-    assert printed(lua)[-1].endswith("root file 900 has no set 7; it has 0, 1 Set_Full")
+    assert printed(lua)[-1].endswith("root file 900 has no set 7; it has 0, 1 Full")
 
 
 def test_the_console_lays_an_emptywmo_out_with_the_default_set_from_its_original(
@@ -702,5 +703,5 @@ def test_the_console_spawns_at_the_player_and_lists_sets(tmp_path: Path) -> None
     assert printed(lua)[-3:] == [
         "|cff66ccffFurnish:|r entry 817579 offers 2 sets:",
         "|cff66ccffFurnish:|r   set 0 (default, 1 objects)",
-        "|cff66ccffFurnish:|r   set 1 Set_Full (2 objects)",
+        "|cff66ccffFurnish:|r   set 1 Full (2 objects)",
     ]

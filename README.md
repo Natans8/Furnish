@@ -97,6 +97,7 @@ lead to the first doodad.
 | file            | role                                                                       |
 |-----------------|----------------------------------------------------------------------------|
 | `Settings.lua`  | the defaults: marker, chained join, in-flight width; `FurnishSettings` keeps changes |
+| `Names.lua`     | a set's name as a player reads it: `Set(name)`                              |
 | `Transform.lua` | the placement maths: `Place(position, rotation, scale, row)`               |
 | `Commands.lua`  | every command spelling and every reply reader                              |
 | `Run.lua`       | any series of commands through `send`, in order, with needs and a width    |

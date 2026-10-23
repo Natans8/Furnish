@@ -22,6 +22,7 @@ Furnish.Console = Console
 local Client = Furnish.Client
 local Pose = Furnish.Pose
 local Sets = Furnish.Sets
+local Names = Furnish.Names
 local Rows = Furnish.Rows
 local Group = Furnish.Group
 local Commands = Furnish.Commands
@@ -48,7 +49,7 @@ local function describe(set)
 	if set.name == "" then
 		return ("set %d (default, %d objects)"):format(set.index, set.count)
 	end
-	return ("set %d %s (%d objects)"):format(set.index, set.name, set.count)
+	return ("set %d %s (%d objects)"):format(set.index, Names.Set(set.name), set.count)
 end
 
 local function hooks()

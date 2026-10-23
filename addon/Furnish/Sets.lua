@@ -12,6 +12,7 @@ local Sets = {}
 Furnish.Sets = Sets
 
 local Reader = Furnish.Reader
+local Names = Furnish.Names
 local Client = Furnish.Client
 
 --- The sets a root file offers, in index order, or nil and the reason.
@@ -43,7 +44,8 @@ function Sets.Pick(file, index)
 		if set.index == index then
 			return set
 		end
-		offered[i] = set.name ~= "" and ("%d %s"):format(set.index, set.name) or tostring(set.index)
+		offered[i] = set.name ~= "" and ("%d %s"):format(set.index, Names.Set(set.name))
+			or tostring(set.index)
 	end
 	return nil,
 		("root file %s has no set %s; it has %s"):format(
