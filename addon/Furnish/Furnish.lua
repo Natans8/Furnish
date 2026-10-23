@@ -45,6 +45,18 @@ local function say(text)
 	print("|cff66ccffFurnish:|r " .. text)
 end
 
+--- A function that prints its fault instead of dying in silence. Every boundary a command
+-- reply or a timer crosses is wrapped, since AddonCommands swallows an error thrown inside
+-- its callback and /run shows one only while script errors are on.
+local function guarded(fn)
+	return function(...)
+		local ok, fault = pcall(fn, ...)
+		if not ok then
+			say("fault: " .. tostring(fault))
+		end
+	end
+end
+
 --- The selected object's GUID, or nil.
 function Furnish.Selected()
 	local lib = _G.EpsilonLib
@@ -129,34 +141,33 @@ local function resolve(guid, callback)
 	if not door then
 		return callback(nil, why)
 	end
-	door("gobject select " .. wanted, function(success, messages)
-		if not success then
-			return callback(
-				nil,
-				"could not select "
-					.. wanted
-					.. ": "
-					.. tostring(messages and messages[1] or "no reply")
-			)
-		end
-		local tries = 0
-		local function look()
-			local object = lib.GameObject:GetSelected()
-			if object and tonumber(object.guid) == wanted then
-				local ok, fault = pcall(callback, object)
-				if not ok then
-					say("fault: " .. tostring(fault))
+	door(
+		"gobject select " .. wanted,
+		guarded(function(success, messages)
+			if not success then
+				return callback(
+					nil,
+					"could not select "
+						.. wanted
+						.. ": "
+						.. tostring(messages and messages[1] or "no reply")
+				)
+			end
+			local tries = 0
+			local function look()
+				local object = lib.GameObject:GetSelected()
+				if object and tonumber(object.guid) == wanted then
+					return callback(object)
 				end
-				return
+				tries = tries + 1
+				if tries >= SELECT_TRIES then
+					return callback(nil, "selected " .. wanted .. " but its record never arrived")
+				end
+				_G.C_Timer.After(SELECT_INTERVAL, guarded(look))
 			end
-			tries = tries + 1
-			if tries >= SELECT_TRIES then
-				return callback(nil, "selected " .. wanted .. " but its record never arrived")
-			end
-			_G.C_Timer.After(SELECT_INTERVAL, look)
-		end
-		look()
-	end)
+			look()
+		end)
+	)
 end
 
 --- The root a gameobject entry spawns, through the server's own gobject info.
@@ -167,29 +178,32 @@ function Furnish.RootOf(entry, callback)
 	if not door then
 		return callback(nil, why)
 	end
-	door("gobject info " .. entry, function(success, messages)
-		if not success then
-			return callback(
-				nil,
-				("no gameobject %s: %s"):format(
-					tostring(entry),
-					tostring(messages and messages[1] or "no reply")
+	door(
+		"gobject info " .. entry,
+		guarded(function(success, messages)
+			if not success then
+				return callback(
+					nil,
+					("no gameobject %s: %s"):format(
+						tostring(entry),
+						tostring(messages and messages[1] or "no reply")
+					)
 				)
-			)
-		end
-		for _, line in ipairs(messages or {}) do
-			local display = line:match("DisplayID:%s*|c%x%x%x%x%x%x%x%x(%d+)|r")
-				or line:match("DisplayID:%s*(%d+)")
-			if display then
-				local file = Furnish.FileOf(tonumber(display))
-				if file then
-					return callback(file)
-				end
-				return callback(nil, ("the data has no sets for display %s"):format(display))
 			end
-		end
-		callback(nil, ("gobject info %s printed no display"):format(tostring(entry)))
-	end)
+			for _, line in ipairs(messages or {}) do
+				local display = line:match("DisplayID:%s*|c%x%x%x%x%x%x%x%x(%d+)|r")
+					or line:match("DisplayID:%s*(%d+)")
+				if display then
+					local file = Furnish.FileOf(tonumber(display))
+					if file then
+						return callback(file)
+					end
+					return callback(nil, ("the data has no sets for display %s"):format(display))
+				end
+			end
+			callback(nil, ("gobject info %s printed no display"):format(tostring(entry)))
+		end)
+	)
 end
 
 --- The source root for a house: the root of the entry `from` names, the original behind an
@@ -215,44 +229,53 @@ end
 -- @param index the set's position in the source's MODS, as the listing shows it
 -- @param options { from = gameobject entry, attach, nopivot, default }, optional
 function Furnish.Spawn(guid, index, options)
-	options = options or {}
-	if running and not running.Done() then
-		say("a run is still going; Furnish.Abort() stops it")
-		return
-	end
-	local lib = _G.EpsilonLib
-	if not (lib and lib.GameObject) then
-		say("EpsilonLib is not loaded")
-		return
-	end
-	resolve(guid, function(object, reason)
-		if not object then
-			say(reason)
+	guarded(function()
+		options = options or {}
+		say(
+			("set %s of %s on %s"):format(
+				tostring(index),
+				options.from and ("entry " .. tostring(options.from)) or "its own root",
+				tostring(guid)
+			)
+		)
+		if running and not running.Done() then
+			say("a run is still going; Furnish.Abort() stops it")
 			return
 		end
-		if not object:IsWMO() then
-			say("that is not a WMO")
+		local lib = _G.EpsilonLib
+		if not (lib and lib.GameObject) then
+			say("EpsilonLib is not loaded")
 			return
 		end
-		local loaded, unloaded = Furnish.Load()
-		if not loaded then
-			say(unloaded)
-			return
-		end
-		local house = Furnish.HouseOf(object)
-		sourceOf(house, options.from, function(source, missing)
-			if not source then
-				say(missing)
+		resolve(guid, function(object, reason)
+			if not object then
+				say(reason)
 				return
 			end
-			Furnish.Start(house, source, index, options)
+			if not object:IsWMO() then
+				say("that is not a WMO")
+				return
+			end
+			local loaded, unloaded = Furnish.Load()
+			if not loaded then
+				say(unloaded)
+				return
+			end
+			local house = Furnish.HouseOf(object)
+			sourceOf(house, options.from, function(source, missing)
+				if not source then
+					say(missing)
+					return
+				end
+				Furnish.Start(house, source, index, options)
+			end)
 		end)
-	end)
+	end)()
 end
 
 --- Plan and run one set of a source root on a resolved house.
 function Furnish.Start(house, source, index, options)
-	do
+	guarded(function()
 		local plan, refused = Furnish.Plan.Build(house, source, index, options)
 		if not plan then
 			say(refused)
@@ -275,13 +298,13 @@ function Furnish.Start(house, source, index, options)
 		)
 		local last = 0
 		running = Furnish.Run.Start(plan, door, {
-			progress = function(done, total)
+			progress = guarded(function(done, total)
 				if done == total or done - last >= 10 then
 					last = done
 					say(("%d of %d"):format(done, total))
 				end
-			end,
-			finished = function(result)
+			end),
+			finished = guarded(function(result)
 				local text = ("done: %d spawned"):format(#result.spawned)
 				if #result.refused > 0 then
 					text = text .. (", %d refused"):format(#result.refused)
@@ -303,9 +326,9 @@ function Furnish.Start(house, source, index, options)
 						.. (result.deleted and (", %d deleted"):format(result.deleted) or "")
 				end
 				say(text)
-			end,
+			end),
 		})
-	end
+	end)()
 end
 
 --- Stop the current run. With cleanup, delete what it spawned.
