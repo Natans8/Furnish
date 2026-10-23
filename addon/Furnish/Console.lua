@@ -10,7 +10,7 @@
 --   entry   an object's entry naming the root, as a lookup line prints it
 --   file    a root's file id, which a list link carries
 --   label   what to call that root in a line, which a list link carries
---   here    true to spawn at the player rather than on the selected building
+--   here    true to spawn at the player rather than on the selected object
 --   group   "pivot", "first", "attach" or "nogroup"; nil is "pivot"
 --   base    true to lay the root's base set under the set
 
@@ -66,18 +66,24 @@ local function busy()
 	return nil
 end
 
---- The selected building's pose, or nil and the way out.
+--- The selected object's pose, or nil and the way out.
+-- @param what what the selection is for, as the way out names it: "the building"
 -- @param otherwise another way out, said after selecting, or nil
-local function building(otherwise)
+local function selection(what, otherwise)
 	local pose, reason = Pose.Selected()
 	if not pose then
 		return nil,
-			reason .. "; select the building first, as with .gob select" .. (otherwise or "")
-	end
-	if not pose.wmo then
-		return nil, pose.name .. " is not a building; a set is laid out against one"
+			("%s; select %s first, as with .gob select%s"):format(reason, what, otherwise or "")
 	end
 	return pose
+end
+
+--- Why an object's own sets cannot be read, or nil when it is a building that has them.
+local function notBuilding(pose, instead)
+	if pose.wmo then
+		return nil
+	end
+	return pose.name .. " is not a building, so it has no sets; " .. instead
 end
 
 --- The root a request names, what to call it, and the list command that shows its sets;
@@ -205,8 +211,12 @@ function Console.List(request)
 	end
 	local pose
 	if not request.entry then
-		pose, reason = building()
+		pose, reason = selection("the building")
 		if not pose then
+			return say(reason)
+		end
+		reason = notBuilding(pose, "/furn list <entry> lists another object's")
+		if reason then
 			return say(reason)
 		end
 	end
@@ -263,11 +273,11 @@ function Console.Describe(request, tooltip)
 	if #said > 0 then
 		tooltip:AddLine("with " .. table.concat(said, " and "), 0.62, 0.62, 0.62)
 	end
-	tooltip:AddLine("Click: spawn it on the selected building", 1, 1, 1)
+	tooltip:AddLine("Click: spawn it on the selected object", 1, 1, 1)
 	tooltip:AddLine("Ctrl-click: spawn it at your feet", 1, 1, 1)
 end
 
---- Spawn a set on the selected building, or at the player.
+--- Spawn a set on the selected object, or at the player.
 -- @param request as the head of this file describes it
 function Console.Spawn(request)
 	local blocked = busy()
@@ -278,13 +288,22 @@ function Console.Spawn(request)
 	if not loaded then
 		return say(reason)
 	end
-	-- The selected building is the target unless the set goes at the player; even then it
-	-- names the root when nothing else does, and leads the group the set attaches to.
+	-- The selected object is the target unless the set goes at the player, and any object
+	-- will do. It must be a building only where the set is its own, read off it because
+	-- neither a link nor an entry names one; and it leads the group a set attaches to.
+	local named = request.entry or request.file
 	local pose, target
-	if not request.here or not (request.entry or request.file) or request.group == "attach" then
-		local named = request.here and request.group ~= "attach"
-		pose, reason = building(named and ", or name it, as /furn 3 here <entry>" or nil)
+	if not request.here or not named or request.group == "attach" then
+		local what = not named and "the building"
+			or request.here and "the object whose group to join"
+			or "the object to spawn on"
+		local otherwise = request.here and not named and request.group ~= "attach"
+		pose, reason = selection(what, otherwise and ", or name it, as /furn 3 here <entry>" or nil)
 		if not pose then
+			return say(reason)
+		end
+		reason = not named and notBuilding(pose, "name one, as /furn 3 from <entry>")
+		if reason then
 			return say(reason)
 		end
 		target = pose

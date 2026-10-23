@@ -151,7 +151,7 @@ def test_the_help_names_every_command_and_word(tmp_path: Path) -> None:
     assert lines[0] == "|cffffd100Furnish|r|cff9d9d9d spawns a building's doodad sets as objects|r"
     assert lines[1] == "  |cffffd100/furn help|r this help"
     assert lines[2] == "  |cffffd100/furn list|r the selected building's sets"
-    assert "  |cffffd100attach|r join the selected building's group" in lines
+    assert "  |cffffd100attach|r join the selected object's group" in lines
     assert lines[-1].endswith("click it to spawn it, ctrl-click to spawn it at your feet.|r")
     assert len(lines) == 1 + 10 + 1 + 4 + 1
 
@@ -185,7 +185,8 @@ def test_a_list_refuses_without_a_building(tmp_path: Path) -> None:
     ]
     lua.execute("SELECTED = 502")
     assert run(lua, "list") == [
-        PREFIX + "chair.m2 is not a building; a set is laid out against one"
+        PREFIX + "chair.m2 is not a building, so it has no sets; "
+        "/furn list <entry> lists another object's"
     ]
     assert run(lua, "list 5") == [
         PREFIX
@@ -342,7 +343,7 @@ def test_resting_on_a_link_says_the_set_and_the_clicks(tmp_path: Path) -> None:
         "Full",
         "Set_Full, set 1 of house, 2 objects",
         "with base",
-        "Click: spawn it on the selected building",
+        "Click: spawn it on the selected object",
         "Ctrl-click: spawn it at your feet",
     ]
 
@@ -436,4 +437,30 @@ def test_an_import_waiting_for_its_object_says_so_to_another_command(tmp_path: P
     ]
     assert run(lua, "1") == [
         PREFIX + "Furnish is waiting for the imported object; /furn stop ends it"
+    ]
+
+
+def test_a_named_set_spawns_on_any_selected_object(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    words = run(lua, "list 817579")[2].split("garrmission:furnish:")[1].split("|h")[0]
+    lua.execute("SELECTED = 502")
+    lua.globals().HOOKS.SetItemRef("garrmission:furnish:" + words)
+    assert printed(lua)[-2] == (
+        PREFIX
+        + "spawning object 817579's Full (set 1, 2 objects) on chair.m2, led by an invisible pivot"
+    )
+    assert run(lua, "1 from 817579 nogroup")[0] == (
+        PREFIX + "spawning object 817579's Full (set 1, 2 objects) on chair.m2, ungrouped"
+    )
+
+
+def test_a_set_read_off_the_selection_needs_a_building(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("SELECTED = 502")
+    assert run(lua, "1") == [
+        PREFIX + "chair.m2 is not a building, so it has no sets; name one, as /furn 3 from <entry>"
+    ]
+    lua.execute("SELECTED = nil")
+    assert run(lua, "1 from 817579") == [
+        PREFIX + "no object is selected; select the object to spawn on first, as with .gob select"
     ]

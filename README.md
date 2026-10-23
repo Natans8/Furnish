@@ -17,7 +17,7 @@ The command is `/furnish`, or `/furn` for short, and `/furn help` prints what fo
 | `/furn list`               | the selected building's sets                                      |
 | `/furn list <entry>`       | an object's sets, by the entry on its lookup line                 |
 | `/furn <set>`              | spawn a set on the selected building                              |
-| `/furn <set> from <entry>` | spawn an object's set on the selected building                    |
+| `/furn <set> from <entry>` | spawn an object's set on the selected object                      |
 | `/furn <set> here`         | spawn the selected building's set at your feet                    |
 | `/furn <set> here <entry>` | spawn an object's set at your feet                                |
 | `/furn import`             | import the selected doodad and furnish it as the map does         |
@@ -29,12 +29,12 @@ A set, list or import takes any of these words after it:
 | word      | does                                                            |
 |-----------|-----------------------------------------------------------------|
 | `first`   | its first object leads the group, instead of an invisible pivot |
-| `attach`  | join the selected building's group                              |
+| `attach`  | join the selected object's group                                |
 | `nogroup` | spawn every object ungrouped                                    |
 | `base`    | lay the base set under it, which an emptywmo always gets        |
 
-Each set in a list is a link: a click spawns it on the selected building, a ctrl-click at
-your feet, and resting on it says what it is. A run that leaves a group selects that group
+Each set in a list is a link: a click spawns it on the selected object, building or not, a
+ctrl-click at your feet, and resting on it says what it is. A run that leaves a group selects that group
 when it ends, in the chat as if typed, so `.gob group` commands act on it next.
 
 ## Build

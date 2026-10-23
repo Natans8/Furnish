@@ -19,7 +19,7 @@ Command.USAGE = {
 	{ "/furn list", "the selected building's sets" },
 	{ "/furn list <entry>", "an object's sets, by the entry on its lookup line" },
 	{ "/furn <set>", "spawn a set on the selected building" },
-	{ "/furn <set> from <entry>", "spawn an object's set on the selected building" },
+	{ "/furn <set> from <entry>", "spawn an object's set on the selected object" },
 	{ "/furn <set> here", "spawn the selected building's set at your feet" },
 	{ "/furn <set> here <entry>", "spawn an object's set at your feet" },
 	{ "/furn import", "import the selected doodad and furnish it as the map does" },
@@ -35,7 +35,7 @@ Command.WORDS = {
 		word = "attach",
 		field = "group",
 		value = "attach",
-		hint = "join the selected building's group",
+		hint = "join the selected object's group",
 	},
 	{ word = "nogroup", field = "group", value = "nogroup", hint = "spawn every object ungrouped" },
 	{ word = "base", field = "base", value = true, hint = "lay the base set under it" },
@@ -187,7 +187,7 @@ local function fromLink(words)
 	}
 end
 
---- A click on a list link spawns its set: plainly on the selected building, with ctrl at
+--- A click on a list link spawns its set: plainly on the selected object, with ctrl at
 -- the player's feet.
 function Command.Click(words, modifier)
 	-- TODO: a shift-click shares the set, once what a shared set carries is decided.
