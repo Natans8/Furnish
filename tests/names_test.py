@@ -9,7 +9,7 @@ NAMES = Path(__file__).parents[1] / "addon" / "Furnish" / "Names.lua"
 
 
 @pytest.fixture(scope="module")
-def pretty() -> "lua51.LuaFunction":
+def pretty() -> lua51.LuaFunction:
     lua = lua51.LuaRuntime(unpack_returned_tuples=True)
     lua.execute(NAMES.read_text(encoding="utf-8"))
     return lua.eval("Furnish.Names.Set")
@@ -38,13 +38,13 @@ def pretty() -> "lua51.LuaFunction":
         ("set_1", "1"),
     ],
 )
-def test_a_set_name_reads_as_words(pretty: "lua51.LuaFunction", spelled: str, read: str) -> None:
+def test_a_set_name_reads_as_words(pretty: lua51.LuaFunction, spelled: str, read: str) -> None:
     assert pretty(spelled) == read
 
 
-def test_the_default_sets_empty_name_stays_empty(pretty: "lua51.LuaFunction") -> None:
+def test_the_default_sets_empty_name_stays_empty(pretty: lua51.LuaFunction) -> None:
     assert pretty("") == ""
 
 
-def test_a_name_that_is_only_its_prefix_is_drawn_as_spelled(pretty: "lua51.LuaFunction") -> None:
+def test_a_name_that_is_only_its_prefix_is_drawn_as_spelled(pretty: lua51.LuaFunction) -> None:
     assert pretty("Set_") == "Set_"
