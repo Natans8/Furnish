@@ -31,7 +31,6 @@ class Database:
         self._path = path
         self._connection: sqlite3.Connection | None = None
         self._sets: dict[tuple[str, tuple[tuple[int, Placement], ...]], int] = {}
-        self._names: dict[str, int] = {}
         self.shared_sets = 0
         """How many sets were asked for that an identical one already answered."""
 
@@ -89,7 +88,7 @@ class Database:
             self.shared_sets += 1
             return known
         connection = self._connected()
-        cursor = connection.execute("INSERT INTO sets (name) VALUES (?)", (self._name_id(name),))
+        cursor = connection.execute("INSERT INTO sets (name) VALUES (?)", (name,))
         set_id = cursor.lastrowid
         if set_id is None:
             raise RuntimeError("sqlite returned no rowid for a set")
@@ -102,16 +101,6 @@ class Database:
         )
         self._sets[key] = set_id
         return set_id
-
-    def _name_id(self, name: str) -> int:
-        known = self._names.get(name)
-        if known is not None:
-            return known
-        cursor = self._connected().execute("INSERT INTO names (name) VALUES (?)", (name,))
-        if cursor.lastrowid is None:
-            raise RuntimeError("sqlite returned no rowid for a name")
-        self._names[name] = cursor.lastrowid
-        return cursor.lastrowid
 
     def add_wmo_sets(self, rows: Iterable[tuple[int, int, int]]) -> None:
         """Insert ``(display, index, set)`` rows.

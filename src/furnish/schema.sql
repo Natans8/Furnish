@@ -1,6 +1,6 @@
--- The furnishing database. One row of meta, then the tables: a set is a list of doodad
--- placements under a name, shared by every root that holds the same one; a display id
--- reaches the sets of the file it spawns; a map placement names the sets its zone chose.
+-- The furnishing database. One row of meta, then four tables: a set is a named list of
+-- doodad placements, shared by every root that holds the same one; a display id reaches
+-- the sets of the file it spawns; a map placement names the sets its zone chose.
 
 PRAGMA foreign_keys = ON;
 
@@ -9,14 +9,9 @@ CREATE TABLE meta (
     value TEXT NOT NULL
 ) WITHOUT ROWID;
 
-CREATE TABLE names (
-    id   INTEGER PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE       -- as MODS spells it
-);
-
 CREATE TABLE sets (
     id   INTEGER PRIMARY KEY,
-    name INTEGER NOT NULL REFERENCES names(id)
+    name TEXT NOT NULL              -- as MODS spells it
 );
 
 CREATE TABLE wmo_sets (
