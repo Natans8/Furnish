@@ -50,37 +50,37 @@ def test_reader_loads_and_answers(tmp_path: Path) -> None:
     write_database(tmp_path / "f.sqlite")
     export(tmp_path / "f.sqlite", tmp_path / "Data.lua")
     lua = lua_with(tmp_path / "Data.lua")
-    assert lua.eval("Furnish.Load()") is True
-    sets = lua.eval("Furnish.Sets(900)")
+    assert lua.eval("Furnish.Reader.Load()") is True
+    sets = lua.eval("Furnish.Reader.Sets(900)")
     assert [(s[1], s[3], s[4]) for s in sets.values()] == [(0, "", 1), (1, "Set_Full", 2)]
-    rows = lua.eval("Furnish.Placements(Furnish.Sets(900)[2][2])")
+    rows = lua.eval("Furnish.Reader.Placements(Furnish.Reader.Sets(900)[2][2])")
     chair, lamp = rows[1], rows[2]
     assert (chair.display, chair.x, chair.y, chair.z) == (20, 1.5, -2.0, 0.25)
     assert (chair.qx, chair.qy, chair.qz, chair.qw, chair.scale) == (0, 0, 0.5, 0.75, 1)
     assert (lamp.display, lamp.z, lamp.qw, lamp.scale) == (21, 3.0, 1, 0.5)
-    assert lua.eval("Furnish.Placements(2) == Furnish.Placements(2)") is True
-    assert list(lua.eval("Furnish.MapSets(0, 4243)").values()) == [1, 2]
-    assert lua.eval("Furnish.MapSets(1, 4243)") is None
-    assert lua.eval("Furnish.Sets(999)") is None
-    assert lua.eval("Furnish.FileOf(11)") == 900
-    assert lua.eval("Furnish.FileOf(12)") is None
+    assert lua.eval("Furnish.Reader.Placements(2) == Furnish.Reader.Placements(2)") is True
+    assert list(lua.eval("Furnish.Reader.MapSets(0, 4243)").values()) == [1, 2]
+    assert lua.eval("Furnish.Reader.MapSets(1, 4243)") is None
+    assert lua.eval("Furnish.Reader.Sets(999)") is None
+    assert lua.eval("Furnish.Reader.FileOf(11)") == 900
+    assert lua.eval("Furnish.Reader.FileOf(12)") is None
 
 
 def test_reader_refuses_another_format(tmp_path: Path) -> None:
     write_database(tmp_path / "f.sqlite")
     export(tmp_path / "f.sqlite", tmp_path / "Data.lua")
     lua = lua_with(tmp_path / "Data.lua", "FurnishData.format = 99")
-    ok, reason = lua.eval("Furnish.Load()")
+    ok, reason = lua.eval("Furnish.Reader.Load()")
     assert ok is False
     assert "format 99" in reason
     with pytest.raises(lua51.LuaError, match="Load"):
-        lua.eval("Furnish.Sets(900)")
+        lua.eval("Furnish.Reader.Sets(900)")
 
 
 def test_reader_says_when_the_data_is_missing(tmp_path: Path) -> None:
     lua = lua_with(tmp_path / "absent.lua")
     lua.execute("function LoadAddOn(name) return false, 'MISSING' end")
-    ok, reason = lua.eval("Furnish.Load()")
+    ok, reason = lua.eval("Furnish.Reader.Load()")
     assert ok is False
     assert "missing" in reason
 
@@ -96,6 +96,6 @@ def test_lua_reads_large_display_ids_and_their_floats(tmp_path: Path, value: int
         )
     export(tmp_path / "f.sqlite", tmp_path / "Data.lua")
     lua = lua_with(tmp_path / "Data.lua")
-    assert lua.eval("Furnish.Load()") is True
-    row = lua.eval("Furnish.Placements(1)[1]")
+    assert lua.eval("Furnish.Reader.Load()") is True
+    row = lua.eval("Furnish.Reader.Placements(1)[1]")
     assert (row.display, row.x) == (value or 1, float(value))

@@ -1,0 +1,134 @@
+-- Which sets: the ways a root file is found, and the sets it offers.
+--
+-- The data keys sets by the root's file id. A selected object gives that file directly; a
+-- gameobject entry gives it through the display `gobject info` prints; an emptywmo gives it
+-- through the original it was hollowed from; a map placement gives the sets the zone chose.
+
+_G.Furnish = _G.Furnish or {}
+local Furnish = _G.Furnish
+local Sets = {}
+Furnish.Sets = Sets
+
+local Reader = Furnish.Reader
+local Client = Furnish.Client
+local Commands = Furnish.Commands
+
+--- The sets a root file offers, in index order, or nil and the reason.
+-- @return a list of { index, id, name, count }; the default set's name is ""
+function Sets.OfFile(file)
+	local loaded, reason = Reader.Load()
+	if not loaded then
+		return nil, reason
+	end
+	local raw = Reader.Sets(file)
+	if not raw then
+		return nil, ("the data has no doodad sets for root file %s"):format(tostring(file))
+	end
+	local sets = {}
+	for i, entry in ipairs(raw) do
+		sets[i] = { index = entry[1], id = entry[2], name = entry[3], count = entry[4] }
+	end
+	return sets
+end
+
+--- One set of a root by its index, or nil and a reason that lists the indexes there are.
+function Sets.Pick(file, index)
+	local sets, reason = Sets.OfFile(file)
+	if not sets then
+		return nil, reason
+	end
+	local offered = {}
+	for i, set in ipairs(sets) do
+		if set.index == index then
+			return set
+		end
+		offered[i] = set.name ~= "" and ("%d %s"):format(set.index, set.name) or tostring(set.index)
+	end
+	return nil,
+		("root file %s has no set %s; it has %s"):format(
+			tostring(file),
+			tostring(index),
+			table.concat(offered, ", ")
+		)
+end
+
+--- The root file a display spawns, or nil and the reason.
+function Sets.OfDisplay(display)
+	local loaded, reason = Reader.Load()
+	if not loaded then
+		return nil, reason
+	end
+	local file = Reader.FileOf(display)
+	if not file then
+		return nil, ("display %s spawns no root the data has sets for"):format(tostring(display))
+	end
+	return file
+end
+
+--- The root file a gameobject entry spawns, through the server's `gobject info`.
+-- @param callback function(file) or function(nil, reason)
+function Sets.OfEntry(entry, callback)
+	local wanted = tonumber(entry)
+	if not wanted then
+		return callback(nil, ("a gameobject entry is a number, not %s"):format(tostring(entry)))
+	end
+	local send, why = Client.Send()
+	if not send then
+		return callback(nil, why)
+	end
+	send(Commands.Info(wanted), function(success, messages)
+		if not success then
+			return callback(
+				nil,
+				("gobject info %d was refused: %s"):format(wanted, Commands.Quote(messages))
+			)
+		end
+		local display = Commands.DisplayIn(messages)
+		if not display then
+			return callback(
+				nil,
+				("gobject info %d answered %s, and no DisplayID line is in it"):format(
+					wanted,
+					Commands.Quote(messages)
+				)
+			)
+		end
+		callback(Sets.OfDisplay(display))
+	end)
+end
+
+--- The root file an emptywmo was hollowed from, by its name with the prefix trimmed, found
+-- through the client's model search; or nil and the reason.
+function Sets.Original(name)
+	local original = name:gsub("^eps_emptywmo_", "eps_"):gsub("^emptywmo_", "")
+	local found = Client.SearchModels(original)
+	for _, row in ipairs(found) do
+		if Sets.OfFile(row.file) then
+			return row.file
+		end
+	end
+	if #found > 0 then
+		return nil,
+			("%s is in the client's model list but the data has no sets for it"):format(original)
+	end
+	return nil,
+		("no model is named %s, so %s has no original to borrow from"):format(original, name)
+end
+
+--- The set ids a WMO placed on the map draws, by map and ADT unique id; or nil and the
+-- reason. Several on a tile where the zone chose a run of sets.
+function Sets.OfPlacement(map, uid)
+	local loaded, reason = Reader.Load()
+	if not loaded then
+		return nil, reason
+	end
+	local ids = Reader.MapSets(map, uid)
+	if not ids then
+		return nil,
+			("the data has no map placement %s on map %s; only WMOs placed by the map are known"):format(
+				tostring(uid),
+				tostring(map)
+			)
+	end
+	return ids
+end

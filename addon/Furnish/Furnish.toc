@@ -2,11 +2,18 @@
 ## Title: Furnish
 ## Notes: Spawns a WMO's doodad sets as gameobjects on Epsilon. Reads Furnish_Data.
 ## Version: 0.1.0
-## OptionalDeps: EpsilonLib
+## Dependencies: EpsilonLib
 ## X-License: AGPL-3.0-or-later
 
+Settings.lua
 Reader.lua
 Transform.lua
-Plan.lua
+Commands.lua
 Run.lua
-Furnish.lua
+Kernel.lua
+Client.lua
+Pose.lua
+Sets.lua
+Rows.lua
+Group.lua
+Console.lua

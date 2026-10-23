@@ -18,7 +18,8 @@ local decoded = {}
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
-local Reader = Furnish
+local Reader = {}
+Furnish.Reader = Reader
 local Data
 
 --- Load Furnish_Data and check its format. Answers true, or false and a reason.
@@ -28,14 +29,17 @@ function Reader.Load()
 	end
 	local loaded, reason = _G.LoadAddOn("Furnish_Data")
 	if not loaded then
-		return false, "Furnish_Data is " .. tostring(reason):lower()
+		return false,
+			("Furnish_Data could not load (%s): install it beside Furnish and enable it in the addon list"):format(
+				tostring(reason):lower()
+			)
 	end
 	if type(_G.FurnishData) ~= "table" then
 		return false, "Furnish_Data loaded but declared no data"
 	end
 	if _G.FurnishData.format ~= FORMAT then
 		return false,
-			("Furnish_Data is format %s; this Furnish reads format %d"):format(
+			("Furnish_Data is format %s and this Furnish reads format %d: update the one that is behind"):format(
 				tostring(_G.FurnishData.format),
 				FORMAT
 			)
@@ -48,7 +52,7 @@ local VERSION = 1
 
 local function data()
 	if not Data then
-		error("Furnish: call Furnish.Load() before asking for data")
+		error("Furnish: call Furnish.Reader.Load() before asking for data")
 	end
 	return Data
 end

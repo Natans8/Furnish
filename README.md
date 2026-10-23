@@ -54,8 +54,8 @@ placements as one printable string (`blobs`) and the sets each map placement dra
 It loads on demand and holds nothing else, so it changes only when the data does.
 
 `addon/Furnish/Reader.lua` is the reader and ships with the code, never with the data:
-`Furnish.Load()` loads the data addon and refuses another format, `Furnish.Sets(file)`,
-`Furnish.Placements(set)` and `Furnish.MapSets(map, uid)` answer from it. A set's string is
+`Furnish.Reader.Load()` loads the data addon and refuses another format, and `Sets(file)`,
+`Placements(set)`, `FileOf(display)` and `MapSets(map, uid)` on it answer from the data. A set's string is
 LibDeflate's printable encoding of a raw deflate stream over varints, decoded the first time
 the set is asked for; the layout is documented in `src/furnish/codec.py`. Nothing is
 rounded: a placement ships as the file's own float32 values, so the spawn command can be
@@ -63,23 +63,43 @@ given every digit the server keeps.
 
 ## The core
 
-`addon/Furnish` is the addon, and its core is three files over the reader, each pure
-enough to run outside the client and tested in a real Lua 5.1 against a stand-in server:
+`addon/Furnish` is the addon. Its core is a kernel over final values, and providers that
+turn what a player has into those values. The kernel and everything below it are pure Lua,
+tested in a real Lua 5.1 against a stand-in server; the providers are tested against a
+stand-in EpsilonLib.
 
-- `Transform.lua`: the placement maths. `Place(house, row)` is where a doodad stands once its
-  house stands at a pose, `SpawnCommand(display, pose)` the command for it, saying only what
-  differs from a plain spawn.
-- `Plan.lua`: preprocessing. `Plan.Build(house, index, options)` turns a house record, a set
-  index and the options `attach`, `nopivot` and `default` into a plan, which is data: every
-  command in order with its role, the counts, and the leader it will have. A plan is the dry
-  run, and a refusal is nil and the reason.
-- `Run.lua`: processing and post-processing. `Run.Start(plan, send, hooks)` sends the plan
-  through the `send` it is given, reads each reply for its GUID, counts a refusal and goes on,
-  joins every doodad to the leader, and tells its hooks `progress` and `finished`. The handle
-  it returns has `Abort(cleanup)`. A run keeps nothing past its end.
+```lua
+Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
+```
 
-Two facts the core still waits on from the game, both declared at the top of `Plan.lua`:
-the marker entry a pivot is spawned as, and whether `group add` chains onto a spawn.
+- `rows`: a list of `{ display, x, y, z, qx, qy, qz, qw, scale }`, relative to the anchor. A
+  set is an unordered collection of these, so rows from several sets go in together.
+- `position` `{ x, y, z }`, `rotation` `{ roll, pitch, turn }` in degrees or nil for level,
+  `scale` or nil for 1.
+- `group`: `Furnish.Group.Pivot` (an invisible marker at the anchor leads), `First` (the
+  first doodad leads), `None` (loose), or the GUID of an object whose group to join.
+- `send`: `function(text, callback(success, messages))`, the door to the server.
+- `hooks`: `progress(done, total)` and `finished(outcome)`, where the outcome carries
+  `spawned`, `refused` with each refusal's display and the server's words, `leader`, `pivot`
+  and `aborted`.
+
+It answers a handle with `Abort(cleanup)` and `Done()`, or nil and the reason. Who leads is
+read off the replies: the first command that answers a GUID, so a refused marker hands the
+lead to the first doodad.
+
+| file            | role                                                                       |
+|-----------------|----------------------------------------------------------------------------|
+| `Settings.lua`  | the marker display and whether the join is chained onto a spawn            |
+| `Transform.lua` | the placement maths: `Place(position, rotation, scale, row)`               |
+| `Commands.lua`  | every command spelling and every reply reader                              |
+| `Run.lua`       | any series of commands through `send`, in order, with needs and a width    |
+| `Kernel.lua`    | `Furnish.Spawn` and `Furnish.Group`                                        |
+| `Client.lua`    | the one file naming EpsilonLib and `C_Epsilon`                             |
+| `Pose.lua`      | where: `At`, `Here`, `Of(guid, cb)`, `OfDoodad(line)`                      |
+| `Sets.lua`      | which: `OfFile`, `Pick`, `OfDisplay`, `OfEntry(entry, cb)`, `Original`, `OfPlacement` |
+| `Rows.lua`      | what: `OfSet`, `Union`, `Without`                                          |
+| `Group.lua`     | `Furnish.Group.Leading(guid, cb)`, the GUID that leads an object's group   |
+| `Console.lua`   | the `/run` door: `Sets`, `Spawn(index, options)`, `Here(file, index)`, `Abort` |
 
 ## Develop
 

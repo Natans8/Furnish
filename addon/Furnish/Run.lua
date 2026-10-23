@@ -1,34 +1,20 @@
--- Processing and post-processing: a plan goes out as commands, and what comes back is
--- grouped.
+-- A run: a series of commands sent through one door, in order, with what each answered kept
+-- by position.
 --
--- The run is dumb on purpose. It sends the plan's spawns, reads each reply for the GUID it
--- made, counts a refusal and moves on, and tells its hooks how far it is. Grouping is the
--- one thing it decides after the fact, since a group needs the leader's GUID, which only a
--- reply gives. A run keeps its own GUIDs for as long as it lasts and no longer: an abort can
--- take down what it spawned, and nothing survives the run.
+-- The run knows nothing of what the commands do. A command is a string, or a function of
+-- the results so far whose text may depend on an earlier reply and may be nil to send
+-- nothing. A command may name the positions it needs answered before it goes, and no more
+-- than `width` commands are unanswered at once. The run tells its hooks how far it is and
+-- hands back every result when it ends or is aborted. A need names an earlier position, and
+-- a series that breaks that rule is refused before anything is sent.
 --
--- `send(text, callback)` is the one door to the server, handed in rather than reached for,
--- so the whole file runs against a stand-in outside the client.
+-- `send(text, callback(success, messages))` is the one door to the server, handed in rather
+-- than reached for, so the whole file runs against a stand-in outside the client.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
 local Run = {}
 Furnish.Run = Run
-
---- How many spawns are in flight at once when the join is chained onto them. When it is
--- not, the join acts on the selection the spawn left, so one object goes at a time.
-Run.IN_FLIGHT = 4
-
-local function guidOf(messages)
-	for _, message in ipairs(messages or {}) do
-		local guid = message:match("gameobject_GUID:[0-9]+|h([0-9]+)|h")
-			or message:match("GUID: |c[0-9a-fA-F]+([0-9]+)")
-		if guid then
-			return guid
-		end
-	end
-	return nil
-end
 
 local function tell(hooks, name, ...)
 	local hook = hooks and hooks[name]
@@ -37,166 +23,105 @@ local function tell(hooks, name, ...)
 	end
 end
 
---- Carry out a plan.
--- @param plan what Plan.Build answered
--- @param send function(text, callback(success, messages)) that sends one command
--- @param hooks { progress = function(done, total), finished = function(result) }, optional
--- @return a handle with Abort(cleanup), which stops the run and, with cleanup, deletes what
---   it spawned so far
-function Run.Start(plan, send, hooks)
-	local state = {
-		plan = plan,
-		send = send,
-		hooks = hooks,
-		at = 1,
-		inFlight = 0,
-		done = 0,
-		spawned = {},
-		refused = {},
-		leader = nil,
-		aborted = false,
-		finished = false,
-	}
-	local total = #plan.commands
-
-	local function finish()
-		if state.finished then
-			return
+local function answered(results, needs)
+	for _, index in ipairs(needs or {}) do
+		if results[index] == nil then
+			return false
 		end
-		state.finished = true
-		tell(hooks, "finished", {
-			total = total,
-			done = state.done,
-			spawned = state.spawned,
-			refused = state.refused,
-			leader = state.leader,
-			aborted = state.aborted,
-		})
 	end
+	return true
+end
 
-	local function leaderGuid()
-		if plan.leader == "house" then
-			local house = plan.house
-			return tostring(
-				house.groupLeader and house.groupLeader ~= 0 and house.groupLeader or house.guid
-			)
+--- Send a series of commands.
+-- @param commands a list of { text = string or function(results), needs = { positions } }
+-- @param send function(text, callback(success, messages))
+-- @param hooks { progress = function(done, total, index, result), finished = function(outcome) },
+--   optional; progress is told each position as it settles
+-- @param width how many commands may be unanswered at once; 1 when absent
+-- @return a handle with Abort(), which stops sending, and Done(); or nil and the reason
+function Run.Start(commands, send, hooks, width)
+	width = width or 1
+	local total = #commands
+	for index, command in ipairs(commands) do
+		for _, need in ipairs(command.needs or {}) do
+			if need >= index then
+				return nil,
+					("command %d needs position %d, which is not before it"):format(index, need)
+			end
 		end
-		return state.leader
 	end
-
+	local results = {}
+	local at, inFlight, done = 1, 0, 0
+	local aborted, finished = false, false
 	local step
 
-	local function joined(guid)
-		state.spawned[#state.spawned + 1] = guid
-		state.done = state.done + 1
-		tell(hooks, "progress", state.done, total)
-		state.inFlight = state.inFlight - 1
-		step()
-	end
-
-	local function spawned(command, success, messages)
-		if not success then
-			state.refused[#state.refused + 1] = {
-				display = command.display,
-				reason = tostring(messages and messages[1] or "refused"),
-			}
-			state.done = state.done + 1
-			tell(hooks, "progress", state.done, total)
-			state.inFlight = state.inFlight - 1
-			step()
+	local function finish()
+		if finished then
 			return
 		end
-		local guid = guidOf(messages)
-		local first = state.leader == nil and plan.leader ~= "house"
-		if first then
-			state.leader = guid
-		end
-		if first or plan.chainedJoin then
-			joined(guid)
-			return
-		end
-		send("gobject group add " .. leaderGuid(), function()
-			joined(guid)
-		end)
+		finished = true
+		tell(
+			hooks,
+			"finished",
+			{ results = results, total = total, done = done, aborted = aborted }
+		)
 	end
 
-	local function text(command)
-		if plan.chainedJoin and command.role == "doodad" and leaderGuid() then
-			return command.text .. " group add " .. leaderGuid()
-		end
-		return command.text
+	local function settle(index, result)
+		results[index] = result
+		done = done + 1
+		tell(hooks, "progress", done, total, index, result)
 	end
 
 	step = function()
-		if state.aborted then
-			if state.inFlight == 0 then
+		if aborted or at > total then
+			if inFlight == 0 then
 				finish()
 			end
 			return
 		end
-		if state.at > total then
-			if state.inFlight == 0 then
-				finish()
+		while inFlight < width and at <= total do
+			local command = commands[at]
+			if not answered(results, command.needs) then
+				return
 			end
-			return
+			local index = at
+			at = at + 1
+			local text = command.text
+			if type(text) == "function" then
+				text = text(results)
+			end
+			if text == nil then
+				settle(index, { skipped = true })
+			else
+				inFlight = inFlight + 1
+				send(text, function(success, messages)
+					inFlight = inFlight - 1
+					settle(index, { text = text, success = success == true, messages = messages })
+					step()
+				end)
+			end
 		end
-		-- The leader goes alone, since every later join names its GUID; after it, as many as
-		-- the join style allows.
-		local width = (state.leader or plan.leader == "house")
-				and (plan.chainedJoin and Run.IN_FLIGHT or 1)
-			or 1
-		if state.leader == nil and plan.leader ~= "house" and state.inFlight > 0 then
-			return
-		end
-		while state.inFlight < width and state.at <= total do
-			local command = plan.commands[state.at]
-			state.at = state.at + 1
-			state.inFlight = state.inFlight + 1
-			send(text(command), function(success, messages)
-				spawned(command, success, messages)
-			end)
+		if at > total and inFlight == 0 then
+			finish()
 		end
 	end
 
 	local handle = {}
 
-	--- Stop issuing commands. With cleanup, delete what this run spawned once the commands
-	-- in flight have answered.
-	function handle.Abort(cleanup)
-		if state.finished or state.aborted then
+	--- Stop sending. What is already in flight still answers, and then the run finishes.
+	function handle.Abort()
+		if finished or aborted then
 			return
 		end
-		state.aborted = true
-		if cleanup then
-			local previous = hooks and hooks.finished
-			hooks = { progress = hooks and hooks.progress }
-			hooks.finished = function(result)
-				local pending = #result.spawned
-				if pending == 0 then
-					if previous then
-						previous(result)
-					end
-					return
-				end
-				for _, guid in ipairs(result.spawned) do
-					send("gobject delete " .. guid, function()
-						pending = pending - 1
-						if pending == 0 and previous then
-							result.deleted = #result.spawned
-							previous(result)
-						end
-					end)
-				end
-			end
-			state.hooks = hooks
-		end
-		if state.inFlight == 0 then
+		aborted = true
+		if inFlight == 0 then
 			finish()
 		end
 	end
 
 	function handle.Done()
-		return state.finished
+		return finished
 	end
 
 	step()

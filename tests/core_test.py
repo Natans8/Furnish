@@ -1,12 +1,12 @@
-"""The core in a real Lua 5.1: the placement maths, the plan a house and a set become, and a
-run against a stand-in server that answers the way Epsilon's replies read."""
+"""The core in a real Lua 5.1: the placement maths, the command grammar, a run over any series
+of commands, the kernel for every way of grouping, and the providers against a stand-in client
+whose replies read the way Epsilon's do."""
 
 import math
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-import pytest
 from lupa import lua51
 
 from furnish.database import Database
@@ -15,11 +15,30 @@ from furnish.wmo import Placement
 
 LIBDEFLATE = Path(__file__).parent / "lua" / "LibDeflate.lua"
 ADDON = Path(__file__).parents[1] / "addon" / "Furnish"
+FILES = (
+    "Settings.lua",
+    "Reader.lua",
+    "Transform.lua",
+    "Commands.lua",
+    "Run.lua",
+    "Kernel.lua",
+    "Client.lua",
+    "Pose.lua",
+    "Sets.lua",
+    "Rows.lua",
+    "Group.lua",
+    "Console.lua",
+)
 
 HOUSE = 900
 CHAIR = Placement(1001, (1.5, -2.0, 0.25), (0.0, 0.0, 0.0, 1.0), 1.0)
 LAMP = Placement(1002, (0.0, 0.0, 3.0), (0.0, 0.0, 0.0, 1.0), 0.5)
 GLOW = Placement(1003, (4.0, 4.0, 1.0), (0.0, 0.0, 0.0, 1.0), 1.0)
+
+ANCHOR = "{ x = 10, y = 20, z = 30 }"
+SPAWN_CHAIR = "gobject spawn -20 posx 11.5 posy 18 posz 30.25 face north"
+SPAWN_LAMP = "gobject spawn -21 scale 0.5 posx 10 posy 20 posz 33 face north"
+SPAWN_MARKER = "gobject spawn -424242 posx 10 posy 20 posz 30 face north"
 
 
 def write_database(path: Path) -> None:
@@ -29,6 +48,7 @@ def write_database(path: Path) -> None:
         full = db.add_set("Set_Full", [(20, CHAIR), (21, LAMP)])
         db.add_wmo_sets([(HOUSE, 0, default), (HOUSE, 1, full)])
         db.add_root_displays([(30262, HOUSE)])
+        db.add_map_sets([(1116, 4242, full)])
 
 
 def lua_core(tmp_path: Path) -> lua51.LuaRuntime:
@@ -40,137 +60,17 @@ def lua_core(tmp_path: Path) -> lua51.LuaRuntime:
         LibStub = { libs = {} }
         function LibStub:NewLibrary(name, minor) local lib = {} self.libs[name] = lib return lib end
         function LibStub:GetLibrary(name, silent) return self.libs[name] end
+        PRINTED = {}
+        function print(...) PRINTED[#PRINTED + 1] = table.concat({ ... }, " ") end
         """
     )
     lua.execute(LIBDEFLATE.read_text(encoding="utf-8"))
     lua.globals().DATA_PATH = (tmp_path / "Data.lua").as_posix()
     lua.execute("function LoadAddOn(name) dofile(DATA_PATH) return true end")
-    for name in ("Reader.lua", "Transform.lua", "Plan.lua", "Run.lua"):
+    for name in FILES:
         lua.execute((ADDON / name).read_text(encoding="utf-8"))
+    lua.execute("Furnish.Settings.marker = 424242")
     return lua
-
-
-# -- Transform --------------------------------------------------------------------------
-
-
-def test_angles_round_trip_through_the_quaternion(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    for roll, pitch, turn in ((0, 0, 0), (0, 0, 90), (10, 0, 0), (0, -20, 0), (15, 25, 300)):
-        back = lua.eval(
-            f"{{Furnish.Transform.ToAngles(Furnish.Transform.FromAngles({roll}, {pitch}, {turn}))}}"
-        )
-        assert [round(v, 6) % 360 for v in back.values()] == [roll % 360, pitch % 360, turn % 360]
-
-
-def test_a_level_house_turned_west_moves_a_doodad_ahead_of_it_to_its_left(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    # Facing 0 is north, +X; a quarter turn goes toward west, +Y. A doodad one yard ahead
-    # of the house's origin stands one yard west of it once the house faces west.
-    pose = lua.eval(
-        "Furnish.Transform.Place("
-        "{ x = 100, y = 200, z = 5, roll = 0, pitch = 0, turn = 90, scale = 1 },"
-        " { x = 1, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 })"
-    )
-    assert (round(pose.x, 6), round(pose.y, 6), pose.z) == (100, 201, 5)
-    assert (round(pose.roll, 6), round(pose.pitch, 6), round(pose.turn, 6)) == (0, 0, 90)
-
-
-def test_a_scaled_house_scales_offsets_and_doodads(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    pose = lua.eval(
-        "Furnish.Transform.Place({ x = 0, y = 0, z = 0, roll = 0, pitch = 0, turn = 0, scale = 2 },"
-        " { x = 1.5, y = -2, z = 0.25, qx = 0, qy = 0, qz = 0, qw = 1, scale = 0.5 })"
-    )
-    assert (pose.x, pose.y, pose.z, pose.scale) == (3, -4, 0.5, 1)
-
-
-def test_a_doodads_turn_adds_to_the_houses(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    half = math.sin(math.radians(45))
-    pose = lua.eval(
-        "Furnish.Transform.Place("
-        "{ x = 0, y = 0, z = 0, roll = 0, pitch = 0, turn = 30, scale = 1 },"
-        f" {{ x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = {half}, qw = {half}, scale = 1 }})"
-    )
-    assert round(pose.turn, 4) == 120
-
-
-def test_the_spawn_command_says_only_what_differs(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    plain = lua.eval(
-        "Furnish.Transform.SpawnCommand(1001,"
-        " { x = 1, y = -2.5, z = 0, roll = 0, pitch = 0, turn = 0, scale = 1 })"
-    )
-    assert plain == "gobject spawn -1001 posx 1 posy -2.5 posz 0 face north"
-    full = lua.eval(
-        "Furnish.Transform.SpawnCommand(1001,"
-        " { x = 1, y = 2, z = 3, roll = 10, pitch = 350, turn = 90, scale = 0.5 })"
-    )
-    assert (
-        full
-        == "gobject spawn -1001 scale 0.5 posx 1 posy 2 posz 3 pitch 350 roll 10 face north turn 90"
-    )
-
-
-def test_numbers_keep_nine_digits_and_drop_noise(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    number = lua.eval("Furnish.Transform.Number")
-    assert number(-318.0223083496094) == "-318.022308"
-    assert number(0.0) == "0"
-    assert number(-0.0) == "0"
-    assert number(5.135284900665283) == "5.1352849"
-    assert number(1e-7) == "0.0000001"
-
-
-# -- Plan -------------------------------------------------------------------------------
-
-STOCK = (
-    "{ guid = 500, file = 900, x = 10, y = 20, z = 30, roll = 0, pitch = 0, turn = 0, scale = 1,"
-    " groupLeader = 0, canEdit = true }"
-)
-EMPTY = (
-    "{ guid = 501, file = 777, empty = true, x = 0, y = 0, z = 0, roll = 0, pitch = 0, turn = 0,"
-    " scale = 1, groupLeader = 0, canEdit = true }"
-)
-
-
-def test_a_plan_spawns_a_pivot_then_the_set(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    lua.execute("Furnish.Plan.MARKER = 424242")
-    plan = lua.eval(f"Furnish.Plan.Build({STOCK}, 900, 1, {{}})")
-    assert plan.leader == "pivot" and plan.doodads == 2 and plan.set.name == "Set_Full"
-    commands = [(c.role, c.text) for c in plan.commands.values()]
-    assert commands[0] == ("pivot", "gobject spawn -424242 posx 10 posy 20 posz 30 face north")
-    assert commands[1] == ("doodad", "gobject spawn -20 posx 11.5 posy 18 posz 30.25 face north")
-    assert commands[2] == (
-        "doodad",
-        "gobject spawn -21 scale 0.5 posx 10 posy 20 posz 33 face north",
-    )
-
-
-def test_an_emptywmo_gets_the_default_set_too_and_no_pivot_when_attached(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    plan = lua.eval(f"Furnish.Plan.Build({EMPTY}, 900, 1, {{ attach = true }})")
-    assert plan.leader == "house" and plan.withDefault is True and plan.doodads == 3
-    assert [c.display for c in plan.commands.values()] == [21, 20, 21]
-
-
-def test_a_plan_refuses_what_it_must(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    build = lua.eval("Furnish.Plan.Build")
-    assert build(lua.eval(STOCK), 900, 0, lua.table())[1].startswith("the shell already draws")
-    assert build(lua.eval(STOCK), 900, 7, lua.table())[1] == "root 900 has no set 7"
-    lua.execute("Furnish.Plan.MARKER = nil")
-    assert build(lua.eval(STOCK), 900, 1, lua.table())[1].startswith("no marker is set")
-    assert (
-        build(lua.eval(STOCK.replace("canEdit = true", "canEdit = false")), 900, 1, lua.table())[1]
-        == "you cannot edit this object"
-    )
-    assert build(lua.eval(STOCK), 1, 1, lua.table())[1] == "the data has no sets for root 1"
-    assert build(lua.eval(STOCK), 900, 0, lua.table(default=True, nopivot=True)).doodads == 1
-
-
-# -- Run --------------------------------------------------------------------------------
 
 
 def fake_server(lua: lua51.LuaRuntime, refuse: int | None = None) -> Callable[[], list[str]]:
@@ -200,13 +100,15 @@ def fake_server(lua: lua51.LuaRuntime, refuse: int | None = None) -> Callable[[]
     return lambda: list(lua.eval("SENT").values())
 
 
-def run(lua: lua51.LuaRuntime, plan_expr: str) -> Any:
+def rows(lua: lua51.LuaRuntime, *sets: int) -> str:
+    return "Furnish.Rows.Union(" + ", ".join(f"Furnish.Rows.OfSet({s})" for s in sets) + ")"
+
+
+def spawn(lua: lua51.LuaRuntime, rows_expr: str, group: str = "Furnish.Group.Pivot") -> Any:
     lua.execute(
         f"""
-        RESULT = nil
-        PROGRESS = {{}}
-        local plan = assert({plan_expr})
-        HANDLE = Furnish.Run.Start(plan, SEND, {{
+        RESULT, PROGRESS = nil, {{}}
+        HANDLE, REASON = Furnish.Spawn({rows_expr}, {ANCHOR}, nil, nil, {group}, SEND, {{
           progress = function(done, total) PROGRESS[#PROGRESS + 1] = done .. "/" .. total end,
           finished = function(result) RESULT = result end,
         }})
@@ -215,59 +117,311 @@ def run(lua: lua51.LuaRuntime, plan_expr: str) -> Any:
     return lua.eval("RESULT")
 
 
-def test_a_run_spawns_the_pivot_first_and_joins_every_doodad_to_it(tmp_path: Path) -> None:
+def printed(lua: lua51.LuaRuntime) -> list[str]:
+    return list(lua.eval("PRINTED").values())
+
+
+# -- Transform --------------------------------------------------------------------------
+
+
+def test_angles_round_trip_through_the_quaternion(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
-    lua.execute("Furnish.Plan.MARKER = 424242")
+    for roll, pitch, turn in ((0, 0, 0), (0, 0, 90), (10, 0, 0), (0, -20, 0), (15, 25, 300)):
+        back = lua.eval(
+            f"{{Furnish.Transform.ToAngles(Furnish.Transform.FromAngles({roll}, {pitch}, {turn}))}}"
+        )
+        assert [round(v, 6) % 360 for v in back.values()] == [roll % 360, pitch % 360, turn % 360]
+
+
+def test_an_anchor_turned_west_moves_a_doodad_ahead_of_it_to_its_left(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    # Facing 0 is north, +X; a quarter turn goes toward west, +Y. A doodad one yard ahead
+    # of the anchor stands one yard west of it once the anchor faces west.
+    pose = lua.eval(
+        "Furnish.Transform.Place({ x = 100, y = 200, z = 5 }, { turn = 90 }, 1,"
+        " { x = 1, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 })"
+    )
+    assert (round(pose.x, 6), round(pose.y, 6), pose.z) == (100, 201, 5)
+    assert (round(pose.roll, 6), round(pose.pitch, 6), round(pose.turn, 6)) == (0, 0, 90)
+
+
+def test_a_scaled_anchor_scales_offsets_and_doodads(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    pose = lua.eval(
+        "Furnish.Transform.Place({ x = 0, y = 0, z = 0 }, nil, 2,"
+        " { x = 1.5, y = -2, z = 0.25, qx = 0, qy = 0, qz = 0, qw = 1, scale = 0.5 })"
+    )
+    assert (pose.x, pose.y, pose.z, pose.scale) == (3, -4, 0.5, 1)
+
+
+def test_a_doodads_turn_adds_to_the_anchors(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    half = math.sin(math.radians(45))
+    pose = lua.eval(
+        "Furnish.Transform.Place({ x = 0, y = 0, z = 0 }, { turn = 30 }, 1,"
+        f" {{ x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = {half}, qw = {half}, scale = 1 }})"
+    )
+    assert round(pose.turn, 4) == 120
+
+
+# -- Commands ---------------------------------------------------------------------------
+
+
+def test_the_spawn_command_says_only_what_differs(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    plain = lua.eval(
+        "Furnish.Commands.Spawn(1001,"
+        " { x = 1, y = -2.5, z = 0, roll = 0, pitch = 0, turn = 0, scale = 1 })"
+    )
+    assert plain == "gobject spawn -1001 posx 1 posy -2.5 posz 0 face north"
+    full = lua.eval(
+        "Furnish.Commands.Spawn(1001,"
+        " { x = 1, y = 2, z = 3, roll = 10, pitch = 350, turn = 90, scale = 0.5 })"
+    )
+    assert (
+        full
+        == "gobject spawn -1001 scale 0.5 posx 1 posy 2 posz 3 pitch 350 roll 10 face north turn 90"
+    )
+
+
+def test_numbers_keep_nine_digits_and_drop_noise(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    number = lua.eval("Furnish.Commands.Number")
+    assert number(-318.0223083496094) == "-318.022308"
+    assert number(0.0) == "0"
+    assert number(-0.0) == "0"
+    assert number(5.135284900665283) == "5.1352849"
+    assert number(1e-7) == "0.0000001"
+
+
+def test_the_widest_spawn_line_stays_under_the_limit(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    line = lua.eval(
+        "Furnish.Commands.Chained(Furnish.Commands.Spawn(9999999, { x = -17066.1234,"
+        " y = -17066.1234, z = -17066.1234, roll = 359.999999, pitch = 359.999999,"
+        " turn = 359.999999, scale = 0.123456789 }), '99999999')"
+    )
+    assert len(line) < lua.eval("Furnish.Commands.LIMIT")
+
+
+def test_replies_are_read_and_quoted_plain(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    commands = lua.eval("Furnish.Commands")
+    guid = "Spawned |cff00ff00|Hgameobject_GUID:7001|h7001|h|r"
+    assert commands.GuidIn(lua.table(guid)) == "7001"
+    assert commands.GuidIn(lua.table("(GUID: |cff00CCFF88|r)")) == "88"
+    assert (
+        commands.DisplayIn(lua.table("Template GameObject DisplayID: |cff00CCFF30262|r")) == 30262
+    )
+    assert commands.Quote(lua.table(guid, "ok")) == '"Spawned 7001 / ok"'
+    assert commands.Quote(lua.table()) == "an empty reply"
+
+
+def test_a_doodad_select_line_is_read_in_full(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    line = (
+        "Selected doodad |cff00CCFF|Hdoodad_uid:10059564:0|h[draenei jug - 326022]|h|r"
+        " (UID: |cff00CCFF10059564|r) at X: |cff00CCFF2984.496745|r Y: |cff00CCFF3273.661784|r"
+        " Z: |cff00CCFF45.630093|r on map |cff00CCFF1116|r with scale: |cff00CCFF1.000000|r."
+    )
+    doodad = lua.eval("Furnish.Commands.DoodadIn")(line)
+    assert (doodad.uid, doodad.name, doodad.entry, doodad.map) == (
+        10059564,
+        "draenei jug",
+        326022,
+        1116,
+    )
+    assert (doodad.x, doodad.y, doodad.z, doodad.scale) == (2984.496745, 3273.661784, 45.630093, 1)
+    assert lua.eval("Furnish.Commands.DoodadIn")("Found 50 doodads.") is None
+
+
+# -- Run --------------------------------------------------------------------------------
+
+
+def start_run(lua: lua51.LuaRuntime, commands: str, width: int = 1) -> Any:
+    lua.execute(
+        f"""
+        OUT = nil
+        HANDLE, REASON = Furnish.Run.Start({commands}, SEND, {{
+          finished = function(out) OUT = out end,
+        }}, {width})
+        """
+    )
+    return lua.eval("OUT")
+
+
+def test_a_run_sends_in_order_and_keeps_every_result_by_position(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
     sent = fake_server(lua)
-    result = run(lua, f"Furnish.Plan.Build({STOCK}, 900, 1, {{}})")
+    out = start_run(
+        lua, '{ { text = "gobject spawn -1 posx 0" }, { text = "gobject group add 5" } }'
+    )
+    assert sent() == ["gobject spawn -1 posx 0", "gobject group add 5"]
+    assert out.done == 2 and out.results[1].success is True and out.results[2].messages is not None
+
+
+def test_a_command_may_read_an_earlier_reply_or_send_nothing(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    sent = fake_server(lua)
+    out = start_run(
+        lua,
+        """{
+          { text = "gobject spawn -1 posx 0" },
+          { needs = { 1 }, text = function(results)
+              return "gobject group add " .. Furnish.Commands.GuidIn(results[1].messages) end },
+          { needs = { 1 }, text = function() return nil end },
+        }""",
+    )
+    assert sent() == ["gobject spawn -1 posx 0", "gobject group add 7001"]
+    assert out.done == 3 and out.results[3].skipped is True
+
+
+def test_a_need_that_is_not_earlier_is_refused_before_anything_is_sent(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    sent = fake_server(lua)
+    start_run(lua, '{ { needs = { 2 }, text = "a" }, { text = "b" } }')
+    assert lua.eval("HANDLE") is None and "command 1 needs position 2" in lua.eval("REASON")
+    assert sent() == []
+
+
+def test_width_bounds_what_is_in_flight(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute(
+        """
+        SENT, PENDING = {}, {}
+        function SEND(text, callback) SENT[#SENT + 1] = text PENDING[#SENT] = callback end
+        function ANSWER(index) local cb = PENDING[index] PENDING[index] = nil cb(true, {}) end
+        """
+    )
+    start_run(lua, '{ { text = "a" }, { text = "b" }, { text = "c" }, { text = "d" } }', width=2)
+    assert list(lua.eval("SENT").values()) == ["a", "b"]
+    lua.execute("ANSWER(1)")
+    assert list(lua.eval("SENT").values()) == ["a", "b", "c"]
+    lua.execute("HANDLE.Abort()")
+    lua.execute("ANSWER(2); ANSWER(3)")
+    out = lua.eval("OUT")
+    assert (
+        out.aborted is True and out.done == 3 and list(lua.eval("SENT").values()) == ["a", "b", "c"]
+    )
+
+
+# -- Kernel -----------------------------------------------------------------------------
+
+
+def test_pivot_spawns_the_marker_first_and_joins_every_doodad_to_it(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    sent = fake_server(lua)
+    result = spawn(lua, rows(lua, 2))
     assert sent() == [
-        "gobject spawn -424242 posx 10 posy 20 posz 30 face north",
-        "gobject spawn -20 posx 11.5 posy 18 posz 30.25 face north",
+        SPAWN_MARKER,
+        SPAWN_CHAIR,
         "gobject group add 7001",
-        "gobject spawn -21 scale 0.5 posx 10 posy 20 posz 33 face north",
+        SPAWN_LAMP,
         "gobject group add 7001",
     ]
-    assert result.leader == "7001" and result.done == 3 and len(result.refused) == 0
+    assert (result.leader, result.pivot, result.total) == ("7001", "7001", 2)
     assert list(result.spawned.values()) == ["7001", "7002", "7003"]
-    assert list(lua.eval("PROGRESS").values()) == ["1/3", "2/3", "3/3"]
+    assert list(lua.eval("PROGRESS").values()) == ["1/2", "2/2"]
 
 
-def test_an_attached_run_joins_the_houses_group_and_spawns_no_pivot(tmp_path: Path) -> None:
+def test_first_lets_the_first_doodad_lead_and_sends_it_no_join(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     sent = fake_server(lua)
-    grouped = STOCK.replace("groupLeader = 0", "groupLeader = 333")
-    result = run(lua, f"Furnish.Plan.Build({grouped}, 900, 1, {{ attach = true }})")
+    result = spawn(lua, rows(lua, 2), "Furnish.Group.First")
+    assert sent() == [SPAWN_CHAIR, SPAWN_LAMP, "gobject group add 7001"]
+    assert result.leader == "7001" and result.pivot is None
+
+
+def test_a_guid_group_joins_every_doodad_to_the_object_given(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    sent = fake_server(lua)
+    result = spawn(lua, rows(lua, 2), "333")
     assert sent()[1::2] == ["gobject group add 333", "gobject group add 333"]
-    assert result.leader is None and result.done == 2
+    assert result.leader == "333"
 
 
-def test_a_refused_display_is_counted_and_the_run_goes_on(tmp_path: Path) -> None:
+def test_none_spawns_loose_objects_several_at_a_time(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
-    sent = fake_server(lua, refuse=20)
-    result = run(lua, f"Furnish.Plan.Build({STOCK}, 900, 1, {{ nopivot = true }})")
-    assert result.done == 2 and len(result.refused) == 1
-    refused = result.refused[1]
-    assert refused.display == 20 and "doesn't exist" in refused.reason
-    # With the first doodad refused, the next one leads.
-    assert result.leader == "7001" and "gobject group add" not in " ".join(sent())
-
-
-def test_chained_joins_go_out_several_at_a_time(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    lua.execute("Furnish.Plan.MARKER = 424242; Furnish.Plan.CHAINED_JOIN = true")
     sent = fake_server(lua)
-    result = run(lua, f"Furnish.Plan.Build({STOCK}, 900, 1, {{}})")
+    result = spawn(lua, rows(lua, 2), "Furnish.Group.None")
+    assert sent() == [SPAWN_CHAIR, SPAWN_LAMP]
+    assert result.leader is None and len(result.spawned) == 2
+
+
+def test_a_refused_marker_makes_the_first_doodad_lead(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    sent = fake_server(lua, refuse=424242)
+    result = spawn(lua, rows(lua, 2))
+    assert sent() == [SPAWN_MARKER, SPAWN_CHAIR, SPAWN_LAMP, "gobject group add 7001"]
+    assert result.leader == "7001" and result.pivot is None
+    refused = result.refused[1]
+    assert refused.display == 424242 and "doesn't exist" in refused.reason
+
+
+def test_no_marker_setting_spawns_none(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute("Furnish.Settings.marker = nil")
+    sent = fake_server(lua)
+    spawn(lua, rows(lua, 2))
+    assert sent()[0] == SPAWN_CHAIR
+
+
+def test_a_refused_doodad_is_counted_with_the_servers_words(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    fake_server(lua, refuse=20)
+    result = spawn(lua, rows(lua, 2), "Furnish.Group.First")
+    assert len(result.spawned) == 1 and result.leader == "7001"
+    assert result.refused[1].display == 20
+    assert result.refused[1].reason == '"the gameobject with displayid -20 doesn\'t exist"'
+
+
+def test_chained_joins_go_out_several_at_a_time_after_the_leader(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute("Furnish.Settings.chainedJoin = true")
+    sent = fake_server(lua)
+    result = spawn(lua, rows(lua, 2))
     assert sent() == [
-        "gobject spawn -424242 posx 10 posy 20 posz 30 face north",
-        "gobject spawn -20 posx 11.5 posy 18 posz 30.25 face north group add 7001",
-        "gobject spawn -21 scale 0.5 posx 10 posy 20 posz 33 face north group add 7001",
+        SPAWN_MARKER,
+        SPAWN_CHAIR + " group add 7001",
+        SPAWN_LAMP + " group add 7001",
     ]
-    assert result.done == 3
+    assert len(result.spawned) == 3
+
+
+def test_rows_from_two_sets_spawn_as_one_collection(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    sent = fake_server(lua)
+    result = spawn(lua, rows(lua, 1, 2), "Furnish.Group.None")
+    assert len(sent()) == 3 and result.total == 3
+    thinned = lua.eval(f"#Furnish.Rows.Without({rows(lua, 1, 2)}, 21)")
+    assert thinned == 1
+
+
+def test_the_kernel_refuses_bad_values_by_name(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    fake_server(lua)
+    refuse = lua.eval(
+        "function(rows, position, rotation, scale, group)"
+        " local _, why = Furnish.Spawn(rows, position, rotation, scale, group, SEND) return why end"
+    )
+    good = lua.eval(rows(lua, 2))
+    position = lua.eval(ANCHOR)
+    assert (
+        refuse(lua.table(), position, None, None, "pivot") == "nothing to spawn: the rows are empty"
+    )
+    assert (
+        refuse(good, lua.table(x=1), None, None, "pivot") == "the anchor position needs x, y and z"
+    )
+    assert refuse(good, position, None, -1, "pivot").startswith("the anchor scale must be")
+    assert refuse(good, position, None, None, "chair").startswith("the group must be")
+    assert refuse(good, position, "west", None, "pivot").startswith("the anchor rotation is")
+    assert lua.eval(
+        'select(2, Furnish.Spawn({ { display = 1 } }, { x = 0, y = 0, z = 0 }, nil, nil, "pivot"))'
+    ) == ("send must be the function that delivers a command")
 
 
 def test_an_abort_with_cleanup_deletes_what_was_spawned(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
-    lua.execute("Furnish.Plan.MARKER = 424242")
     # A server that answers nothing until asked, so the run can be aborted mid-way.
     lua.execute(
         """
@@ -276,33 +430,234 @@ def test_an_abort_with_cleanup_deletes_what_was_spawned(tmp_path: Path) -> None:
         function ANSWER(index, ...) local cb = PENDING[index] PENDING[index] = nil cb(...) end
         """
     )
-    run(lua, f"Furnish.Plan.Build({STOCK}, 900, 1, {{}})")
+    spawn(lua, rows(lua, 2))
     lua.execute('ANSWER(1, true, { "|Hgameobject_GUID:7001|h7001|h" })')
     lua.execute('ANSWER(2, true, { "|Hgameobject_GUID:7002|h7002|h" })')
     lua.execute("HANDLE.Abort(true)")
     lua.execute("ANSWER(3, true, {})")
     sent = list(lua.eval("SENT").values())
-    assert sent[:3] == [
-        "gobject spawn -424242 posx 10 posy 20 posz 30 face north",
-        "gobject spawn -20 posx 11.5 posy 18 posz 30.25 face north",
-        "gobject group add 7001",
-    ]
+    assert sent[:3] == [SPAWN_MARKER, SPAWN_CHAIR, "gobject group add 7001"]
     assert sent[3:] == ["gobject delete 7001", "gobject delete 7002"]
     lua.execute("ANSWER(4, true, {}); ANSWER(5, true, {})")
     result = lua.eval("RESULT")
-    assert result.aborted is True and result.deleted == 2
+    assert result.aborted is True and result.deleted == 2 and lua.eval("HANDLE.Done()") is True
 
 
-def test_a_recolour_takes_another_roots_sets_without_the_default(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    recolour = STOCK.replace("file = 900", "file = 5555")
-    plan = lua.eval(f"Furnish.Plan.Build({recolour}, 900, 1, {{ nopivot = true }})")
-    assert plan.source == 900 and plan.withDefault is False and plan.doodads == 2
+# -- Providers --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("field", ["spawned", "refused"])
-def test_the_result_carries_lists(tmp_path: Path, field: str) -> None:
-    lua = lua_core(tmp_path)
+def fake_client(lua: lua51.LuaRuntime) -> None:
+    """EpsilonLib and C_Epsilon as the providers see them: a selection record arrives when an
+    object is selected, gobject info answers a display, and the model search knows one root."""
+    lua.execute(
+        """
+        RECORDS = {
+          [500] = { guid = "500", fileID = 900, name = "world/wmo/house.wmo\\r", scale = 2,
+                    transform = { position = { x = 10, y = 20, z = 30 },
+                                  rotation = { x = 0, y = 0, z = 90 } },
+                    groupLeader = 0, canEdit = true, IsWMO = function() return true end },
+          [501] = { guid = "501", fileID = 777, name = "world/wmo/emptywmo_house.wmo", scale = 1,
+                    transform = { position = { x = 0, y = 0, z = 0 },
+                                  rotation = { x = 0, y = 0, z = 0 } },
+                    orientation = math.pi, groupLeader = 333, canEdit = true,
+                    IsWMO = function() return true end },
+          [502] = { guid = "502", fileID = 1, name = "world/prop/chair.m2", scale = 1,
+                    transform = { position = { x = 0, y = 0, z = 0 },
+                                  rotation = { x = 0, y = 0, z = 0 } },
+                    groupLeader = 0, canEdit = false, IsWMO = function() return false end },
+        }
+        SELECTED = nil
+        EpsilonLib = {
+          GameObject = {
+            IsGroupSelected = function() return SELECTED == "group" end,
+            GetSelected = function() return RECORDS[SELECTED] end,
+          },
+          AddonCommands = { Register = function() return SEND end },
+        }
+        C_Timer = { After = function(_, fn) fn() end }
+        C_Epsilon = {
+          GetPosition = function() return 1, 2, 3, 1116 end,
+          GODI_Search = function(name) return name == "house" and 2 or 0 end,
+          GODI_RetrieveSearch = function(i)
+            return ({
+              { displayid = 1, fileid = 999, name = "world/wmo/House.wmo" .. string.char(13) },
+              { displayid = 30262, fileid = 900, name = "world/wmo/house.wmo" },
+            })[i + 1]
+          end,
+        }
+        function GetPlayerFacing() return math.pi / 2 end
+        """
+    )
     fake_server(lua)
-    result = run(lua, f"Furnish.Plan.Build({STOCK}, 900, 1, {{ nopivot = true }})")
-    assert lua.eval("type")(result[field]) == "table"
+    lua.execute(
+        """
+        local plain = SEND
+        function SEND(text, callback)
+          local guid = text:match("^gobject select (%d+)")
+          local entry = text:match("^gobject info (%d+)")
+          if guid or entry then SENT[#SENT + 1] = text end
+          if guid then SELECTED = tonumber(guid) return callback(true, {}) end
+          if entry == "817579" then
+            return callback(true, { "Entry: |cff00CCFF817579|r",
+                                    "Template GameObject DisplayID: |cff00CCFF30262|r" })
+          elseif entry then
+            return callback(true, { "Template GameObject DisplayID: |cff00CCFF1|r" })
+          end
+          plain(text, callback)
+        end
+        """
+    )
+
+
+def test_pose_of_selects_the_object_and_reads_its_record(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    fake_client(lua)
+    lua.execute("POSE, WHY = nil, nil; Furnish.Pose.Of(500, function(p, w) POSE, WHY = p, w end)")
+    pose = lua.eval("POSE")
+    assert (pose.position.x, pose.position.y, pose.position.z, pose.scale) == (10, 20, 30, 2)
+    assert (pose.rotation.turn, pose.guid, pose.file, pose.name, pose.wmo) == (
+        90,
+        500,
+        900,
+        "house",
+        True,
+    )
+    assert list(lua.eval("SENT").values()) == ["gobject select 500"]
+    lua.execute("Furnish.Pose.Of(501, function(p, w) POSE, WHY = p, w end)")
+    pose = lua.eval("POSE")
+    assert pose.empty is True and pose.groupLeader == 333 and round(pose.rotation.turn) == 180
+    lua.execute("Furnish.Pose.Of('chair', function(p, w) POSE, WHY = p, w end)")
+    assert (
+        lua.eval("POSE") is None and lua.eval("WHY") == "a gameobject GUID is a number, not chair"
+    )
+
+
+def test_pose_here_reads_the_servers_position_and_the_facing(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    fake_client(lua)
+    pose = lua.eval("Furnish.Pose.Here()")
+    assert (pose.position.x, pose.position.y, pose.position.z, pose.map) == (1, 2, 3, 1116)
+    assert round(pose.rotation.turn) == 90 and pose.scale == 1
+
+
+def test_pose_of_a_doodad_line_carries_no_rotation(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    line = (
+        "Selected doodad [draenei jug - 326022] (UID: 4242) at X: 2984.5 Y: 3273.7 Z: 45.6"
+        " on map 1116 with scale: 1.000000."
+    )
+    pose = lua.eval("Furnish.Pose.OfDoodad")(line)
+    assert (pose.uid, pose.map, pose.entry, pose.rotation) == (4242, 1116, 326022, None)
+    assert list(lua.eval("Furnish.Sets.OfPlacement")(pose.map, pose.uid).values()) == [2]
+    assert lua.eval("Furnish.Pose.OfDoodad")("hello")[1] == "that is not a `.doodad select` line"
+
+
+def test_sets_name_what_a_root_offers_and_what_it_lacks(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    sets = lua.eval(f"Furnish.Sets.OfFile({HOUSE})")
+    assert [(s.index, s.name, s.count) for s in sets.values()] == [(0, "", 1), (1, "Set_Full", 2)]
+    assert lua.eval(f"Furnish.Sets.Pick({HOUSE}, 1)").id == 2
+    assert lua.eval(f"select(2, Furnish.Sets.Pick({HOUSE}, 7))") == (
+        "root file 900 has no set 7; it has 0, 1 Set_Full"
+    )
+    assert (
+        lua.eval("select(2, Furnish.Sets.OfFile(1))")
+        == "the data has no doodad sets for root file 1"
+    )
+    assert lua.eval("Furnish.Sets.OfDisplay(30262)") == HOUSE
+    assert lua.eval("select(2, Furnish.Sets.OfDisplay(5))") == (
+        "display 5 spawns no root the data has sets for"
+    )
+
+
+def test_sets_of_entry_read_the_display_off_gobject_info(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    fake_client(lua)
+    lua.execute(
+        "FILE, WHY = nil, nil; Furnish.Sets.OfEntry(817579, function(f, w) FILE, WHY = f, w end)"
+    )
+    assert (lua.eval("FILE"), lua.eval("WHY")) == (HOUSE, None)
+    assert list(lua.eval("SENT").values()) == ["gobject info 817579"]
+    lua.execute("Furnish.Sets.OfEntry(5, function(f, w) FILE, WHY = f, w end)")
+    assert (
+        lua.eval("FILE") is None
+        and lua.eval("WHY") == "display 1 spawns no root the data has sets for"
+    )
+
+
+def test_an_emptywmo_borrows_its_originals_sets_through_the_model_search(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    fake_client(lua)
+    original = lua.eval("Furnish.Sets.Original")
+    assert original("emptywmo_house") == HOUSE
+    assert original("eps_emptywmo_barn")[1] == (
+        "no model is named eps_barn, so eps_emptywmo_barn has no original to borrow from"
+    )
+
+
+def test_group_leading_answers_the_leader_or_the_object_itself(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    fake_client(lua)
+    lua.execute("LEADER = nil; Furnish.Group.Leading(501, function(l) LEADER = l end)")
+    assert lua.eval("LEADER") == 333
+    lua.execute("Furnish.Group.Leading(500, function(l) LEADER = l end)")
+    assert lua.eval("LEADER") == 500
+
+
+# -- Console ----------------------------------------------------------------------------
+
+
+def test_the_console_spawns_the_selections_set_with_a_pivot_and_says_so(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    fake_client(lua)
+    lua.execute("SELECTED = 500; Furnish.Console.Spawn(1)")
+    sent = list(lua.eval("SENT").values())
+    assert sent[0] == "gobject spawn -424242 posx 10 posy 20 posz 30 face north turn 90"
+    assert len(sent) == 5
+    lines = printed(lua)
+    assert lines[0] == (
+        "|cff66ccffFurnish:|r spawning 2 objects, set 1 Set_Full (2 objects) of root file 900,"
+        " at 10 20 30, an invisible pivot leading"
+    )
+    assert lines[-1] == "|cff66ccffFurnish:|r done: 3 of 2 spawned, group led by 7001"
+
+
+def test_the_console_refuses_with_the_way_out(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    fake_client(lua)
+    lua.execute("Furnish.Console.Spawn(1)")
+    assert printed(lua)[-1].endswith("no object is selected; select one with gobject select <guid>")
+    lua.execute("SELECTED = 'group'; Furnish.Console.Spawn(1)")
+    assert printed(lua)[-1].endswith("a group is selected; select one object with gobject select")
+    lua.execute("SELECTED = 502; Furnish.Console.Spawn(1)")
+    assert printed(lua)[-1].endswith(
+        "chair.m2 (502) is not a WMO; a set is laid out against a building"
+    )
+    lua.execute("SELECTED = 500; Furnish.Console.Spawn(7)")
+    assert printed(lua)[-1].endswith("root file 900 has no set 7; it has 0, 1 Set_Full")
+
+
+def test_the_console_lays_an_emptywmo_out_with_the_default_set_from_its_original(
+    tmp_path: Path,
+) -> None:
+    lua = lua_core(tmp_path)
+    fake_client(lua)
+    lua.execute("SELECTED = 501; Furnish.Console.Spawn(1, { group = Furnish.Group.None })")
+    sent = list(lua.eval("SENT").values())
+    assert [s.split()[2] for s in sent] == ["-21", "-20", "-21"]
+    assert "with the default set's 1" in printed(lua)[0]
+
+
+def test_the_console_spawns_at_the_player_and_lists_sets(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    fake_client(lua)
+    lua.execute(f"Furnish.Console.Here({HOUSE}, 0, {{ group = Furnish.Group.First }})")
+    assert list(lua.eval("SENT").values()) == [
+        "gobject spawn -21 posx -3 posy 6 posz 4 face north turn 90"
+    ]
+    lua.execute(f"Furnish.Console.Sets({HOUSE})")
+    assert printed(lua)[-3:] == [
+        "|cff66ccffFurnish:|r root file 900 offers 2 sets:",
+        "|cff66ccffFurnish:|r   set 0 (default, 1 objects)",
+        "|cff66ccffFurnish:|r   set 1 Set_Full (2 objects)",
+    ]
