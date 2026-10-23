@@ -45,15 +45,14 @@ local function say(text)
 	print("|cff66ccffFurnish:|r " .. text)
 end
 
---- A function that prints its fault instead of dying in silence. Every boundary a command
--- reply or a timer crosses is wrapped, since AddonCommands swallows an error thrown inside
--- its callback and /run shows one only while script errors are on.
+--- A function whose fault reaches the client's error handler, traceback and all, instead
+-- of dying in silence. Every boundary a command reply or a timer crosses is wrapped, since
+-- AddonCommands swallows an error thrown inside its callback. The handler is the client's
+-- own, so BugSack and the error frame show it the way they show any addon's.
 local function guarded(fn)
 	return function(...)
-		local ok, fault = pcall(fn, ...)
-		if not ok then
-			say("fault: " .. tostring(fault))
-		end
+		local handler = _G.geterrorhandler and _G.geterrorhandler() or print
+		return select(2, xpcall(fn, handler, ...))
 	end
 end
 
