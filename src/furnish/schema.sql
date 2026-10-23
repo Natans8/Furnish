@@ -15,10 +15,10 @@ CREATE TABLE sets (
 );
 
 CREATE TABLE wmo_sets (
-    display INTEGER NOT NULL,       -- a display id that spawns the root
+    file    INTEGER NOT NULL,       -- the root's file id, which a spawned object reports
     "index" INTEGER NOT NULL,       -- the set's position in the root's MODS
     "set"   INTEGER NOT NULL REFERENCES sets(id),
-    PRIMARY KEY (display, "index")
+    PRIMARY KEY (file, "index")
 ) WITHOUT ROWID;
 
 CREATE TABLE placements (

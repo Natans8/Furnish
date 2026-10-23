@@ -119,10 +119,10 @@ class Database:
         return set_id
 
     def add_wmo_sets(self, rows: Iterable[tuple[int, int, int]]) -> None:
-        """Insert ``(display, index, set)`` rows.
+        """Insert ``(file, index, set)`` rows.
 
         Args:
-            rows: One per display id and set index.
+            rows: One per root file and set index.
         """
         self._connected().executemany("INSERT INTO wmo_sets VALUES (?, ?, ?)", rows)
 

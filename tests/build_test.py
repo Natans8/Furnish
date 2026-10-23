@@ -70,13 +70,11 @@ def test_build_writes_the_four_tables(tmp_path: Path) -> None:
         "build": "9.2.7.45745",
     }
     assert db.execute("SELECT name FROM sets ORDER BY id").fetchall() == [(None,), ("Set_Full",)]
-    assert db.execute('SELECT display, "index", "set" FROM wmo_sets ORDER BY 1, 2').fetchall() == [
-        (10, 0, 1),
-        (10, 1, 2),
-        (11, 0, 1),
-        (11, 1, 2),
-        (13, 0, 1),
-        (13, 1, 2),
+    assert db.execute('SELECT file, "index", "set" FROM wmo_sets ORDER BY 1, 2').fetchall() == [
+        (900, 0, 1),
+        (900, 1, 2),
+        (904, 0, 1),
+        (904, 1, 2),
     ]
     rows = db.execute(
         'SELECT "set", display, x, qz, scale FROM placements ORDER BY "set", seq'
@@ -91,7 +89,7 @@ def test_build_writes_the_four_tables(tmp_path: Path) -> None:
         (0, 4243, 1),
         (0, 4243, 2),
     ]
-    assert db.execute("SELECT count(*) FROM wmo_sets WHERE display = 12").fetchone() == (0,)
+    assert db.execute("SELECT count(*) FROM wmo_sets WHERE file = 903").fetchone() == (0,)
     assert (
         report.roots_read,
         report.roots_without_display,

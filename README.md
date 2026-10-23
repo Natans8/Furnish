@@ -26,7 +26,7 @@ optional and fills `map_sets`. The build fetches the community listfile and wago
 |--------------|---------------------------------------------------------------|
 | `meta`       | `format`, `build`                                             |
 | `sets`       | a doodad set and its name, NULL for the default set           |
-| `wmo_sets`   | a display id that spawns a root, a set index, its set         |
+| `wmo_sets`   | a root file id, a set index, its set                          |
 | `placements` | a set's doodad in order: display, position, quaternion, scale |
 | `map_sets`   | a map id and ADT unique id, and a set it draws                |
 
@@ -48,21 +48,42 @@ uv run furnish export --db furnish.sqlite --out addon/Furnish_Data/Data.lua
 ```
 
 `addon/Furnish_Data` is the data addon: `Data.lua`, generated and not committed, declaring
-`FurnishData` with a `format` number, the `build`, each display's sets (`wmo`), each set's
+`FurnishData` with a `format` number, the `build`, each root file's sets (`wmo`), each set's
 placements as one printable string (`blobs`) and the sets each map placement draws (`maps`).
 It loads on demand and holds nothing else, so it changes only when the data does.
 
 `addon/Furnish/Reader.lua` is the reader and ships with the code, never with the data:
-`Furnish.Load()` loads the data addon and refuses another format, `Furnish.Sets(display)`,
+`Furnish.Load()` loads the data addon and refuses another format, `Furnish.Sets(file)`,
 `Furnish.Placements(set)` and `Furnish.MapSets(map, uid)` answer from it. A set's string is
 LibDeflate's printable encoding of a raw deflate stream over varints, decoded the first time
 the set is asked for; the layout is documented in `src/furnish/codec.py`. Nothing is
 rounded: a placement ships as the file's own float32 values, so the spawn command can be
 given every digit the server keeps.
 
+## The core
+
+`addon/Furnish` is the addon, and its core is three files over the reader, each pure
+enough to run outside the client and tested in a real Lua 5.1 against a stand-in server:
+
+- `Transform.lua`: the placement maths. `Place(house, row)` is where a doodad stands once its
+  house stands at a pose, `SpawnCommand(display, pose)` the command for it, saying only what
+  differs from a plain spawn.
+- `Plan.lua`: preprocessing. `Plan.Build(house, index, options)` turns a house record, a set
+  index and the options `attach`, `nopivot` and `default` into a plan, which is data: every
+  command in order with its role, the counts, and the leader it will have. A plan is the dry
+  run, and a refusal is nil and the reason.
+- `Run.lua`: processing and post-processing. `Run.Start(plan, send, hooks)` sends the plan
+  through the `send` it is given, reads each reply for its GUID, counts a refusal and goes on,
+  joins every doodad to the leader, and tells its hooks `progress` and `finished`. The handle
+  it returns has `Abort(cleanup)`. A run keeps nothing past its end.
+
+Two facts the core still waits on from the game, both declared at the top of `Plan.lua`:
+the marker entry a pivot is spawned as, and whether `group add` chains onto a spawn.
+
 ## Develop
 
 ```bash
 uv sync
 uv run ruff format && uv run ruff check && uv run mypy && uv run pytest
+stylua addon/Furnish && selene addon/Furnish
 ```

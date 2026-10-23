@@ -21,7 +21,7 @@ def write_database(path: Path) -> None:
         db.meta({"build": "9.2.7.45745"})
         default = db.add_set(None, [(21, LAMP)])
         full = db.add_set("Set_Full", [(20, CHAIR), (21, LAMP)])
-        db.add_wmo_sets([(10, 0, default), (10, 1, full)])
+        db.add_wmo_sets([(900, 0, default), (900, 1, full)])
         db.add_map_sets([(0, 4242, full), (0, 4243, default), (0, 4243, full)])
 
 
@@ -50,9 +50,9 @@ def test_reader_loads_and_answers(tmp_path: Path) -> None:
     export(tmp_path / "f.sqlite", tmp_path / "Data.lua")
     lua = lua_with(tmp_path / "Data.lua")
     assert lua.eval("Furnish.Load()") is True
-    sets = lua.eval("Furnish.Sets(10)")
+    sets = lua.eval("Furnish.Sets(900)")
     assert [(s[1], s[3], s[4]) for s in sets.values()] == [(0, "", 1), (1, "Set_Full", 2)]
-    rows = lua.eval("Furnish.Placements(Furnish.Sets(10)[2][2])")
+    rows = lua.eval("Furnish.Placements(Furnish.Sets(900)[2][2])")
     chair, lamp = rows[1], rows[2]
     assert (chair.display, chair.x, chair.y, chair.z) == (20, 1.5, -2.0, 0.25)
     assert (chair.qx, chair.qy, chair.qz, chair.qw, chair.scale) == (0, 0, 0.5, 0.75, 1)
@@ -60,7 +60,7 @@ def test_reader_loads_and_answers(tmp_path: Path) -> None:
     assert lua.eval("Furnish.Placements(2) == Furnish.Placements(2)") is True
     assert list(lua.eval("Furnish.MapSets(0, 4243)").values()) == [1, 2]
     assert lua.eval("Furnish.MapSets(1, 4243)") is None
-    assert lua.eval("Furnish.Sets(99)") is None
+    assert lua.eval("Furnish.Sets(999)") is None
 
 
 def test_reader_refuses_another_format(tmp_path: Path) -> None:
@@ -71,7 +71,7 @@ def test_reader_refuses_another_format(tmp_path: Path) -> None:
     assert ok is False
     assert "format 99" in reason
     with pytest.raises(lua51.LuaError, match="Load"):
-        lua.eval("Furnish.Sets(10)")
+        lua.eval("Furnish.Sets(900)")
 
 
 def test_reader_says_when_the_data_is_missing(tmp_path: Path) -> None:

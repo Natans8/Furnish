@@ -1,0 +1,11 @@
+# The client runs Lua 5.1, so that is what the addon is checked against. A newer standard
+# would accept goto, integer division and bitwise operators, every one of which parses here
+# and fails in the game.
+std = "lua51"
+
+# Generated data is machine-written; there is nothing in it for a linter to find.
+exclude = ["addon/Furnish_Data/**", "tests/lua/**"]
+
+[lints]
+# A client global is read as `_G.Name` on purpose: it marks every reach into the client.
+global_usage = "allow"

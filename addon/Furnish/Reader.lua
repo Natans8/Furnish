@@ -16,134 +16,139 @@
 local FORMAT = 1
 local decoded = {}
 
-Furnish = Furnish or {}
+_G.Furnish = _G.Furnish or {}
+local Furnish = _G.Furnish
 local Reader = Furnish
 local Data
 
 --- Load Furnish_Data and check its format. Answers true, or false and a reason.
 function Reader.Load()
-  if Data then
-    return true
-  end
-  local loaded, reason = LoadAddOn("Furnish_Data")
-  if not loaded then
-    return false, "Furnish_Data is " .. tostring(reason):lower()
-  end
-  if type(FurnishData) ~= "table" then
-    return false, "Furnish_Data loaded but declared no data"
-  end
-  if FurnishData.format ~= FORMAT then
-    return false, ("Furnish_Data is format %s; this Furnish reads format %d"):format(tostring(FurnishData.format), FORMAT)
-  end
-  Data = FurnishData
-  return true
+	if Data then
+		return true
+	end
+	local loaded, reason = _G.LoadAddOn("Furnish_Data")
+	if not loaded then
+		return false, "Furnish_Data is " .. tostring(reason):lower()
+	end
+	if type(_G.FurnishData) ~= "table" then
+		return false, "Furnish_Data loaded but declared no data"
+	end
+	if _G.FurnishData.format ~= FORMAT then
+		return false,
+			("Furnish_Data is format %s; this Furnish reads format %d"):format(
+				tostring(_G.FurnishData.format),
+				FORMAT
+			)
+	end
+	Data = _G.FurnishData
+	return true
 end
 
 local VERSION = 1
 
 local function data()
-  if not Data then
-    error("Furnish: call Furnish.Load() before asking for data")
-  end
-  return Data
+	if not Data then
+		error("Furnish: call Furnish.Load() before asking for data")
+	end
+	return Data
 end
 
 local function deflate()
-  local lib = LibStub and LibStub:GetLibrary("LibDeflate", true)
-  if not lib then
-    error("Furnish_Data: LibDeflate is not loaded")
-  end
-  return lib
+	local lib = _G.LibStub and _G.LibStub:GetLibrary("LibDeflate", true)
+	if not lib then
+		error("Furnish_Data: LibDeflate is not loaded")
+	end
+	return lib
 end
 
 local function decodeBlob(text)
-  local lib = deflate()
-  local bytes = lib:DecompressDeflate(lib:DecodeForPrint(text))
-  local at = 1
+	local lib = deflate()
+	local bytes = lib:DecompressDeflate(lib:DecodeForPrint(text))
+	local at = 1
 
-  local function u8()
-    local value = bytes:byte(at)
-    at = at + 1
-    return value
-  end
+	local function u8()
+		local value = bytes:byte(at)
+		at = at + 1
+		return value
+	end
 
-  local function varint()
-    local value, shift = 0, 0
-    while true do
-      local byte = u8()
-      value = value + (byte % 128) * 2 ^ shift
-      if byte < 128 then
-        return value
-      end
-      shift = shift + 7
-    end
-  end
+	local function varint()
+		local value, shift = 0, 0
+		while true do
+			local byte = u8()
+			value = value + (byte % 128) * 2 ^ shift
+			if byte < 128 then
+				return value
+			end
+			shift = shift + 7
+		end
+	end
 
-  -- A little-endian IEEE 754 single, by arithmetic: Lua 5.1 has no string.unpack.
-  local function f32()
-    local b1, b2, b3, b4 = bytes:byte(at, at + 3)
-    at = at + 4
-    local sign = b4 >= 128 and -1 or 1
-    local exponent = (b4 % 128) * 2 + math.floor(b3 / 128)
-    local mantissa = (b3 % 128) * 65536 + b2 * 256 + b1
-    if exponent == 0 then
-      return sign * mantissa * 2 ^ -149
-    elseif exponent == 255 then
-      return mantissa == 0 and sign * math.huge or 0 / 0
-    end
-    return sign * (1 + mantissa / 8388608) * 2 ^ (exponent - 127)
-  end
+	-- A little-endian IEEE 754 single, by arithmetic: Lua 5.1 has no string.unpack.
+	local function f32()
+		local b1, b2, b3, b4 = bytes:byte(at, at + 3)
+		at = at + 4
+		local sign = b4 >= 128 and -1 or 1
+		local exponent = (b4 % 128) * 2 + math.floor(b3 / 128)
+		local mantissa = (b3 % 128) * 65536 + b2 * 256 + b1
+		if exponent == 0 then
+			return sign * mantissa * 2 ^ -149
+		elseif exponent == 255 then
+			return mantissa == 0 and sign * math.huge or 0 / 0
+		end
+		return sign * (1 + mantissa / 8388608) * 2 ^ (exponent - 127)
+	end
 
-  if u8() ~= VERSION then
-    error("Furnish_Data: unknown set blob version")
-  end
-  local count = varint()
-  local models, previous = {}, 0
-  for i = 1, varint() do
-    previous = previous + varint()
-    models[i] = previous
-  end
-  local rows = {}
-  for i = 1, count do
-    local row = { display = models[varint() + 1] }
-    row.x, row.y, row.z = f32(), f32(), f32()
-    local flags = u8()
-    if flags % 2 >= 1 then
-      row.qx, row.qy, row.qz, row.qw = f32(), f32(), f32(), f32()
-    else
-      row.qx, row.qy, row.qz, row.qw = 0, 0, 0, 1
-    end
-    if flags % 4 >= 2 then
-      row.scale = f32()
-    else
-      row.scale = 1
-    end
-    rows[i] = row
-  end
-  return rows
+	if u8() ~= VERSION then
+		error("Furnish_Data: unknown set blob version")
+	end
+	local count = varint()
+	local models, previous = {}, 0
+	for i = 1, varint() do
+		previous = previous + varint()
+		models[i] = previous
+	end
+	local rows = {}
+	for i = 1, count do
+		local row = { display = models[varint() + 1] }
+		row.x, row.y, row.z = f32(), f32(), f32()
+		local flags = u8()
+		if flags % 2 >= 1 then
+			row.qx, row.qy, row.qz, row.qw = f32(), f32(), f32(), f32()
+		else
+			row.qx, row.qy, row.qz, row.qw = 0, 0, 0, 1
+		end
+		if flags % 4 >= 2 then
+			row.scale = f32()
+		else
+			row.scale = 1
+		end
+		rows[i] = row
+	end
+	return rows
 end
 
---- The sets a spawned WMO offers, or nil when the data has none for it. Load first.
--- @param display the gameobject display id of the WMO
+--- The sets a WMO root offers, or nil when the data has none for it. Load first.
+-- @param file the root's file id, as a selected object reports it
 -- @return a list of { index, set, name, count }, in index order; the default set's name is ""
-function Reader.Sets(display)
-  return data().wmo[display]
+function Reader.Sets(file)
+	return data().wmo[file]
 end
 
 --- The placements of a set, decoded once and kept.
 -- @param set a set id from Sets or MapSets
 -- @return a list of { display, x, y, z, qx, qy, qz, qw, scale }, positions in yards
 function Reader.Placements(set)
-  local rows = decoded[set]
-  if rows == nil then
-    local blob = data().blobs[set]
-    if blob == nil then
-      return nil
-    end
-    rows = decodeBlob(blob)
-    decoded[set] = rows
-  end
-  return rows
+	local rows = decoded[set]
+	if rows == nil then
+		local blob = data().blobs[set]
+		if blob == nil then
+			return nil
+		end
+		rows = decodeBlob(blob)
+		decoded[set] = rows
+	end
+	return rows
 end
 
 --- The sets a WMO placed on a map draws, or nil when the data has none for it. Load first.
@@ -151,6 +156,6 @@ end
 -- @param uid the placement's unique id, as .doodad near prints it
 -- @return a list of set ids
 function Reader.MapSets(map, uid)
-  local byMap = data().maps[map]
-  return byMap and byMap[uid]
+	local byMap = data().maps[map]
+	return byMap and byMap[uid]
 end

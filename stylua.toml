@@ -1,0 +1,8 @@
+# Tabs and this width are what the client's own interface code uses, and what Glimpse and
+# Epsilook's addon already follow, so a diff against any of them is about the change.
+indent_type = "Tabs"
+indent_width = 4
+column_width = 100
+line_endings = "Unix"
+quote_style = "AutoPreferDouble"
+call_parentheses = "Always"

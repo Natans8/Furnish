@@ -6,3 +6,6 @@
 ## X-License: AGPL-3.0-or-later
 
 Reader.lua
+Transform.lua
+Plan.lua
+Run.lua

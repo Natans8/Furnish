@@ -1,10 +1,11 @@
 """Layer 2: the database as the Lua data file an addon loads.
 
 ``Data.lua`` declares one global, ``FurnishData``, holding three tables and the two meta
-values. ``wmo`` lists each display id's sets with their index, set id, name and placement
+values. ``wmo`` lists each root file's sets with their index, set id, name and placement
 count, which is everything a window needs before a set is chosen. ``blobs`` holds each
 set's placements as one printable string, decoded by the reader only when that set is
 asked for. ``maps`` says which sets each map placement draws, by map id and unique id.
+``wmo`` is keyed by the root's file id, which is what a selected object reports.
 """
 
 import sqlite3
@@ -64,16 +65,16 @@ def export(database: Path, out: Path) -> Sizes:
 def _wmo(connection: sqlite3.Connection) -> Iterable[str]:
     yield "FurnishData.wmo = {\n"
     rows = connection.execute(
-        'SELECT w.display, w."index", w."set", s.name,'
+        'SELECT w.file, w."index", w."set", s.name,'
         ' (SELECT count(*) FROM placements p WHERE p."set" = w."set")'
-        ' FROM wmo_sets w JOIN sets s ON s.id = w."set" ORDER BY w.display, w."index"'
+        ' FROM wmo_sets w JOIN sets s ON s.id = w."set" ORDER BY w.file, w."index"'
     )
-    for display, group in groupby(rows, key=itemgetter(0)):
+    for file_id, group in groupby(rows, key=itemgetter(0)):
         entries = "".join(
             f" {{{index},{set_id},{_string(name or '')},{count}}},"
             for _, index, set_id, name, count in group
         )
-        yield f"  [{display}] = {{{entries} }},\n"
+        yield f"  [{file_id}] = {{{entries} }},\n"
     yield "}\n"
 
 
