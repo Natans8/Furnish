@@ -212,24 +212,6 @@ def test_replies_are_read_and_stripped_plain(tmp_path: Path) -> None:
     assert commands.Plain(guid) == "Spawned 7001"
 
 
-def test_a_doodad_select_line_is_read_in_full(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    line = (
-        "Selected doodad |cff00CCFF|Hdoodad_uid:10059564:0|h[draenei jug - 326022]|h|r"
-        " (UID: |cff00CCFF10059564|r) at X: |cff00CCFF2984.496745|r Y: |cff00CCFF3273.661784|r"
-        " Z: |cff00CCFF45.630093|r on map |cff00CCFF1116|r with scale: |cff00CCFF1.000000|r."
-    )
-    doodad = lua.eval("Furnish.Commands.DoodadIn")(line)
-    assert (doodad.uid, doodad.name, doodad.entry, doodad.map) == (
-        10059564,
-        "draenei jug",
-        326022,
-        1116,
-    )
-    assert (doodad.x, doodad.y, doodad.z, doodad.scale) == (2984.496745, 3273.661784, 45.630093, 1)
-    assert lua.eval("Furnish.Commands.DoodadIn")("Found 50 doodads.") is None
-
-
 # -- Run --------------------------------------------------------------------------------
 
 
@@ -571,16 +553,12 @@ def test_pose_here_reads_the_servers_position_and_the_facing(tmp_path: Path) -> 
     assert round(pose.rotation.turn) == 90 and pose.scale == 1
 
 
-def test_pose_of_a_doodad_line_carries_no_rotation(tmp_path: Path) -> None:
+def test_a_map_placement_names_the_sets_its_zone_drew(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
-    line = (
-        "Selected doodad [draenei jug - 326022] (UID: 4242) at X: 2984.5 Y: 3273.7 Z: 45.6"
-        " on map 1116 with scale: 1.000000."
+    assert list(lua.eval("Furnish.Sets.OfPlacement(1116, 4242)").values()) == [2]
+    assert "no map placement 1 on map 1116" in lua.eval(
+        "select(2, Furnish.Sets.OfPlacement(1116, 1))"
     )
-    pose = lua.eval("Furnish.Pose.OfDoodad")(line)
-    assert (pose.uid, pose.map, pose.entry, pose.rotation) == (4242, 1116, 326022, None)
-    assert list(lua.eval("Furnish.Sets.OfPlacement")(pose.map, pose.uid).values()) == [2]
-    assert lua.eval("Furnish.Pose.OfDoodad")("hello")[1] == "that is not a `.doodad select` line"
 
 
 def test_sets_name_what_a_root_offers_and_what_it_lacks(tmp_path: Path) -> None:

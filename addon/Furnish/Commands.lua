@@ -94,28 +94,3 @@ function Commands.GuidIn(messages)
 	end
 	return nil
 end
-
---- What a `.doodad select` line says about the selected map doodad, or nil when the line
--- is not one. The line carries no rotation.
--- @return { uid, name, entry, x, y, z, map, scale }
-function Commands.DoodadIn(line)
-	local plain = Commands.Plain(line)
-	local name, entry = plain:match("^Selected doodad %[(.-) %- (%d+)%]")
-	if not name then
-		return nil
-	end
-	local uid = plain:match("%(UID: (%d+)%)")
-	local x, y, z = plain:match("X: ([%-%d%.]+) Y: ([%-%d%.]+) Z: ([%-%d%.]+)")
-	local map = plain:match("on map (%d+)")
-	local scale = plain:match("scale: ([%d%.]+)")
-	return {
-		uid = tonumber(uid),
-		name = name,
-		entry = tonumber(entry),
-		x = tonumber(x),
-		y = tonumber(y),
-		z = tonumber(z),
-		map = tonumber(map),
-		scale = tonumber(scale) or 1,
-	}
-end

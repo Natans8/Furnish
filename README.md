@@ -96,7 +96,7 @@ lead to the first doodad.
 | `Run.lua`       | any series of commands through `send`, in order, with needs and a width    |
 | `Kernel.lua`    | `Furnish.Spawn` and `Furnish.Group`                                        |
 | `Client.lua`    | the one file naming EpsilonLib and `C_Epsilon`; it reads, and never selects |
-| `Pose.lua`      | where: `At`, `Here`, `Selected`, `OfDoodad(line)`                          |
+| `Pose.lua`      | where: `At`, `Here`, `Selected`                                            |
 | `Sets.lua`      | which: `OfFile`, `Pick`, `IsEmptyShell`, `Original`, `OfPlacement`         |
 | `Rows.lua`      | what: `OfSet`, `Union`, `Without`                                          |
 | `Console.lua`   | the `/run` door: `Sets`, `Spawn(index, options)`, `Here(file, index)`, `Abort` |

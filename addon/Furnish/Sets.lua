@@ -13,7 +13,6 @@ Furnish.Sets = Sets
 
 local Reader = Furnish.Reader
 local Client = Furnish.Client
-local Commands = Furnish.Commands
 
 --- The sets a root file offers, in index order, or nil and the reason.
 -- @return a list of { index, id, name, count }; the default set's name is ""
@@ -92,8 +91,9 @@ function Sets.Original(name)
 	return file
 end
 
---- The set ids a WMO placed on the map draws, by map and ADT unique id; or nil and the
--- reason. Several on a tile where the zone chose a run of sets.
+--- The set ids a WMO placed on the map draws, by map and ADT unique id, the number a
+-- `.doodad import` line prints; or nil and the reason. Several on a tile where the zone
+-- chose a run of sets.
 function Sets.OfPlacement(map, uid)
 	local loaded, reason = Reader.Load()
 	if not loaded then

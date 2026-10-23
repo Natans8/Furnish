@@ -2,9 +2,9 @@
 --
 -- Every function answers the same shape, { position = { x, y, z }, rotation = { roll, pitch,
 -- turn }, scale }, plus whatever else the source knew, so a surface may take the pose from
--- one source and anything else from another. A rotation the source did not know is nil,
--- which the kernel reads as level. Nothing here sends a command: an object's record is read
--- off the selection the player made, never one the addon makes for them.
+-- one source and anything else from another. Nothing here sends a command: an object's
+-- record is read off the selection the player made, never one the addon makes for them. A
+-- map doodad is reached the same way, since `.doodad import` selects what it imports.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -12,7 +12,6 @@ local Pose = {}
 Furnish.Pose = Pose
 
 local Client = Furnish.Client
-local Commands = Furnish.Commands
 
 --- A pose from plain values.
 -- @param turn degrees, 0 north, or nil for north
@@ -72,23 +71,4 @@ function Pose.Selected()
 		return nil, "no object is selected"
 	end
 	return Pose.OfRecord(object)
-end
-
---- A map doodad's pose from its `.doodad select` line, which the client prints and keeps
--- nowhere. Beside the pose: uid, map, entry, name. The line carries no rotation, so the
--- rotation is nil; the data's own placement, by map and uid, is where one would come from.
-function Pose.OfDoodad(line)
-	local doodad = Commands.DoodadIn(line)
-	if not doodad then
-		return nil, "that is not a `.doodad select` line"
-	end
-	return {
-		position = { x = doodad.x, y = doodad.y, z = doodad.z },
-		rotation = nil,
-		scale = doodad.scale,
-		uid = doodad.uid,
-		map = doodad.map,
-		entry = doodad.entry,
-		name = doodad.name,
-	}
 end
