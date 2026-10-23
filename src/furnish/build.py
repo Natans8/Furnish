@@ -40,6 +40,7 @@ class Inputs:
         roots: A directory of WMO files, each at its listfile path or named ``<id>.wmo``.
         maps: A directory of ADT files at their listfile paths, or None to skip ``map_sets``.
         listfile: The community listfile.
+        extra_listfiles: More listfiles in the same shape, a private client's own names.
         display_table: wago's ``GameObjectDisplayInfo`` CSV.
         map_table: wago's ``Map`` CSV.
         overlay: Extra ``(file id, display)`` rows that outrank the table's.
@@ -51,6 +52,7 @@ class Inputs:
     listfile: Path
     display_table: Path
     map_table: Path
+    extra_listfiles: list[Path] = field(default_factory=list)
     overlay: list[tuple[int, int]] = field(default_factory=list)
     build: str = ""
 
@@ -90,7 +92,11 @@ def build(inputs: Inputs, out: Path) -> Report:
         out: The database path; an existing file is replaced.
     """
     report = Report()
-    path_to_id = {path_key(path): file_id for file_id, path in read_listfile(inputs.listfile)}
+    path_to_id = {
+        path_key(path): file_id
+        for listfile in (inputs.listfile, *inputs.extra_listfiles)
+        for file_id, path in read_listfile(listfile)
+    }
     spawnable = spawners(inputs.display_table, inputs.overlay)
     displays = {file_id: preferred(ids) for file_id, ids in spawnable.items()}
     with Database(out) as database:

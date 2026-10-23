@@ -16,7 +16,8 @@ uv run furnish build --roots <dir of .wmo files> --maps <dir of .adt files> --ou
 
 The directories hold the files at their listfile paths (`world/wmo/...`), as any CASC
 extractor writes them; a root may also be named by its file id, `849966.wmo`. `--maps` is
-optional and fills `map_sets`. The build fetches the community listfile and wago.tools'
+optional and fills `map_sets`. `--listfile-extra <file>` adds a listfile the community one
+lacks, a private client's own names, plain or gzipped, and may be repeated. The build fetches the community listfile and wago.tools'
 `GameObjectDisplayInfo` and `Map` exports for the build given (`--build`, default Epsilon's
 `9.2.7.45745`) into `--cache`, once.
 

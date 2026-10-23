@@ -33,6 +33,13 @@ def main(argv: list[str] | None = None) -> int:
         "--build", default=DEFAULT_BUILD, help="the client build whose tables to fetch"
     )
     builder.add_argument(
+        "--listfile-extra",
+        type=Path,
+        action="append",
+        default=[],
+        help="another listfile naming files the community one does not, repeatable",
+    )
+    builder.add_argument(
         "--cache", type=Path, default=Path(".cache"), help="where fetched tables are kept"
     )
     builder.add_argument(
@@ -61,6 +68,7 @@ def main(argv: list[str] | None = None) -> int:
         roots=args.roots,
         maps=args.maps,
         listfile=listfile(args.cache),
+        extra_listfiles=args.listfile_extra,
         display_table=wago_table("GameObjectDisplayInfo", args.build, args.cache),
         map_table=wago_table("Map", args.build, args.cache),
         overlay=[] if args.no_overlay else vendored_overlay(),

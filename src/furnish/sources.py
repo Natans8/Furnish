@@ -7,6 +7,7 @@ map directory name into the map id the client reports.
 """
 
 import csv
+import gzip
 import json
 import urllib.error
 import urllib.request
@@ -82,9 +83,10 @@ def read_listfile(path: Path) -> Iterator[tuple[int, str]]:
     """Yield ``(file id, path)`` from a listfile, paths as written.
 
     Args:
-        path: The listfile, ``id;path`` per line.
+        path: The listfile, ``id;path`` per line, gzipped when its name ends in ``.gz``.
     """
-    with path.open(encoding="utf-8", errors="replace") as handle:
+    opener = gzip.open if path.suffix == ".gz" else open
+    with opener(path, "rt", encoding="utf-8", errors="replace") as handle:
         for line in handle:
             file_id, _, name = line.rstrip("\n").partition(";")
             if file_id.isdigit():
