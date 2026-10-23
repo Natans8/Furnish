@@ -46,10 +46,7 @@ def main(argv: list[str] | None = None) -> int:
         "--db", type=Path, default=Path("furnish.sqlite"), help="the database furnish build wrote"
     )
     exporter.add_argument(
-        "--out",
-        type=Path,
-        default=Path("addon/Furnish_Data/Data.lua"),
-        help="the Lua file to write, beside the addon's Reader.lua",
+        "--out", type=Path, required=True, help="the Lua file to write: addon/Furnish_Data/Data.lua"
     )
     args = parser.parse_args(argv)
 

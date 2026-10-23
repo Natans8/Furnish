@@ -8,6 +8,7 @@ map directory name into the map id the client reports.
 
 import csv
 import json
+import urllib.error
 import urllib.request
 from collections.abc import Iterator
 from pathlib import Path
@@ -27,10 +28,18 @@ def fetch(url: str, into: Path) -> Path:
     """
     if not into.exists():
         into.parent.mkdir(parents=True, exist_ok=True)
-        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        with urllib.request.urlopen(request, timeout=120) as response:
-            into.write_bytes(response.read())
+        into.write_bytes(_get(url, 120))
     return into
+
+
+def _get(url: str, timeout: int) -> bytes:
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            data: bytes = response.read()
+            return data
+    except urllib.error.URLError as error:
+        raise RuntimeError(f"could not fetch {url}: {error}") from error
 
 
 def listfile(cache: Path) -> Path:
@@ -42,9 +51,7 @@ def listfile(cache: Path) -> Path:
     into = cache / "listfile" / LISTFILE_ASSET
     if into.exists():
         return into
-    request = urllib.request.Request(LISTFILE_RELEASE_API, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(request, timeout=60) as response:
-        release = json.load(response)
+    release = json.loads(_get(LISTFILE_RELEASE_API, 60))
     assets = {asset["name"]: asset["browser_download_url"] for asset in release["assets"]}
     if LISTFILE_ASSET not in assets:
         raise LookupError(f"release {release['tag_name']} has no {LISTFILE_ASSET}")

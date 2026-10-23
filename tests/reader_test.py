@@ -70,7 +70,8 @@ def test_reader_refuses_another_format(tmp_path: Path) -> None:
     ok, reason = lua.eval("Furnish.Load()")
     assert ok is False
     assert "format 99" in reason
-    assert lua.eval("Furnish.Sets(10)") is None
+    with pytest.raises(lua51.LuaError, match="Load"):
+        lua.eval("Furnish.Sets(10)")
 
 
 def test_reader_says_when_the_data_is_missing(tmp_path: Path) -> None:
@@ -82,9 +83,9 @@ def test_reader_says_when_the_data_is_missing(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("value", [0, 1, 127, 128, 16383, 16384, 2**31])
-def test_lua_varints_match_python(tmp_path: Path, value: int) -> None:
-    # The Lua side reads a varint with powers of two rather than bit shifts, which must hold
-    # past 2^31, where WoW's bit library would wrap.
+def test_lua_reads_large_display_ids_and_their_floats(tmp_path: Path, value: int) -> None:
+    # A display id travels as a varint the Lua reads with powers of two rather than the bit
+    # library, which wraps at 2^31; the float beside it must come back exact at any size.
     with Database(tmp_path / "f.sqlite") as db:
         db.meta({})
         db.add_set(

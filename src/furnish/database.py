@@ -4,7 +4,9 @@ The schema is ``schema.sql`` beside this module, applied to a fresh file. Rows g
 through a few typed methods, in one transaction, so a failed build leaves no half file.
 """
 
+import hashlib
 import sqlite3
+import struct
 from collections.abc import Iterable, Mapping
 from importlib import resources
 from pathlib import Path
@@ -13,6 +15,8 @@ from typing import Self
 
 from furnish import FORMAT
 from furnish.wmo import Placement
+
+_ROW = struct.Struct("<Q8f")
 
 
 class Database:
@@ -30,13 +34,22 @@ class Database:
         """
         self._path = path
         self._connection: sqlite3.Connection | None = None
-        self._sets: dict[tuple[str | None, tuple[tuple[int, Placement], ...]], int] = {}
+        self._sets: dict[tuple[str | None, bytes], int] = {}
+        self.sets = 0
+        """Set rows written."""
+        self.placements = 0
+        """Placement rows written."""
         self.shared_sets = 0
-        """How many sets were asked for that an identical one already answered."""
+        """Sets asked for that an identical row already answered."""
 
     def __enter__(self) -> Self:
         """Create the file and its schema, and open the one transaction."""
-        self._path.unlink(missing_ok=True)
+        try:
+            self._path.unlink(missing_ok=True)
+        except PermissionError as error:
+            raise RuntimeError(
+                f"cannot replace {self._path}: another program holds it open; close it and retry"
+            ) from error
         self._connection = sqlite3.connect(self._path, isolation_level=None)
         self._connection.executescript(
             resources.files("furnish").joinpath("schema.sql").read_text()
@@ -83,7 +96,7 @@ class Database:
             placements: ``(display id, placement)`` pairs, already filtered to the spawnable.
         """
         rows = tuple(placements)
-        key = (name, rows)
+        key = (name, _digest(rows))
         known = self._sets.get(key)
         if known is not None:
             self.shared_sets += 1
@@ -101,6 +114,8 @@ class Database:
             ),
         )
         self._sets[key] = set_id
+        self.sets += 1
+        self.placements += len(rows)
         return set_id
 
     def add_wmo_sets(self, rows: Iterable[tuple[int, int, int]]) -> None:
@@ -126,3 +141,11 @@ class Database:
         if self._connection is None:
             raise RuntimeError("the database is not open; use it as a context manager")
         return self._connection
+
+
+def _digest(rows: tuple[tuple[int, Placement], ...]) -> bytes:
+    """A fingerprint of a set's rows, so sharing costs bytes per set rather than the rows."""
+    digest = hashlib.blake2b(digest_size=16)
+    for display, p in rows:
+        digest.update(_ROW.pack(display, *p.position, *p.rotation, p.scale))
+    return digest.digest()

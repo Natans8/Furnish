@@ -13,7 +13,7 @@ was authored for.
 """
 
 import struct
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from furnish.chunks import chunk_map
@@ -73,13 +73,13 @@ def read_root(raw: bytes, path_to_id: dict[str, int] | None = None) -> Root:
     """Read a WMO root file's doodad sets.
 
     Args:
-        raw: The whole root file. Group files carry no doodad data and read as empty.
+        raw: The whole root file. A group file is refused, since it has no header.
         path_to_id: How to resolve a model named by path, for roots that predate file ids.
             Keys are lower-cased paths with forward slashes. A path not in the map, or a
             root naming paths when no map is given, yields model 0.
 
     Raises:
-        ValueError: If the file is not a WMO root.
+        ValueError: If the file is not a WMO root, a group file among them.
     """
     found = chunk_map(raw)
     if b"MVER" not in found or b"MOHD" not in found:
@@ -101,43 +101,31 @@ def _sets(payload: memoryview) -> list[tuple[str, int, int]]:
     return out
 
 
-def _models(found: dict[bytes, memoryview], path_to_id: dict[str, int]) -> _Models:
+def _models(found: dict[bytes, memoryview], path_to_id: dict[str, int]) -> Callable[[int], int]:
+    """How this root names a model: by id through ``MODI``, or by path through ``MODN``."""
     if b"MODI" in found:
         ids = found[b"MODI"]
-        return _ById(struct.unpack_from(f"<{len(ids) // 4}I", ids))
-    return _ByName(bytes(found.get(b"MODN", memoryview(b""))), path_to_id)
+        return _by_id(struct.unpack_from(f"<{len(ids) // 4}I", ids))
+    return _by_name(bytes(found.get(b"MODN", memoryview(b""))), path_to_id)
 
 
-def _placements(payload: memoryview, models: _Models) -> tuple[Placement, ...]:
+def _placements(payload: memoryview, resolve: Callable[[int], int]) -> tuple[Placement, ...]:
     out = []
     usable = payload[: len(payload) - len(payload) % _PLACEMENT.size]
     for head, x, y, z, qx, qy, qz, qw, scale, _b, _g, _r, _a in _PLACEMENT.iter_unpack(usable):
-        out.append(
-            Placement(models.resolve(head & MODEL_INDEX_MASK), (x, y, z), (qx, qy, qz, qw), scale)
-        )
+        out.append(Placement(resolve(head & MODEL_INDEX_MASK), (x, y, z), (qx, qy, qz, qw), scale))
     return tuple(out)
 
 
-class _Models:
-    def resolve(self, reference: int) -> int:
-        raise NotImplementedError
+def _by_id(ids: Sequence[int]) -> Callable[[int], int]:
+    return lambda reference: ids[reference] if reference < len(ids) else 0
 
 
-class _ById(_Models):
-    def __init__(self, ids: Sequence[int]) -> None:
-        self._ids = ids
-
-    def resolve(self, reference: int) -> int:
-        return self._ids[reference] if reference < len(self._ids) else 0
-
-
-class _ByName(_Models):
-    def __init__(self, names: bytes, path_to_id: dict[str, int]) -> None:
-        self._names = names
-        self._path_to_id = path_to_id
-
-    def resolve(self, reference: int) -> int:
-        if reference >= len(self._names):
+def _by_name(names: bytes, path_to_id: dict[str, int]) -> Callable[[int], int]:
+    def resolve(reference: int) -> int:
+        if reference >= len(names):
             return 0
-        name = self._names[reference:].split(b"\0", 1)[0].decode("latin-1")
-        return self._path_to_id.get(name.lower().replace("\\", "/"), 0)
+        name = names[reference:].split(b"\0", 1)[0].decode("latin-1")
+        return path_to_id.get(name.lower().replace("\\", "/"), 0)
+
+    return resolve

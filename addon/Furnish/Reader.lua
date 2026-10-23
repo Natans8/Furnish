@@ -41,6 +41,13 @@ end
 
 local VERSION = 1
 
+local function data()
+  if not Data then
+    error("Furnish: call Furnish.Load() before asking for data")
+  end
+  return Data
+end
+
 local function deflate()
   local lib = LibStub and LibStub:GetLibrary("LibDeflate", true)
   if not lib then
@@ -116,11 +123,11 @@ local function decodeBlob(text)
   return rows
 end
 
---- The sets a spawned WMO offers, or nil when the data has none for it.
+--- The sets a spawned WMO offers, or nil when the data has none for it. Load first.
 -- @param display the gameobject display id of the WMO
 -- @return a list of { index, set, name, count }, in index order; the default set's name is ""
 function Reader.Sets(display)
-  return Data and Data.wmo[display]
+  return data().wmo[display]
 end
 
 --- The placements of a set, decoded once and kept.
@@ -129,7 +136,7 @@ end
 function Reader.Placements(set)
   local rows = decoded[set]
   if rows == nil then
-    local blob = Data and Data.blobs[set]
+    local blob = data().blobs[set]
     if blob == nil then
       return nil
     end
@@ -139,11 +146,11 @@ function Reader.Placements(set)
   return rows
 end
 
---- The sets a WMO placed on a map draws, or nil when the data has none for it.
+--- The sets a WMO placed on a map draws, or nil when the data has none for it. Load first.
 -- @param map the map id the client reports
 -- @param uid the placement's unique id, as .doodad near prints it
 -- @return a list of set ids
 function Reader.MapSets(map, uid)
-  local byMap = Data and Data.maps[map]
+  local byMap = data().maps[map]
   return byMap and byMap[uid]
 end

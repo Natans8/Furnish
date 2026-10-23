@@ -84,8 +84,7 @@ def _blobs(connection: sqlite3.Connection) -> Iterable[str]:
     sets = connection.execute("SELECT id FROM sets ORDER BY id").fetchall()
     for (set_id,) in tqdm(sets, desc="sets", unit="set"):
         rows = connection.execute(
-            'SELECT display, x, y, z, qx, qy, qz, qw, scale FROM placements WHERE "set" = ?'
-            " ORDER BY seq",
+            'SELECT display, x, y, z, qx, qy, qz, qw, scale FROM placements WHERE "set" = ?',
             (set_id,),
         )
         blob = encode(

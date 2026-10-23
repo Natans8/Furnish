@@ -23,7 +23,10 @@ GROUP_FILE = re.compile(r"_\d{3}(_lod\d)?\.wmo$", re.IGNORECASE)
 """A WMO group file's name ends in a three-digit group number; a root's does not."""
 
 OBJECT_FILE = re.compile(r"_obj0\.adt$", re.IGNORECASE)
-"""The map tile file that carries WMO placements."""
+"""The map tile file that carries WMO placements.
+
+Its ``_obj1`` twin repeats them for the far view and is left alone.
+"""
 
 MAP_DIRECTORY = re.compile(r"(?:^|/)world/maps/([^/]+)/", re.IGNORECASE)
 """Where a tile's path names its map."""
@@ -54,16 +57,23 @@ class Inputs:
 
 @dataclass(slots=True)
 class Report:
-    """What the build did, for the log line at the end."""
+    """What the build did, for the log line at the end.
+
+    A slot is a set or placement a root asked for; a row is one written, after identical sets
+    were shared.
+    """
 
     roots_read: int = 0
     roots_without_display: int = 0
     roots_without_doodads: int = 0
     roots_unresolved: int = 0
+    roots_unreadable: int = 0
     empty_sets: int = 0
+    set_slots: int = 0
+    placement_slots: int = 0
     sets: int = 0
-    shared_sets: int = 0
     placements: int = 0
+    shared_sets: int = 0
     blank_slots: int = 0
     models_without_display: int = 0
     tiles_read: int = 0
@@ -89,6 +99,8 @@ def build(inputs: Inputs, out: Path) -> Report:
         if inputs.maps is not None:
             maps = {row["Directory"].lower(): int(row["ID"]) for row in read_csv(inputs.map_table)}
             _write_maps(inputs.maps, path_to_id, maps, sets_by_root, database, report)
+        report.sets = database.sets
+        report.placements = database.placements
         report.shared_sets = database.shared_sets
     return report
 
@@ -119,7 +131,12 @@ def _write_roots(
         if file_id not in spawners:
             report.roots_without_display += 1
             continue
-        root = read_root(path.read_bytes(), path_to_id)
+        try:
+            root = read_root(path.read_bytes(), path_to_id)
+        except ValueError as error:
+            tqdm.write(f"skipped {path}: {error}")
+            report.roots_unreadable += 1
+            continue
         kept = _spawnable(root, displays, report)
         if not kept:
             report.roots_without_doodads += 1
@@ -158,8 +175,8 @@ def _spawnable(
             report.empty_sets += 1
             continue
         kept[index] = (doodad_set.name if index else None, rows)
-        report.sets += 1
-        report.placements += len(rows)
+        report.set_slots += 1
+        report.placement_slots += len(rows)
     return kept
 
 
