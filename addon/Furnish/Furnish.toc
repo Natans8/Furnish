@@ -1,0 +1,8 @@
+## Interface: 90207
+## Title: Furnish
+## Notes: Spawns a WMO's doodad sets as gameobjects on Epsilon. Reads Furnish_Data.
+## Version: 0.1.0
+## OptionalDeps: EpsilonLib
+## X-License: AGPL-3.0-or-later
+
+Reader.lua
