@@ -1,4 +1,4 @@
-"""The command line: ``furnish build``."""
+"""The command line: ``furnish build`` and ``furnish export``."""
 
 import argparse
 import dataclasses
@@ -7,6 +7,7 @@ from pathlib import Path
 
 from furnish.build import Inputs, build
 from furnish.displays import vendored_overlay
+from furnish.export import export
 from furnish.sources import listfile, wago_table
 
 DEFAULT_BUILD = "9.2.7.45745"
@@ -40,7 +41,24 @@ def main(argv: list[str] | None = None) -> int:
     builder.add_argument(
         "--no-overlay", action="store_true", help="ignore the vendored Epsilon display rows"
     )
+    exporter = commands.add_parser("export", help="write the addon's Data.lua from a database")
+    exporter.add_argument(
+        "--db", type=Path, default=Path("furnish.sqlite"), help="the database furnish build wrote"
+    )
+    exporter.add_argument(
+        "--out",
+        type=Path,
+        default=Path("addon/Furnish_Data/Data.lua"),
+        help="the Lua file to write, beside the addon's Reader.lua",
+    )
     args = parser.parse_args(argv)
+
+    if args.command == "export":
+        sizes = export(args.db, args.out)
+        for name, value in dataclasses.asdict(sizes).items():
+            print(f"{name}: {value / 1048576:.2f} MB", file=sys.stderr)
+        print(args.out)
+        return 0
 
     inputs = Inputs(
         roots=args.roots,

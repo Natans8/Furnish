@@ -1,0 +1,8 @@
+## Interface: 90207
+## Title: Furnish Data
+## Notes: The doodad sets of World of Warcraft's WMOs, for spawning them on Epsilon. Data only; Furnish reads it.
+## Version: 0.1.0
+## LoadOnDemand: 1
+## X-License: AGPL-3.0-or-later
+
+Data.lua

@@ -21,6 +21,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "lupa>=2.8",
     "mypy>=2.4.0",
     "pytest>=9.1.1",
     "ruff>=0.17.1",
@@ -36,6 +37,11 @@ strict = true
 warn_unreachable = true
 python_version = "3.14"
 files = ["src", "tests"]
+
+# lupa ships no stubs; the Lua values it returns are typed at the test that reads them.
+[[tool.mypy.overrides]]
+module = ["lupa", "lupa.*"]
+ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 100

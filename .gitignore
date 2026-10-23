@@ -9,6 +9,9 @@ wheels/
 # Virtual environments
 .venv
 
+# The build's inputs and its outputs, the addon's data file among them.
+addon/Furnish_Data/Data.lua
+
 # The build's inputs and its output. The database is an artifact, built from
 # the roots on disk and the tables the build downloads; neither is a source.
 .cache/

@@ -41,6 +41,25 @@ row of `sets`.
 model files, read from inside the game, because wago.tools cannot see them and some of
 Blizzard's rows are refused by Epsilon's server.
 
+## The addon data
+
+```bash
+uv run furnish export --db furnish.sqlite --out addon/Furnish_Data/Data.lua
+```
+
+`addon/Furnish_Data` is the data addon: `Data.lua`, generated and not committed, declaring
+`FurnishData` with a `format` number, the `build`, each display's sets (`wmo`), each set's
+placements as one printable string (`blobs`) and the sets each map placement draws (`maps`).
+It loads on demand and holds nothing else, so it changes only when the data does.
+
+`addon/Furnish/Reader.lua` is the reader and ships with the code, never with the data:
+`Furnish.Load()` loads the data addon and refuses another format, `Furnish.Sets(display)`,
+`Furnish.Placements(set)` and `Furnish.MapSets(map, uid)` answer from it. A set's string is
+LibDeflate's printable encoding of a raw deflate stream over varints, decoded the first time
+the set is asked for; the layout is documented in `src/furnish/codec.py` and is lossy to the
+grain a spawn command takes: centimetres, a quaternion in ten-thousandths, a scale in
+thousandths. On the 9.2.7 data the file is 14 MB and loads to an 18.6 MB Lua heap.
+
 ## Develop
 
 ```bash
