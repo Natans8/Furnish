@@ -90,6 +90,11 @@ def test_build_writes_the_four_tables(tmp_path: Path) -> None:
         (0, 4243, 2),
     ]
     assert db.execute("SELECT count(*) FROM wmo_sets WHERE file = 903").fetchone() == (0,)
+    assert db.execute("SELECT display, file FROM root_displays ORDER BY 1").fetchall() == [
+        (10, 900),
+        (11, 900),
+        (13, 904),
+    ]
     assert (
         report.roots_read,
         report.roots_without_display,

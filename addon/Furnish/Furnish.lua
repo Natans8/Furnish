@@ -1,14 +1,14 @@
 -- The door: the core driven by a GUID, for a test from /run.
 --
 --   /run Furnish.Spawn(guid, 1)                      set 1 of that WMO's own root, on it
---   /run Furnish.Spawn(guid, 1, { from = 849966 })   set 1 of another root, by file id
---   /run Furnish.Spawn(guid, 1, { from = "6dr_draenei_house2" })   by model name
+--   /run Furnish.Spawn(guid, 1, { from = 817579 })   set 1 of another object's root, by entry
 --   /run Furnish.Spawn(Furnish.Selected(), 1)        the selected object's GUID
 --   /run Furnish.Abort(true)                         stop the run, delete what it spawned
 --
--- The target is a GUID and the source is a root: the target's own by default, an emptywmo
--- twin's original when the target is one, or whatever `from` names, so a building's sets
--- can go on a recolour of it. A GUID becomes a record by selecting the object, since
+-- The target is a GUID and the source is a root: the target's own by default, the original
+-- behind an emptywmo when the target is one, or the root of the gameobject entry `from` names,
+-- so a building's sets can go on a recolour of it. An entry becomes a root through the
+-- server's own `gobject info`, which prints the display, and the data's display table. A GUID becomes a record by selecting the object, since
 -- EpsilonLib keeps no record by id, only the one the server pushes for the selection.
 -- Nothing here parses text or draws anything; a command and a window come later and call
 -- the same functions.
@@ -99,7 +99,7 @@ function Furnish.HouseOf(object)
 		guid = object.guid,
 		file = object.fileID,
 		name = modelName(object.name),
-		twin = modelName(object.name):find("emptywmo_", 1, true) ~= nil,
+		empty = modelName(object.name):find("emptywmo_", 1, true) ~= nil,
 		x = position.x,
 		y = position.y,
 		z = position.z,
@@ -159,27 +159,61 @@ local function resolve(guid, callback)
 	end)
 end
 
---- The source root for a house: `from` where given, the original behind a twin, else the
--- house's own file.
--- @return the file id, or nil and the reason
-local function sourceOf(house, from)
-	if type(from) == "number" then
-		return from
+--- The root a gameobject entry spawns, through the server's own gobject info.
+-- @param entry the gameobject template entry
+-- @param callback function(file) or function(nil, reason)
+function Furnish.RootOf(entry, callback)
+	local door, why = sender()
+	if not door then
+		return callback(nil, why)
 	end
-	if type(from) == "string" then
-		return Furnish.Find(from)
+	door("gobject info " .. entry, function(success, messages)
+		if not success then
+			return callback(
+				nil,
+				("no gameobject %s: %s"):format(
+					tostring(entry),
+					tostring(messages and messages[1] or "no reply")
+				)
+			)
+		end
+		for _, line in ipairs(messages or {}) do
+			local display = line:match("DisplayID:%s*|c%x%x%x%x%x%x%x%x(%d+)|r")
+				or line:match("DisplayID:%s*(%d+)")
+			if display then
+				local file = Furnish.FileOf(tonumber(display))
+				if file then
+					return callback(file)
+				end
+				return callback(nil, ("the data has no sets for display %s"):format(display))
+			end
+		end
+		callback(nil, ("gobject info %s printed no display"):format(tostring(entry)))
+	end)
+end
+
+--- The source root for a house: the root of the entry `from` names, the original behind an
+-- emptywmo, else the house's own file.
+-- @param callback function(file) or function(nil, reason)
+local function sourceOf(house, from, callback)
+	if from ~= nil then
+		local entry = tonumber(from)
+		if not entry then
+			return callback(nil, "from is a gameobject entry")
+		end
+		return Furnish.RootOf(entry, callback)
 	end
-	if house.twin then
+	if house.empty then
 		local original = house.name:gsub("^eps_emptywmo_", "eps_"):gsub("^emptywmo_", "")
-		return Furnish.Find(original)
+		return callback(Furnish.Find(original))
 	end
-	return house.file
+	callback(house.file)
 end
 
 --- Spawn a set on a WMO.
 -- @param guid the target WMO's GUID; Furnish.Selected() gives the selection's
 -- @param index the set's position in the source's MODS, as the listing shows it
--- @param options { from = file id or model name, attach, nopivot, default }, optional
+-- @param options { from = gameobject entry, attach, nopivot, default }, optional
 function Furnish.Spawn(guid, index, options)
 	options = options or {}
 	if running and not running.Done() then
@@ -206,11 +240,19 @@ function Furnish.Spawn(guid, index, options)
 			return
 		end
 		local house = Furnish.HouseOf(object)
-		local source, missing = sourceOf(house, options.from)
-		if not source then
-			say(missing)
-			return
-		end
+		sourceOf(house, options.from, function(source, missing)
+			if not source then
+				say(missing)
+				return
+			end
+			Furnish.Start(house, source, index, options)
+		end)
+	end)
+end
+
+--- Plan and run one set of a source root on a resolved house.
+function Furnish.Start(house, source, index, options)
+	do
 		local plan, refused = Furnish.Plan.Build(house, source, index, options)
 		if not plan then
 			say(refused)
@@ -263,7 +305,7 @@ function Furnish.Spawn(guid, index, options)
 				say(text)
 			end,
 		})
-	end)
+	end
 end
 
 --- Stop the current run. With cleanup, delete what it spawned.

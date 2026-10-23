@@ -21,6 +21,11 @@ CREATE TABLE wmo_sets (
     PRIMARY KEY (file, "index")
 ) WITHOUT ROWID;
 
+CREATE TABLE root_displays (
+    display INTEGER PRIMARY KEY,    -- a gameobject display that spawns a furnished root
+    file    INTEGER NOT NULL        -- that root's file id, the key of wmo_sets
+) WITHOUT ROWID;
+
 CREATE TABLE placements (
     "set"   INTEGER NOT NULL REFERENCES sets(id),
     seq     INTEGER NOT NULL,       -- the placement's position within the set

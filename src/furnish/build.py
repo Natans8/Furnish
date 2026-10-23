@@ -138,6 +138,7 @@ def _write_roots(
         set_ids = {index: database.add_set(name, rows) for index, (name, rows) in kept.items()}
         sets_by_root[file_id] = set_ids
         database.add_wmo_sets((file_id, index, set_id) for index, set_id in set_ids.items())
+        database.add_root_displays((display, file_id) for display in spawners[file_id])
     return sets_by_root
 
 

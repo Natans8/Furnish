@@ -6,10 +6,10 @@
 --
 -- The house is the target: the object record as the client reports it, reduced to what the
 -- maths and the checks need, resolved by whoever calls here.
---   { guid, file, twin, x, y, z, roll, pitch, turn, scale, groupLeader, canEdit }
--- `twin` says the shell is an emptywmo copy, which draws no default set of its own. The
+--   { guid, file, empty, x, y, z, roll, pitch, turn, scale, groupLeader, canEdit }
+-- `empty` says the shell is an emptywmo, a hollowed copy that draws no default set of its own. The
 -- source is a root file id whose sets are spawned, usually the house's own file, but any
--- root's: a stock original on its emptywmo twin, or a building's sets on a recolour of it.
+-- root's: a stock original on its emptywmo, or a building's sets on a recolour of it.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -41,8 +41,8 @@ local function findSet(sets, index)
 	return nil
 end
 
---- The placements a set spawns: its own, and the default set's before them on a twin or
--- when asked for, since a twin draws none of the default and any other shell all of it.
+--- The placements a set spawns: its own, and the default set's before them on an emptywmo or
+-- when asked for, since an emptywmo draws none of the default and any other shell all of it.
 local function rows(sets, chosen, withDefault)
 	local out = {}
 	if withDefault and chosen[1] ~= DEFAULT then
@@ -82,8 +82,8 @@ function Plan.Build(house, source, index, options)
 	if not chosen then
 		return nil, ("root %s has no set %d"):format(tostring(source), index)
 	end
-	local twin = house.twin == true
-	if index == DEFAULT and not twin and not options.default then
+	local empty = house.empty == true
+	if index == DEFAULT and not empty and not options.default then
 		return nil, "the shell already draws its default set; say default to spawn it again"
 	end
 	local leader
@@ -117,7 +117,7 @@ function Plan.Build(house, source, index, options)
 		commands[#commands + 1] =
 			{ role = "pivot", text = Transform.SpawnCommand(Plan.MARKER, origin) }
 	end
-	local placements = rows(sets, chosen, twin or options.default)
+	local placements = rows(sets, chosen, empty or options.default)
 	for _, row in ipairs(placements) do
 		commands[#commands + 1] = {
 			role = "doodad",
@@ -130,7 +130,7 @@ function Plan.Build(house, source, index, options)
 		house = house,
 		source = source,
 		set = { index = chosen[1], id = chosen[2], name = chosen[3], count = chosen[4] },
-		withDefault = twin or options.default == true,
+		withDefault = empty or options.default == true,
 		leader = leader,
 		attach = options.attach == true,
 		chainedJoin = Plan.CHAINED_JOIN,

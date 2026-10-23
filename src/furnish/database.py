@@ -126,6 +126,14 @@ class Database:
         """
         self._connected().executemany("INSERT INTO wmo_sets VALUES (?, ?, ?)", rows)
 
+    def add_root_displays(self, rows: Iterable[tuple[int, int]]) -> None:
+        """Insert ``(display, file)`` rows, one per display that spawns a furnished root.
+
+        Args:
+            rows: The displays and the root file each spawns.
+        """
+        self._connected().executemany("INSERT INTO root_displays VALUES (?, ?)", rows)
+
     def add_map_sets(self, rows: Iterable[tuple[int, int, int]]) -> None:
         """Insert ``(map, uid, set)`` rows, ignoring exact repeats.
 

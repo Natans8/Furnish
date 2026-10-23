@@ -151,6 +151,12 @@ function Reader.Placements(set)
 	return rows
 end
 
+--- The root file a gameobject display spawns, or nil when it spawns no furnished root.
+-- @param display a gameobject display id, as gobject info prints it
+function Reader.FileOf(display)
+	return data().displays[display]
+end
+
 --- The sets a WMO placed on a map draws, or nil when the data has none for it. Load first.
 -- @param map the map id the client reports
 -- @param uid the placement's unique id, as .doodad near prints it

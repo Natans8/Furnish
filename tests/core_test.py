@@ -28,6 +28,7 @@ def write_database(path: Path) -> None:
         default = db.add_set(None, [(21, GLOW)])
         full = db.add_set("Set_Full", [(20, CHAIR), (21, LAMP)])
         db.add_wmo_sets([(HOUSE, 0, default), (HOUSE, 1, full)])
+        db.add_root_displays([(30262, HOUSE)])
 
 
 def lua_core(tmp_path: Path) -> lua51.LuaRuntime:
@@ -127,8 +128,8 @@ STOCK = (
     "{ guid = 500, file = 900, x = 10, y = 20, z = 30, roll = 0, pitch = 0, turn = 0, scale = 1,"
     " groupLeader = 0, canEdit = true }"
 )
-TWIN = (
-    "{ guid = 501, file = 777, twin = true, x = 0, y = 0, z = 0, roll = 0, pitch = 0, turn = 0,"
+EMPTY = (
+    "{ guid = 501, file = 777, empty = true, x = 0, y = 0, z = 0, roll = 0, pitch = 0, turn = 0,"
     " scale = 1, groupLeader = 0, canEdit = true }"
 )
 
@@ -147,9 +148,9 @@ def test_a_plan_spawns_a_pivot_then_the_set(tmp_path: Path) -> None:
     )
 
 
-def test_a_twin_gets_the_default_set_too_and_no_pivot_when_attached(tmp_path: Path) -> None:
+def test_an_emptywmo_gets_the_default_set_too_and_no_pivot_when_attached(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
-    plan = lua.eval(f"Furnish.Plan.Build({TWIN}, 900, 1, {{ attach = true }})")
+    plan = lua.eval(f"Furnish.Plan.Build({EMPTY}, 900, 1, {{ attach = true }})")
     assert plan.leader == "house" and plan.withDefault is True and plan.doodads == 3
     assert [c.display for c in plan.commands.values()] == [21, 20, 21]
 
