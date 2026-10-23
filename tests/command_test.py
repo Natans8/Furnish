@@ -212,7 +212,7 @@ def test_a_spawn_says_what_it_sends_and_selects_its_group_in_sight(tmp_path: Pat
     lines = run(lua, "1")
     assert lines == [
         PREFIX + "spawning Full (set 1, 2 objects) on house, led by an invisible pivot",
-        PREFIX + "done: 2 of 2 spawned",
+        PREFIX + "done: 2 of 2 spawned in 0.0 s",
     ]
     assert sent(lua)[0] == "gobject spawn -424242 posx 10 posy 20 posz 30 face north turn 90"
     assert shown(lua) == ["gobject group select 7001"]
@@ -366,10 +366,9 @@ def test_an_import_furnishes_the_object_with_the_sets_the_map_placed(tmp_path: P
     assert sent(lua)[:2] == ["doodad import", "gobject select 500"]
     assert lines == [
         PREFIX + "spawning Full (set 1, 2 objects) on house, joining house's group",
-        PREFIX + "done: 2 of 2 spawned",
+        PREFIX + "done: 2 of 2 spawned in 0.0 s",
     ]
     assert "gobject group add 500" in sent(lua)
-    assert len(lines) == 2
     assert shown(lua) == ["gobject group select 500"]
     # A word still decides who leads.
     run(lua, "import first")
@@ -549,3 +548,11 @@ def test_any_true_answer_to_the_permission_check_is_permission(tmp_path: Path) -
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 500; EpsilonLib.GameObject.CanSpawn = function() return 1 end")
     assert run(lua, "1")[0].startswith(PREFIX + "spawning Full")
+
+
+def test_a_run_says_how_long_it_took(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path, deferred=True)
+    lua.execute("SELECTED = 500; CLOCK = 2")
+    run(lua, "1")
+    lua.execute("CLOCK = 14.5; FLUSH()")
+    assert printed(lua)[-1] == PREFIX + "done: 2 of 2 spawned in 12.5 s"

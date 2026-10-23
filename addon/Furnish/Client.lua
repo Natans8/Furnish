@@ -203,6 +203,11 @@ function Client.Position()
 	return _G.C_Epsilon.GetPosition()
 end
 
+--- The client's clock, in seconds.
+function Client.Now()
+	return _G.GetTime()
+end
+
 --- The player's facing in degrees, 0 north and growing toward west, as a spawn's turn.
 function Client.Facing()
 	return math.deg(_G.GetPlayerFacing() or 0)

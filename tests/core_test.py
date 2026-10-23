@@ -569,6 +569,8 @@ def fake_client(lua: lua51.LuaRuntime) -> None:
           GetPosition = function() return 1, 2, 3, 1116 end,
         }
         function GetPlayerFacing() return math.pi / 2 end
+        CLOCK = 0
+        function GetTime() return CLOCK end
         """
     )
     fake_server(lua)

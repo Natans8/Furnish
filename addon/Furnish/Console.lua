@@ -52,6 +52,11 @@ local function quote(messages)
 	return '"' .. table.concat(plain, " / ") .. '"'
 end
 
+--- How long since a moment on the client's clock, as a line says it.
+local function since(moment)
+	return ("%.1f s"):format(Client.Now() - moment)
+end
+
 local function objects(count)
 	return count == 1 and "1 object" or count .. " objects"
 end
@@ -128,8 +133,9 @@ local function groupOf(request, pose)
 	return leader, "joining " .. pose.name .. "'s group"
 end
 
---- Report a finished run, and select its group so the next group command acts on it.
-local function finish(result)
+--- Report a finished run, how long it took, and select its group so the next group
+-- command acts on it.
+local function finish(result, started)
 	local doodads = #result.spawned - (result.pivot and 1 or 0)
 	if result.deleted == #result.spawned then
 		say(("stopped, and deleted the %s it spawned"):format(objects(result.deleted)))
@@ -141,9 +147,9 @@ local function finish(result)
 			)
 		)
 	elseif result.aborted then
-		say(("stopped: %d of %d spawned"):format(doodads, result.total))
+		say(("stopped: %d of %d spawned in %s"):format(doodads, result.total, since(started)))
 	else
-		say(("done: %d of %d spawned"):format(doodads, result.total))
+		say(("done: %d of %d spawned in %s"):format(doodads, result.total, since(started)))
 	end
 	for _, refusal in ipairs(result.refused) do
 		say(("display %d was refused: %s"):format(refusal.display, quote(refusal.messages)))
@@ -163,7 +169,7 @@ local function finish(result)
 end
 
 local function hooks()
-	local last = 0
+	local last, started = 0, Client.Now()
 	return {
 		progress = function(done, total)
 			if done < total and done - last >= 10 then
@@ -171,7 +177,9 @@ local function hooks()
 				say(("%d of %d"):format(done, total))
 			end
 		end,
-		finished = finish,
+		finished = function(result)
+			finish(result, started)
+		end,
 	}
 end
 
