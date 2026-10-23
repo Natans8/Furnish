@@ -25,7 +25,8 @@ optional and fills `map_sets`. The build fetches the community listfile and wago
 | table        | row                                                           |
 |--------------|---------------------------------------------------------------|
 | `meta`       | `format`, `build`                                             |
-| `sets`       | one named doodad set, shared by roots that hold it            |
+| `names`      | a set name as `MODS` spells it, once                          |
+| `sets`       | a doodad set under a name, shared by roots that hold it       |
 | `wmo_sets`   | a display id that spawns a root, a set index, its set         |
 | `placements` | a set's doodad in order: display, position, quaternion, scale |
 | `map_sets`   | a map id and ADT unique id, and a set it draws                |
