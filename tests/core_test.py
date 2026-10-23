@@ -592,7 +592,7 @@ def test_the_console_spawns_the_selections_set_with_a_pivot_and_says_so(tmp_path
         "|cff66ccffFurnish:|r spawning 2 objects, set 1 Set_Full (2 objects) of root file 900,"
         " at 10 20 30, an invisible pivot leading"
     )
-    assert lines[-1] == "|cff66ccffFurnish:|r done: 3 of 2 spawned, group led by 7001"
+    assert lines[-1] == "|cff66ccffFurnish:|r done: 2 of 2 spawned, group led by 7001"
 
 
 def test_the_console_refuses_with_the_way_out(tmp_path: Path) -> None:

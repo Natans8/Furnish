@@ -50,7 +50,8 @@ local function hooks()
 			end
 		end,
 		finished = function(result)
-			local text = ("done: %d of %d spawned"):format(#result.spawned, result.total)
+			local doodads = #result.spawned - (result.pivot and 1 or 0)
+			local text = ("done: %d of %d spawned"):format(doodads, result.total)
 			if result.leader then
 				text = text .. ", group led by " .. result.leader
 			end
