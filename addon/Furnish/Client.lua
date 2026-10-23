@@ -69,7 +69,8 @@ function Client.CanSpawn()
 	if not check then
 		return true
 	end
-	return check(true) == true
+	-- Any true answer is permission, as EpsilonLib reads it: Epsilon's calls may answer 1.
+	return check(true) and true or false
 end
 
 --- The selected object's record, or nil; false for a group selection.

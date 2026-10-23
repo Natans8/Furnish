@@ -543,3 +543,9 @@ def test_an_import_hears_its_line_when_the_server_sends_it_apart(tmp_path: Path)
     assert printed(lua)[-2] == (
         PREFIX + "spawning Full (set 1, 2 objects) on house, joining house's group"
     )
+
+
+def test_any_true_answer_to_the_permission_check_is_permission(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("SELECTED = 500; EpsilonLib.GameObject.CanSpawn = function() return 1 end")
+    assert run(lua, "1")[0].startswith(PREFIX + "spawning Full")
