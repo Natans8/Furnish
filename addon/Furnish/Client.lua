@@ -60,6 +60,18 @@ function Client.Send()
 	return send
 end
 
+--- Whether the player may spawn objects in this phase, its members, officers and owner. A
+-- refusal is said in chat in Epsilon's own words, as its other building tools say it. Where
+-- EpsilonLib cannot answer, the server is left to decide.
+function Client.CanSpawn()
+	local lib = _G.EpsilonLib
+	local check = lib and lib.GameObject and lib.GameObject.CanSpawn
+	if not check then
+		return true
+	end
+	return check(true) == true
+end
+
 --- The selected object's record, or nil; false for a group selection.
 function Client.Selected()
 	local lib = _G.EpsilonLib

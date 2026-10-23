@@ -464,3 +464,14 @@ def test_a_set_read_off_the_selection_needs_a_building(tmp_path: Path) -> None:
     assert run(lua, "1 from 817579") == [
         PREFIX + "no object is selected; select the object to spawn on first, as with .gob select"
     ]
+
+
+def test_nothing_is_sent_where_the_player_may_not_spawn(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("SELECTED = 500; NO_PERMISSION = true")
+    refusal = ["You do not have permission to spawn objects here."]
+    assert run(lua, "1") == refusal
+    assert run(lua, "import") == refusal
+    assert sent(lua) == []
+    # A list sends nothing, so it is not asked for permission.
+    assert run(lua, "list")[0] == PREFIX + "house has 2 sets:"

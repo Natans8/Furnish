@@ -276,6 +276,9 @@ function Console.Spawn(request)
 	if blocked then
 		return say(blocked)
 	end
+	if not Client.CanSpawn() then
+		return
+	end
 	local loaded, reason = Reader.Load()
 	if not loaded then
 		return say(reason)
@@ -365,6 +368,9 @@ function Console.Import(request)
 	local blocked = busy()
 	if blocked then
 		return say(blocked)
+	end
+	if not Client.CanSpawn() then
+		return
 	end
 	local loaded, reason = Reader.Load()
 	if not loaded then

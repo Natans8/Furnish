@@ -553,6 +553,12 @@ def fake_client(lua: lua51.LuaRuntime) -> None:
           GameObject = {
             IsGroupSelected = function() return SELECTED == "group" end,
             GetSelected = function() return RECORDS[SELECTED] end,
+            CanSpawn = function(vocal)
+              if NO_PERMISSION and vocal then
+                print("You do not have permission to spawn objects here.")
+              end
+              return not NO_PERMISSION
+            end,
           },
           AddonCommands = { Register = function() return SEND end },
         }
