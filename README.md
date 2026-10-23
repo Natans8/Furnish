@@ -38,9 +38,9 @@ model no display spawns, are dropped at build; a set left empty, and a root left
 set, get no rows. Two roots holding the same set, name and placements alike, share one
 row of `sets`.
 
-`src/furnish/data/epsilon-displays.csv` carries Epsilon's own display rows for Blizzard's
-model files, read from inside the game, because wago.tools cannot see them and some of
-Blizzard's rows are refused by Epsilon's server.
+`src/furnish/data/epsilon-displays.csv` carries Epsilon's own display rows, every row of the
+client's `GameObjectDisplayInfo` at or above 100000, because wago.tools cannot see them and
+the server refuses a Blizzard display wherever Epsilon has made its own row for the file.
 
 ## The addon data
 
