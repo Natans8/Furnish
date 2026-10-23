@@ -1,0 +1,20 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# The build's inputs and its output. The database is an artifact, built from
+# the roots on disk and the tables the build downloads; neither is a source.
+.cache/
+*.sqlite
+
+# Tool caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/

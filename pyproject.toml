@@ -1,0 +1,57 @@
+[project]
+name = "furnish"
+version = "0.1.0"
+description = "Doodad sets of World of Warcraft WMOs as a database, for spawning them on Epsilon."
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+authors = [{ name = "Natan Shick" }]
+requires-python = ">=3.14"
+dependencies = [
+    # Progress for the steps that take minutes: a walk over sixteen thousand
+    # roots, a download of the display table.
+    "tqdm>=4.70.1",
+]
+
+[project.scripts]
+furnish = "furnish.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+    "ruff>=0.17.1",
+    "types-tqdm>=4.70.0.20260906",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--quiet --no-header"
+
+[tool.mypy]
+strict = true
+warn_unreachable = true
+python_version = "3.14"
+files = ["src", "tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "D", "N", "PL", "PERF", "FURB"]
+ignore = [
+    # Both ask for a docstring on every test and fixture; the test name is the docstring.
+    "D103", "D100",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "PLR2004"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.pylint]
+max-args = 8
