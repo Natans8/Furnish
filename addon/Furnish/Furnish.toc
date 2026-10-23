@@ -15,5 +15,4 @@ Client.lua
 Pose.lua
 Sets.lua
 Rows.lua
-Group.lua
 Console.lua

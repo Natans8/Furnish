@@ -3,7 +3,8 @@
 -- Every function answers the same shape, { position = { x, y, z }, rotation = { roll, pitch,
 -- turn }, scale }, plus whatever else the source knew, so a surface may take the pose from
 -- one source and anything else from another. A rotation the source did not know is nil,
--- which the kernel reads as level.
+-- which the kernel reads as level. Nothing here sends a command: an object's record is read
+-- off the selection the player made, never one the addon makes for them.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -61,37 +62,18 @@ function Pose.OfRecord(object)
 	}
 end
 
---- An object's pose by GUID. EpsilonLib keeps a record only for the selection, so the
--- object is selected first unless it already is.
--- @param callback function(pose) or function(nil, reason)
-function Pose.Of(guid, callback)
-	local wanted = tonumber(guid)
-	if not wanted then
-		return callback(nil, ("a gameobject GUID is a number, not %s"):format(tostring(guid)))
+--- The selected object's pose, from the record the server pushed for it. The core never
+-- selects anything itself, since that would move the player's own selection.
+-- @return the pose; or nil and the reason, false standing for a group selection
+function Pose.Selected()
+	local object = Client.Selected()
+	if object == false then
+		return nil, "a group is selected; select one object"
 	end
-	local function deliver(object, reason)
-		if not object then
-			return callback(nil, reason)
-		end
-		callback(Pose.OfRecord(object))
+	if not object then
+		return nil, "no object is selected"
 	end
-	local selected = Client.Selected()
-	if selected and tonumber(selected.guid) == wanted then
-		return deliver(selected)
-	end
-	local send, why = Client.Send()
-	if not send then
-		return callback(nil, why)
-	end
-	send(Commands.Select(wanted), function(success, messages)
-		if not success then
-			return callback(
-				nil,
-				("gobject select %d was refused: %s"):format(wanted, Commands.Quote(messages))
-			)
-		end
-		Client.AwaitSelection(wanted, deliver)
-	end)
+	return Pose.OfRecord(object)
 end
 
 --- A map doodad's pose from its `.doodad select` line, which the client prints and keeps

@@ -3,13 +3,14 @@
 -- This is a surface, not the API: it holds the one running run, picks defaults, and prints.
 -- Every line it prints says what was asked, what was found and, on a refusal, the way out.
 --
--- A root is known by an object standing in the world, whose record carries the file id, or
--- by that file id itself, the data's own key, which Sets() prints.
+-- A root is the selected object's, off the record the server pushed for it, or a root file
+-- id, the data's own key, which Sets() prints for whatever is selected. Nothing here moves
+-- the selection.
 --
---   /run Furnish.Console.Sets()                 the selected object's sets
+--   /run Furnish.Console.Sets()                 the selected object's sets and root file id
 --   /run Furnish.Console.Sets(849966)           a root's sets, by file id
 --   /run Furnish.Console.Spawn(1)               set 1 of the selected object's root, on it
---   /run Furnish.Console.Spawn(1, { from = 99657 })      another object's root, by its GUID
+--   /run Furnish.Console.Spawn(1, { from = 849966 })     another root's set 1, on the selection
 --   /run Furnish.Console.Spawn(1, { group = Furnish.Group.First })
 --   /run Furnish.Console.Here(849966, 1)        a root's set 1, at the player
 --   /run Furnish.Console.Abort(true)            stop, and delete what was spawned
@@ -67,16 +68,13 @@ local function hooks()
 	}
 end
 
---- The selected object's pose, or nil and the reason, with the selection's shape named.
-local function selection(callback)
-	local object = Client.Selected()
-	if object == false then
-		return callback(nil, "a group is selected; select one object with gobject select")
+--- The selected object's pose, or nil and a reason that names the way out.
+local function selection()
+	local pose, reason = Pose.Selected()
+	if not pose then
+		return nil, reason .. "; select one object with gobject select <guid>"
 	end
-	if not object then
-		return callback(nil, "no object is selected; select one with gobject select <guid>")
-	end
-	Pose.Of(object.guid, callback)
+	return pose
 end
 
 --- The rows for a set of a root: the set's own, with the default set's before them on an
@@ -146,21 +144,21 @@ function Console.Sets(file)
 	if file then
 		return list(file, "root file " .. tostring(file))
 	end
-	selection(function(pose, reason)
-		if not pose then
-			return say(reason)
-		end
-		list(pose.file, ("%s (root file %s)"):format(pose.name, tostring(pose.file)))
-	end)
+	local pose, reason = selection()
+	if not pose then
+		return say(reason)
+	end
+	list(pose.file, ("%s (root file %s)"):format(pose.name, tostring(pose.file)))
 end
 
 --- Spawn a set on the selected object.
 -- @param index the set's index
--- @param options { from = another object's GUID, group = a Furnish.Group value or GUID,
+-- @param options { from = another root's file id, group = a Furnish.Group value or GUID,
 --   default = true }
 function Console.Spawn(index, options)
 	options = options or {}
-	selection(function(pose, reason)
+	local pose, reason = selection()
+	do
 		if not pose then
 			return say(reason)
 		end
@@ -183,21 +181,13 @@ function Console.Spawn(index, options)
 			start(rows, pose, options.group or Group.Pivot, note .. " of root file " .. file)
 		end
 		if options.from then
-			return Pose.Of(options.from, function(source, missing)
-				if not source then
-					return go(nil, missing)
-				end
-				if source.empty then
-					return go(Sets.Original(source.name))
-				end
-				go(source.file)
-			end)
+			return go(options.from)
 		end
 		if pose.empty then
 			return go(Sets.Original(pose.name))
 		end
 		go(pose.file)
-	end)
+	end
 end
 
 --- Spawn a set of a root where the player stands, facing as the player faces.

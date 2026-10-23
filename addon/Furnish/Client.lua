@@ -66,35 +66,6 @@ function Client.Selected()
 	return lib.GameObject:GetSelected()
 end
 
-Client.SELECT_TRIES = 30
-Client.SELECT_INTERVAL = 0.1
-
---- Wait for the selection to be the object asked for, which the server pushes a moment
--- after `gobject select` is answered.
--- @param guid the object's GUID
--- @param callback function(object) or function(nil, reason)
-function Client.AwaitSelection(guid, callback)
-	local tries = 0
-	local function look()
-		local object = Client.Selected()
-		if object and tonumber(object.guid) == guid then
-			return callback(object)
-		end
-		tries = tries + 1
-		if tries >= Client.SELECT_TRIES then
-			return callback(
-				nil,
-				("selected %d, but its record never reached the client in %.1f s"):format(
-					guid,
-					Client.SELECT_TRIES * Client.SELECT_INTERVAL
-				)
-			)
-		end
-		_G.C_Timer.After(Client.SELECT_INTERVAL, Client.Guarded(look))
-	end
-	look()
-end
-
 --- The player's position as the server places by, and the map: x, y, z, map. Blizzard's
 -- UnitPosition answers nothing useful on a phase, which is an instanced map.
 function Client.Position()

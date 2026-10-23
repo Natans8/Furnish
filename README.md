@@ -95,11 +95,10 @@ lead to the first doodad.
 | `Commands.lua`  | every command spelling and every reply reader                              |
 | `Run.lua`       | any series of commands through `send`, in order, with needs and a width    |
 | `Kernel.lua`    | `Furnish.Spawn` and `Furnish.Group`                                        |
-| `Client.lua`    | the one file naming EpsilonLib and `C_Epsilon`                             |
-| `Pose.lua`      | where: `At`, `Here`, `Of(guid, cb)`, `OfDoodad(line)`                      |
+| `Client.lua`    | the one file naming EpsilonLib and `C_Epsilon`; it reads, and never selects |
+| `Pose.lua`      | where: `At`, `Here`, `Selected`, `OfDoodad(line)`                          |
 | `Sets.lua`      | which: `OfFile`, `Pick`, `Original`, `OfPlacement`                       |
 | `Rows.lua`      | what: `OfSet`, `Union`, `Without`                                          |
-| `Group.lua`     | `Furnish.Group.Leading(guid, cb)`, the GUID that leads an object's group   |
 | `Console.lua`   | the `/run` door: `Sets`, `Spawn(index, options)`, `Here(file, index)`, `Abort` |
 
 ## Develop

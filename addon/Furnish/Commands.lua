@@ -68,10 +68,6 @@ function Commands.Chained(spawn, leader)
 	return spawn .. " group add " .. leader
 end
 
-function Commands.Select(guid)
-	return "gobject select " .. guid
-end
-
 function Commands.Info(entry)
 	return "gobject info " .. entry
 end

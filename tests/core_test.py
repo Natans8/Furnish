@@ -26,7 +26,6 @@ FILES = (
     "Pose.lua",
     "Sets.lua",
     "Rows.lua",
-    "Group.lua",
     "Console.lua",
 )
 
@@ -509,11 +508,11 @@ def fake_client(lua: lua51.LuaRuntime) -> None:
     )
 
 
-def test_pose_of_selects_the_object_and_reads_its_record(tmp_path: Path) -> None:
+def test_pose_selected_reads_the_record_and_never_selects(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     fake_client(lua)
-    lua.execute("POSE, WHY = nil, nil; Furnish.Pose.Of(500, function(p, w) POSE, WHY = p, w end)")
-    pose = lua.eval("POSE")
+    lua.execute("SELECTED = 500")
+    pose = lua.eval("Furnish.Pose.Selected()")
     assert (pose.position.x, pose.position.y, pose.position.z, pose.scale) == (10, 20, 30, 2)
     assert (pose.rotation.turn, pose.guid, pose.file, pose.name, pose.wmo) == (
         90,
@@ -522,14 +521,16 @@ def test_pose_of_selects_the_object_and_reads_its_record(tmp_path: Path) -> None
         "house",
         True,
     )
-    assert list(lua.eval("SENT").values()) == ["gobject select 500"]
-    lua.execute("Furnish.Pose.Of(501, function(p, w) POSE, WHY = p, w end)")
-    pose = lua.eval("POSE")
+    lua.execute("SELECTED = 501")
+    pose = lua.eval("Furnish.Pose.Selected()")
     assert pose.empty is True and pose.groupLeader == 333 and round(pose.rotation.turn) == 180
-    lua.execute("Furnish.Pose.Of('chair', function(p, w) POSE, WHY = p, w end)")
+    lua.execute("SELECTED = nil")
+    assert lua.eval("select(2, Furnish.Pose.Selected())") == "no object is selected"
+    lua.execute("SELECTED = 'group'")
     assert (
-        lua.eval("POSE") is None and lua.eval("WHY") == "a gameobject GUID is a number, not chair"
+        lua.eval("select(2, Furnish.Pose.Selected())") == "a group is selected; select one object"
     )
+    assert list(lua.eval("SENT").values()) == []
 
 
 def test_pose_here_reads_the_servers_position_and_the_facing(tmp_path: Path) -> None:
@@ -576,15 +577,6 @@ def test_an_emptywmo_borrows_its_originals_sets_through_the_model_search(tmp_pat
     )
 
 
-def test_group_leading_answers_the_leader_or_the_object_itself(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    fake_client(lua)
-    lua.execute("LEADER = nil; Furnish.Group.Leading(501, function(l) LEADER = l end)")
-    assert lua.eval("LEADER") == 333
-    lua.execute("Furnish.Group.Leading(500, function(l) LEADER = l end)")
-    assert lua.eval("LEADER") == 500
-
-
 # -- Console ----------------------------------------------------------------------------
 
 
@@ -607,9 +599,9 @@ def test_the_console_refuses_with_the_way_out(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     fake_client(lua)
     lua.execute("Furnish.Console.Spawn(1)")
-    assert printed(lua)[-1].endswith("no object is selected; select one with gobject select <guid>")
+    assert printed(lua)[-1].endswith("no object is selected; select one object with gobject select <guid>")
     lua.execute("SELECTED = 'group'; Furnish.Console.Spawn(1)")
-    assert printed(lua)[-1].endswith("a group is selected; select one object with gobject select")
+    assert printed(lua)[-1].endswith("a group is selected; select one object; select one object with gobject select <guid>")
     lua.execute("SELECTED = 502; Furnish.Console.Spawn(1)")
     assert printed(lua)[-1].endswith(
         "chair.m2 (502) is not a WMO; a set is laid out against a building"
@@ -632,12 +624,12 @@ def test_the_console_lays_an_emptywmo_out_with_the_default_set_from_its_original
 def test_another_objects_root_comes_from_its_record(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     fake_client(lua)
-    # Object 501 is an emptywmo with no sets of its own; the set comes from object 500's root.
+    # Object 501 is an emptywmo; the set comes from the root file given, with no select sent.
     lua.execute(
-        "SELECTED = 501; Furnish.Console.Spawn(1, { from = 500, group = Furnish.Group.None })"
+        "SELECTED = 501; Furnish.Console.Spawn(1, { from = 900, group = Furnish.Group.None })"
     )
     sent = list(lua.eval("SENT").values())
-    assert sent[0] == "gobject select 500"
+    assert all(s.startswith("gobject spawn") for s in sent)
     assert [s.split()[2] for s in sent if s.startswith("gobject spawn")] == ["-21", "-20", "-21"]
 
 
