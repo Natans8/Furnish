@@ -1,8 +1,9 @@
 -- Which sets: the ways a root file is found, and the sets it offers.
 --
 -- The data keys sets by the root's file id. A selected object gives that file directly; a
--- gameobject entry gives it through the display `gobject info` prints; an emptywmo gives it
--- through the original it was hollowed from; a map placement gives the sets the zone chose.
+-- model name gives it through the client's own display table; a gameobject entry through
+-- the display `gobject info` prints, where the server answers it; an emptywmo through the
+-- original it was hollowed from; a map placement gives the sets the zone chose.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -97,11 +98,13 @@ function Sets.OfEntry(entry, callback)
 	end)
 end
 
---- The root file an emptywmo was hollowed from, by its name with the prefix trimmed, found
--- through the client's model search; or nil and the reason.
-function Sets.Original(name)
-	local original = name:gsub("^eps_emptywmo_", "eps_"):gsub("^emptywmo_", "")
-	local found = Client.SearchModels(original)
+--- The root file a model name spawns, through the client's own display table, which the
+-- model search reads without a server round trip. A name is the file's base name, with or
+-- without its folder and extension, the way `.lookup gobject` prints it beside the entry.
+-- @return the file id, or nil and the reason
+function Sets.OfName(name)
+	local wanted = Client.ModelName(name)
+	local found = Client.SearchModels(wanted)
 	for _, row in ipairs(found) do
 		if Sets.OfFile(row.file) then
 			return row.file
@@ -109,10 +112,21 @@ function Sets.Original(name)
 	end
 	if #found > 0 then
 		return nil,
-			("%s is in the client's model list but the data has no sets for it"):format(original)
+			("%s is in the client's model list but the data has no doodad sets for it"):format(
+				wanted
+			)
 	end
-	return nil,
-		("no model is named %s, so %s has no original to borrow from"):format(original, name)
+	return nil, ("no model is named %s; the name is what .lookup gobject prints"):format(wanted)
+end
+
+--- The root file an emptywmo was hollowed from, by its name with the prefix trimmed.
+function Sets.Original(name)
+	local original = name:gsub("^eps_emptywmo_", "eps_"):gsub("^emptywmo_", "")
+	local file, reason = Sets.OfName(original)
+	if not file then
+		return nil, ("%s has no original to borrow from: %s"):format(name, reason)
+	end
+	return file
 end
 
 --- The set ids a WMO placed on the map draws, by map and ADT unique id; or nil and the

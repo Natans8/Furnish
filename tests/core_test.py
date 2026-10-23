@@ -591,8 +591,10 @@ def test_an_emptywmo_borrows_its_originals_sets_through_the_model_search(tmp_pat
     original = lua.eval("Furnish.Sets.Original")
     assert original("emptywmo_house") == HOUSE
     assert original("eps_emptywmo_barn")[1] == (
-        "no model is named eps_barn, so eps_emptywmo_barn has no original to borrow from"
+        "eps_emptywmo_barn has no original to borrow from: no model is named eps_barn;"
+        " the name is what .lookup gobject prints"
     )
+    assert lua.eval("Furnish.Sets.OfName")("world/wmo/House.wmo") == HOUSE
 
 
 def test_group_leading_answers_the_leader_or_the_object_itself(tmp_path: Path) -> None:
@@ -651,14 +653,13 @@ def test_the_console_lays_an_emptywmo_out_with_the_default_set_from_its_original
 def test_the_console_spawns_at_the_player_and_lists_sets(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     fake_client(lua)
-    lua.execute("Furnish.Console.Here(817579, 0, { group = Furnish.Group.First })")
+    lua.execute("Furnish.Console.Here('house', 0, { group = Furnish.Group.First })")
     assert list(lua.eval("SENT").values()) == [
-        "gobject info 817579",
-        "gobject spawn -21 posx -3 posy 6 posz 4 face north turn 90",
+        "gobject spawn -21 posx -3 posy 6 posz 4 face north turn 90"
     ]
-    lua.execute("Furnish.Console.Sets(817579)")
+    lua.execute("Furnish.Console.Sets('house.wmo')")
     assert printed(lua)[-3:] == [
-        "|cff66ccffFurnish:|r entry 817579 (root file 900) offers 2 sets:",
+        "|cff66ccffFurnish:|r house.wmo (root file 900) offers 2 sets:",
         "|cff66ccffFurnish:|r   set 0 (default, 1 objects)",
         "|cff66ccffFurnish:|r   set 1 Set_Full (2 objects)",
     ]

@@ -3,16 +3,16 @@
 -- This is a surface, not the API: it holds the one running run, picks defaults, and prints.
 -- Every line it prints says what was asked, what was found and, on a refusal, the way out.
 --
--- A root is named by a gameobject entry, the number `.lookup` and `.gob info` show, never by
--- a file id, which no player has.
+-- A root is named by its model name, the word `.lookup gobject` prints beside the entry,
+-- resolved by the client's own display table; never by a file id, which no player has.
 --
---   /run Furnish.Console.Sets()                 the selected object's sets
---   /run Furnish.Console.Sets(817579)           the sets of the root entry 817579 spawns
---   /run Furnish.Console.Spawn(1)               set 1 of the selected object's root, on it
---   /run Furnish.Console.Spawn(1, { from = 817579 })        entry 817579's root, on it
+--   /run Furnish.Console.Sets()                      the selected object's sets
+--   /run Furnish.Console.Sets("6dr_draenei_house2")  that root's sets
+--   /run Furnish.Console.Spawn(1)                    set 1 of the selected object's root, on it
+--   /run Furnish.Console.Spawn(1, { from = "6dr_draenei_house2" })   that root's set 1, on it
 --   /run Furnish.Console.Spawn(1, { group = Furnish.Group.First })
---   /run Furnish.Console.Here(817579, 1)        set 1 of entry 817579's root, at the player
---   /run Furnish.Console.Abort(true)            stop, and delete what was spawned
+--   /run Furnish.Console.Here("6dr_draenei_house2", 1)   that root's set 1, at the player
+--   /run Furnish.Console.Abort(true)                 stop, and delete what was spawned
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -131,8 +131,8 @@ local function start(rows, pose, group, note)
 	running = handle
 end
 
---- List the sets of the selected object's root, or of the root a gameobject entry spawns.
-function Console.Sets(entry)
+--- List the sets of the selected object's root, or of the root a model name spawns.
+function Console.Sets(name)
 	local function list(file, label)
 		local sets, reason = Sets.OfFile(file)
 		if not sets then
@@ -143,13 +143,12 @@ function Console.Sets(entry)
 			say("  " .. describe(set))
 		end
 	end
-	if entry then
-		return Sets.OfEntry(entry, function(file, reason)
-			if not file then
-				return say(reason)
-			end
-			list(file, ("entry %s (root file %s)"):format(tostring(entry), tostring(file)))
-		end)
+	if name then
+		local file, reason = Sets.OfName(name)
+		if not file then
+			return say(reason)
+		end
+		return list(file, ("%s (root file %s)"):format(tostring(name), tostring(file)))
 	end
 	selection(function(pose, reason)
 		if not pose then
@@ -161,7 +160,7 @@ end
 
 --- Spawn a set on the selected object.
 -- @param index the set's index
--- @param options { from = entry, group = a Furnish.Group value or GUID, default = true }
+-- @param options { from = a model name, group = a Furnish.Group value or GUID, default = true }
 function Console.Spawn(index, options)
 	options = options or {}
 	selection(function(pose, reason)
@@ -187,7 +186,7 @@ function Console.Spawn(index, options)
 			start(rows, pose, options.group or Group.Pivot, note .. " of root file " .. file)
 		end
 		if options.from then
-			return Sets.OfEntry(options.from, go)
+			return go(Sets.OfName(options.from))
 		end
 		if pose.empty then
 			return go(Sets.Original(pose.name))
@@ -196,28 +195,27 @@ function Console.Spawn(index, options)
 	end)
 end
 
---- Spawn a set of the root a gameobject entry spawns, where the player stands, facing as the
+--- Spawn a set of the root a model name spawns, where the player stands, facing as the
 -- player faces.
--- @param entry the gameobject entry, as .lookup and .gob info show it
+-- @param name the model name, as .lookup gobject prints it
 -- @param index the set's index
 -- @param options { group = a Furnish.Group value or GUID, default = true, scale = number }
-function Console.Here(entry, index, options)
+function Console.Here(name, index, options)
 	options = options or {}
 	local pose, reason = Pose.Here()
 	if not pose then
 		return say(reason)
 	end
 	pose.scale = options.scale or 1
-	Sets.OfEntry(entry, function(file, missing)
-		if not file then
-			return say(missing)
-		end
-		local rows, note = rowsFor(file, index, options.default)
-		if not rows then
-			return say(note)
-		end
-		start(rows, pose, options.group or Group.Pivot, note .. " of root file " .. file)
-	end)
+	local file, missing = Sets.OfName(name)
+	if not file then
+		return say(missing)
+	end
+	local rows, note = rowsFor(file, index, options.default)
+	if not rows then
+		return say(note)
+	end
+	start(rows, pose, options.group or Group.Pivot, note .. " of root file " .. file)
 end
 
 --- Stop the current run. With cleanup, delete what it spawned.

@@ -96,10 +96,10 @@ lead to the first doodad.
 | `Kernel.lua`    | `Furnish.Spawn` and `Furnish.Group`                                        |
 | `Client.lua`    | the one file naming EpsilonLib and `C_Epsilon`                             |
 | `Pose.lua`      | where: `At`, `Here`, `Of(guid, cb)`, `OfDoodad(line)`                      |
-| `Sets.lua`      | which: `OfFile`, `Pick`, `OfDisplay`, `OfEntry(entry, cb)`, `Original`, `OfPlacement` |
+| `Sets.lua`      | which: `OfFile`, `Pick`, `OfDisplay`, `OfName`, `OfEntry(entry, cb)`, `Original`, `OfPlacement` |
 | `Rows.lua`      | what: `OfSet`, `Union`, `Without`                                          |
 | `Group.lua`     | `Furnish.Group.Leading(guid, cb)`, the GUID that leads an object's group   |
-| `Console.lua`   | the `/run` door: `Sets`, `Spawn(index, options)`, `Here(entry, index)`, `Abort` |
+| `Console.lua`   | the `/run` door: `Sets`, `Spawn(index, options)`, `Here(name, index)`, `Abort` |
 
 ## Develop
 
