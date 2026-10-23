@@ -128,7 +128,7 @@ STOCK = (
     " groupLeader = 0, canEdit = true }"
 )
 TWIN = (
-    "{ guid = 501, file = 777, twinOf = 900, x = 0, y = 0, z = 0, roll = 0, pitch = 0, turn = 0,"
+    "{ guid = 501, file = 777, twin = true, x = 0, y = 0, z = 0, roll = 0, pitch = 0, turn = 0,"
     " scale = 1, groupLeader = 0, canEdit = true }"
 )
 
@@ -136,7 +136,7 @@ TWIN = (
 def test_a_plan_spawns_a_pivot_then_the_set(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     lua.execute("Furnish.Plan.MARKER = 424242")
-    plan = lua.eval(f"Furnish.Plan.Build({STOCK}, 1, {{}})")
+    plan = lua.eval(f"Furnish.Plan.Build({STOCK}, 900, 1, {{}})")
     assert plan.leader == "pivot" and plan.doodads == 2 and plan.set.name == "Set_Full"
     commands = [(c.role, c.text) for c in plan.commands.values()]
     assert commands[0] == ("pivot", "gobject spawn -424242 posx 10 posy 20 posz 30 face north")
@@ -149,7 +149,7 @@ def test_a_plan_spawns_a_pivot_then_the_set(tmp_path: Path) -> None:
 
 def test_a_twin_gets_the_default_set_too_and_no_pivot_when_attached(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
-    plan = lua.eval(f"Furnish.Plan.Build({TWIN}, 1, {{ attach = true }})")
+    plan = lua.eval(f"Furnish.Plan.Build({TWIN}, 900, 1, {{ attach = true }})")
     assert plan.leader == "house" and plan.withDefault is True and plan.doodads == 3
     assert [c.display for c in plan.commands.values()] == [21, 20, 21]
 
@@ -157,19 +157,16 @@ def test_a_twin_gets_the_default_set_too_and_no_pivot_when_attached(tmp_path: Pa
 def test_a_plan_refuses_what_it_must(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     build = lua.eval("Furnish.Plan.Build")
-    assert build(lua.eval(STOCK), 0, lua.table())[1].startswith("the shell already draws")
-    assert build(lua.eval(STOCK), 7, lua.table())[1] == "this WMO has no set 7"
+    assert build(lua.eval(STOCK), 900, 0, lua.table())[1].startswith("the shell already draws")
+    assert build(lua.eval(STOCK), 900, 7, lua.table())[1] == "root 900 has no set 7"
     lua.execute("Furnish.Plan.MARKER = nil")
-    assert build(lua.eval(STOCK), 1, lua.table())[1].startswith("no marker is set")
+    assert build(lua.eval(STOCK), 900, 1, lua.table())[1].startswith("no marker is set")
     assert (
-        build(lua.eval(STOCK.replace("canEdit = true", "canEdit = false")), 1, lua.table())[1]
+        build(lua.eval(STOCK.replace("canEdit = true", "canEdit = false")), 900, 1, lua.table())[1]
         == "you cannot edit this object"
     )
-    assert (
-        build(lua.eval(STOCK.replace("file = 900", "file = 1")), 1, lua.table())[1]
-        == "the data has no sets for this WMO"
-    )
-    assert build(lua.eval(STOCK), 0, lua.table(default=True, nopivot=True)).doodads == 1
+    assert build(lua.eval(STOCK), 1, 1, lua.table())[1] == "the data has no sets for root 1"
+    assert build(lua.eval(STOCK), 900, 0, lua.table(default=True, nopivot=True)).doodads == 1
 
 
 # -- Run --------------------------------------------------------------------------------
@@ -221,7 +218,7 @@ def test_a_run_spawns_the_pivot_first_and_joins_every_doodad_to_it(tmp_path: Pat
     lua = lua_core(tmp_path)
     lua.execute("Furnish.Plan.MARKER = 424242")
     sent = fake_server(lua)
-    result = run(lua, f"Furnish.Plan.Build({STOCK}, 1, {{}})")
+    result = run(lua, f"Furnish.Plan.Build({STOCK}, 900, 1, {{}})")
     assert sent() == [
         "gobject spawn -424242 posx 10 posy 20 posz 30 face north",
         "gobject spawn -20 posx 11.5 posy 18 posz 30.25 face north",
@@ -238,7 +235,7 @@ def test_an_attached_run_joins_the_houses_group_and_spawns_no_pivot(tmp_path: Pa
     lua = lua_core(tmp_path)
     sent = fake_server(lua)
     grouped = STOCK.replace("groupLeader = 0", "groupLeader = 333")
-    result = run(lua, f"Furnish.Plan.Build({grouped}, 1, {{ attach = true }})")
+    result = run(lua, f"Furnish.Plan.Build({grouped}, 900, 1, {{ attach = true }})")
     assert sent()[1::2] == ["gobject group add 333", "gobject group add 333"]
     assert result.leader is None and result.done == 2
 
@@ -246,7 +243,7 @@ def test_an_attached_run_joins_the_houses_group_and_spawns_no_pivot(tmp_path: Pa
 def test_a_refused_display_is_counted_and_the_run_goes_on(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     sent = fake_server(lua, refuse=20)
-    result = run(lua, f"Furnish.Plan.Build({STOCK}, 1, {{ nopivot = true }})")
+    result = run(lua, f"Furnish.Plan.Build({STOCK}, 900, 1, {{ nopivot = true }})")
     assert result.done == 2 and len(result.refused) == 1
     refused = result.refused[1]
     assert refused.display == 20 and "doesn't exist" in refused.reason
@@ -258,7 +255,7 @@ def test_chained_joins_go_out_several_at_a_time(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     lua.execute("Furnish.Plan.MARKER = 424242; Furnish.Plan.CHAINED_JOIN = true")
     sent = fake_server(lua)
-    result = run(lua, f"Furnish.Plan.Build({STOCK}, 1, {{}})")
+    result = run(lua, f"Furnish.Plan.Build({STOCK}, 900, 1, {{}})")
     assert sent() == [
         "gobject spawn -424242 posx 10 posy 20 posz 30 face north",
         "gobject spawn -20 posx 11.5 posy 18 posz 30.25 face north group add 7001",
@@ -278,7 +275,7 @@ def test_an_abort_with_cleanup_deletes_what_was_spawned(tmp_path: Path) -> None:
         function ANSWER(index, ...) local cb = PENDING[index] PENDING[index] = nil cb(...) end
         """
     )
-    run(lua, f"Furnish.Plan.Build({STOCK}, 1, {{}})")
+    run(lua, f"Furnish.Plan.Build({STOCK}, 900, 1, {{}})")
     lua.execute('ANSWER(1, true, { "|Hgameobject_GUID:7001|h7001|h" })')
     lua.execute('ANSWER(2, true, { "|Hgameobject_GUID:7002|h7002|h" })')
     lua.execute("HANDLE.Abort(true)")
@@ -295,9 +292,16 @@ def test_an_abort_with_cleanup_deletes_what_was_spawned(tmp_path: Path) -> None:
     assert result.aborted is True and result.deleted == 2
 
 
+def test_a_recolour_takes_another_roots_sets_without_the_default(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    recolour = STOCK.replace("file = 900", "file = 5555")
+    plan = lua.eval(f"Furnish.Plan.Build({recolour}, 900, 1, {{ nopivot = true }})")
+    assert plan.source == 900 and plan.withDefault is False and plan.doodads == 2
+
+
 @pytest.mark.parametrize("field", ["spawned", "refused"])
 def test_the_result_carries_lists(tmp_path: Path, field: str) -> None:
     lua = lua_core(tmp_path)
     fake_server(lua)
-    result = run(lua, f"Furnish.Plan.Build({STOCK}, 1, {{ nopivot = true }})")
+    result = run(lua, f"Furnish.Plan.Build({STOCK}, 900, 1, {{ nopivot = true }})")
     assert lua.eval("type")(result[field]) == "table"

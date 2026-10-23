@@ -1,14 +1,17 @@
 -- The door: the core driven by a GUID, for a test from /run.
 --
---   /run Furnish.Spawn(guid, 1)                  spawn set 1 on that WMO, pivot-led
---   /run Furnish.Spawn(guid, 1, { attach = true })
---   /run Furnish.Spawn(Furnish.Selected(), 1)    the selected object's GUID
---   /run Furnish.Abort(true)                     stop the run and delete what it spawned
+--   /run Furnish.Spawn(guid, 1)                      set 1 of that WMO's own root, on it
+--   /run Furnish.Spawn(guid, 1, { from = 849966 })   set 1 of another root, by file id
+--   /run Furnish.Spawn(guid, 1, { from = "6dr_draenei_house2" })   by model name
+--   /run Furnish.Spawn(Furnish.Selected(), 1)        the selected object's GUID
+--   /run Furnish.Abort(true)                         stop the run, delete what it spawned
 --
--- A GUID becomes a record by selecting the object: EpsilonLib keeps no record by id, only
--- the one the server pushes for the selection. The house is that record reduced to what the
--- plan reads. Nothing here parses text or draws anything; a command and a window come later
--- and call the same functions.
+-- The target is a GUID and the source is a root: the target's own by default, an emptywmo
+-- twin's original when the target is one, or whatever `from` names, so a building's sets
+-- can go on a recolour of it. A GUID becomes a record by selecting the object, since
+-- EpsilonLib keeps no record by id, only the one the server pushes for the selection.
+-- Nothing here parses text or draws anything; a command and a window come later and call
+-- the same functions.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -49,6 +52,39 @@ function Furnish.Selected()
 	return object and object.guid
 end
 
+--- The model name a record carries, as the data spells it: the file's base name, lower
+-- case, without the folder, the extension or the carriage return the client appends.
+local function modelName(name)
+	name = tostring(name or ""):gsub("[\r\n]", ""):lower()
+	name = name:match("([^/\\]+)$") or name
+	return (name:gsub("%.wmo$", ""))
+end
+
+--- The root a name stands for, through the client's own display table, or nil.
+-- @param name a model name, with or without folder and extension
+-- @return the file id, or nil and the reason
+function Furnish.Find(name)
+	local epsilon = _G.C_Epsilon
+	if not (epsilon and epsilon.GODI_Search and epsilon.GODI_RetrieveSearch) then
+		return nil, "the client has no object search"
+	end
+	local wanted = modelName(name)
+	local seen
+	for i = 0, (epsilon.GODI_Search(wanted) or 0) - 1 do
+		local row = epsilon.GODI_RetrieveSearch(i)
+		if row and modelName(row.name) == wanted then
+			seen = row.fileid
+			if Furnish.Sets(row.fileid) then
+				return row.fileid
+			end
+		end
+	end
+	if seen then
+		return nil, ("the data has no sets for %s"):format(wanted)
+	end
+	return nil, ("no object is named %s"):format(wanted)
+end
+
 --- The plan's house record from EpsilonLib's object record.
 -- The rotation is EpsilonLib's own reading of the record, roll on x, pitch on y, turn on z,
 -- with the server's orientation standing in for the turn where the record carries none.
@@ -62,7 +98,8 @@ function Furnish.HouseOf(object)
 	return {
 		guid = object.guid,
 		file = object.fileID,
-		twinOf = nil,
+		name = modelName(object.name),
+		twin = modelName(object.name):find("emptywmo_", 1, true) ~= nil,
 		x = position.x,
 		y = position.y,
 		z = position.z,
@@ -106,7 +143,11 @@ local function resolve(guid, callback)
 		local function look()
 			local object = lib.GameObject:GetSelected()
 			if object and tonumber(object.guid) == wanted then
-				return callback(object)
+				local ok, fault = pcall(callback, object)
+				if not ok then
+					say("fault: " .. tostring(fault))
+				end
+				return
 			end
 			tries = tries + 1
 			if tries >= SELECT_TRIES then
@@ -118,11 +159,29 @@ local function resolve(guid, callback)
 	end)
 end
 
+--- The source root for a house: `from` where given, the original behind a twin, else the
+-- house's own file.
+-- @return the file id, or nil and the reason
+local function sourceOf(house, from)
+	if type(from) == "number" then
+		return from
+	end
+	if type(from) == "string" then
+		return Furnish.Find(from)
+	end
+	if house.twin then
+		local original = house.name:gsub("^eps_emptywmo_", "eps_"):gsub("^emptywmo_", "")
+		return Furnish.Find(original)
+	end
+	return house.file
+end
+
 --- Spawn a set on a WMO.
--- @param guid the WMO's GUID; Furnish.Selected() gives the selection's
--- @param index the set's position in the root's MODS, as the listing shows it
--- @param options { attach = bool, nopivot = bool, default = bool }, optional
+-- @param guid the target WMO's GUID; Furnish.Selected() gives the selection's
+-- @param index the set's position in the source's MODS, as the listing shows it
+-- @param options { from = file id or model name, attach, nopivot, default }, optional
 function Furnish.Spawn(guid, index, options)
+	options = options or {}
 	if running and not running.Done() then
 		say("a run is still going; Furnish.Abort() stops it")
 		return
@@ -141,7 +200,18 @@ function Furnish.Spawn(guid, index, options)
 			say("that is not a WMO")
 			return
 		end
-		local plan, refused = Furnish.Plan.Build(Furnish.HouseOf(object), index, options)
+		local loaded, unloaded = Furnish.Load()
+		if not loaded then
+			say(unloaded)
+			return
+		end
+		local house = Furnish.HouseOf(object)
+		local source, missing = sourceOf(house, options.from)
+		if not source then
+			say(missing)
+			return
+		end
+		local plan, refused = Furnish.Plan.Build(house, source, index, options)
 		if not plan then
 			say(refused)
 			return
@@ -152,9 +222,10 @@ function Furnish.Spawn(guid, index, options)
 			return
 		end
 		say(
-			("spawning set %d%s, %d objects, %s"):format(
+			("spawning set %d%s of root %d, %d objects, %s"):format(
 				plan.set.index,
 				plan.set.name ~= "" and (" " .. plan.set.name) or "",
+				source,
 				plan.doodads,
 				plan.leader == "house" and "attached to the house"
 					or (plan.leader == "pivot" and "with a pivot" or "first object leading")

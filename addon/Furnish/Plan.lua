@@ -4,11 +4,12 @@
 -- counts a window shows before anything is sent. Building one touches no server: it reads
 -- the data, checks what can be checked, and does the maths. A plan is also the dry run.
 --
--- The house is the object record as the client reports it, reduced to what the maths and
--- the checks need; whoever calls here resolves a GUID or a selection into that record.
---   { guid, file, twinOf, x, y, z, roll, pitch, turn, scale, groupLeader, canEdit }
--- `file` is the root's file id and `twinOf` the original's when the file is an emptywmo
--- twin, both resolved by the caller through the client's display table.
+-- The house is the target: the object record as the client reports it, reduced to what the
+-- maths and the checks need, resolved by whoever calls here.
+--   { guid, file, twin, x, y, z, roll, pitch, turn, scale, groupLeader, canEdit }
+-- `twin` says the shell is an emptywmo copy, which draws no default set of its own. The
+-- source is a root file id whose sets are spawned, usually the house's own file, but any
+-- root's: a stock original on its emptywmo twin, or a building's sets on a recolour of it.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -18,11 +19,11 @@ Furnish.Plan = Plan
 local Transform = Furnish.Transform
 
 --- The display spawned as a set's invisible leader at the house's origin. A setting, with a
--- default chosen by scanning every gameobject model: of 17,239, seven draw nothing, light
--- nothing, emit nothing and collide with nothing, and the firewood pile is the one that reads
--- as a word in every list. Spawned by display like every doodad, so no entry is involved,
--- and the record's file tells our pivot from a player's own marker.
-Plan.MARKER = 9653
+-- default chosen by scanning every gameobject model: of 17,239, six draw nothing, light
+-- nothing, emit nothing, sound nothing and collide with nothing, and the hologram base is
+-- the one that reads as a word in every list. Spawned by display like every doodad, so no
+-- entry is involved, and the record's file tells our pivot from a player's own marker.
+Plan.MARKER = 16031
 
 --- Whether `gobject group add` may be chained onto a spawn, which lets the spawns go out
 -- several at a time. Until it is seen to work in game, each doodad is spawned and then
@@ -41,7 +42,7 @@ local function findSet(sets, index)
 end
 
 --- The placements a set spawns: its own, and the default set's before them on a twin or
--- when asked for, since a twin draws none of the default and a stock shell all of it.
+-- when asked for, since a twin draws none of the default and any other shell all of it.
 local function rows(sets, chosen, withDefault)
 	local out = {}
 	if withDefault and chosen[1] ~= DEFAULT then
@@ -58,12 +59,13 @@ local function rows(sets, chosen, withDefault)
 	return out
 end
 
---- Build the plan for spawning one set on one house.
--- @param house the object record, as described at the top of this file
--- @param index the set's position in the root's MODS, as the listing shows it
+--- Build the plan for spawning one set of a source root on one house.
+-- @param house the target's record, as described at the top of this file
+-- @param source the root file id whose sets are spawned
+-- @param index the set's position in the source's MODS, as the listing shows it
 -- @param options { attach = bool, nopivot = bool, default = bool }, any of them absent
 -- @return the plan, or nil and the reason it was refused
-function Plan.Build(house, index, options)
+function Plan.Build(house, source, index, options)
 	options = options or {}
 	if house.canEdit == false then
 		return nil, "you cannot edit this object"
@@ -72,15 +74,15 @@ function Plan.Build(house, index, options)
 	if not loaded then
 		return nil, reason
 	end
-	local sets = Furnish.Sets(house.twinOf or house.file)
+	local sets = Furnish.Sets(source)
 	if not sets then
-		return nil, "the data has no sets for this WMO"
+		return nil, ("the data has no sets for root %s"):format(tostring(source))
 	end
 	local chosen = findSet(sets, index)
 	if not chosen then
-		return nil, ("this WMO has no set %d"):format(index)
+		return nil, ("root %s has no set %d"):format(tostring(source), index)
 	end
-	local twin = house.twinOf ~= nil
+	local twin = house.twin == true
 	if index == DEFAULT and not twin and not options.default then
 		return nil, "the shell already draws its default set; say default to spawn it again"
 	end
@@ -126,6 +128,7 @@ function Plan.Build(house, index, options)
 
 	return {
 		house = house,
+		source = source,
 		set = { index = chosen[1], id = chosen[2], name = chosen[3], count = chosen[4] },
 		withDefault = twin or options.default == true,
 		leader = leader,
