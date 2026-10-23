@@ -3,11 +3,15 @@
 -- This is a surface, not the API: it holds the one running run, picks defaults, and prints.
 -- Every line it prints says what was asked, what was found and, on a refusal, the way out.
 --
+-- A root is named by a gameobject entry, the number `.lookup` and `.gob info` show, never by
+-- a file id, which no player has.
+--
 --   /run Furnish.Console.Sets()                 the selected object's sets
+--   /run Furnish.Console.Sets(817579)           the sets of the root entry 817579 spawns
 --   /run Furnish.Console.Spawn(1)               set 1 of the selected object's root, on it
---   /run Furnish.Console.Spawn(1, { from = 817579 })        another entry's root, on it
+--   /run Furnish.Console.Spawn(1, { from = 817579 })        entry 817579's root, on it
 --   /run Furnish.Console.Spawn(1, { group = Furnish.Group.First })
---   /run Furnish.Console.Here(817579, 1)        set 1 of root file 817579, at the player
+--   /run Furnish.Console.Here(817579, 1)        set 1 of entry 817579's root, at the player
 --   /run Furnish.Console.Abort(true)            stop, and delete what was spawned
 
 _G.Furnish = _G.Furnish or {}
@@ -127,10 +131,10 @@ local function start(rows, pose, group, note)
 	running = handle
 end
 
---- List the sets of the selected object's root, or of a root file given.
-function Console.Sets(file)
-	local function list(root, label)
-		local sets, reason = Sets.OfFile(root)
+--- List the sets of the selected object's root, or of the root a gameobject entry spawns.
+function Console.Sets(entry)
+	local function list(file, label)
+		local sets, reason = Sets.OfFile(file)
 		if not sets then
 			return say(reason)
 		end
@@ -139,8 +143,13 @@ function Console.Sets(file)
 			say("  " .. describe(set))
 		end
 	end
-	if file then
-		return list(file, "root file " .. tostring(file))
+	if entry then
+		return Sets.OfEntry(entry, function(file, reason)
+			if not file then
+				return say(reason)
+			end
+			list(file, ("entry %s (root file %s)"):format(tostring(entry), tostring(file)))
+		end)
 	end
 	selection(function(pose, reason)
 		if not pose then
@@ -187,22 +196,28 @@ function Console.Spawn(index, options)
 	end)
 end
 
---- Spawn a set of a root file where the player stands, facing as the player faces.
--- @param file the root file id
+--- Spawn a set of the root a gameobject entry spawns, where the player stands, facing as the
+-- player faces.
+-- @param entry the gameobject entry, as .lookup and .gob info show it
 -- @param index the set's index
 -- @param options { group = a Furnish.Group value or GUID, default = true, scale = number }
-function Console.Here(file, index, options)
+function Console.Here(entry, index, options)
 	options = options or {}
 	local pose, reason = Pose.Here()
 	if not pose then
 		return say(reason)
 	end
 	pose.scale = options.scale or 1
-	local rows, note = rowsFor(file, index, options.default)
-	if not rows then
-		return say(note)
-	end
-	start(rows, pose, options.group or Group.Pivot, note .. " of root file " .. file)
+	Sets.OfEntry(entry, function(file, missing)
+		if not file then
+			return say(missing)
+		end
+		local rows, note = rowsFor(file, index, options.default)
+		if not rows then
+			return say(note)
+		end
+		start(rows, pose, options.group or Group.Pivot, note .. " of root file " .. file)
+	end)
 end
 
 --- Stop the current run. With cleanup, delete what it spawned.

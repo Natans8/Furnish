@@ -99,7 +99,7 @@ lead to the first doodad.
 | `Sets.lua`      | which: `OfFile`, `Pick`, `OfDisplay`, `OfEntry(entry, cb)`, `Original`, `OfPlacement` |
 | `Rows.lua`      | what: `OfSet`, `Union`, `Without`                                          |
 | `Group.lua`     | `Furnish.Group.Leading(guid, cb)`, the GUID that leads an object's group   |
-| `Console.lua`   | the `/run` door: `Sets`, `Spawn(index, options)`, `Here(file, index)`, `Abort` |
+| `Console.lua`   | the `/run` door: `Sets`, `Spawn(index, options)`, `Here(entry, index)`, `Abort` |
 
 ## Develop
 
