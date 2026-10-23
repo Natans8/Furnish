@@ -33,9 +33,6 @@ end
 --- A placement at the anchor itself, which is where the marker stands.
 local ORIGIN = { x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 }
 
---- The widest GUID a chained join could append, for the line-length guard.
-local LONGEST_GUID = string.rep("9", 10)
-
 local function check(rows, position, rotation, scale, group, send)
 	if type(rows) ~= "table" or #rows == 0 then
 		return "nothing to spawn: the rows are empty"
@@ -102,7 +99,6 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 	end
 	local settings = Furnish.Settings
 	local marker = group == Group.Pivot and settings.marker or nil
-	local chained = settings.chainedJoin
 	local joins = group ~= Group.None
 
 	-- Positions in the series: spawns[i] is the display spawned at i, joined[i] the spawn
@@ -110,49 +106,31 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 	local commands, spawns, joined = {}, {}, {}
 	local function spawn(display, pose)
 		local line = Commands.Spawn(display, pose)
-		local longest = chained and joins and Commands.Chained(line, LONGEST_GUID) or line
-		if #longest > Commands.LIMIT then
+		if #line > Commands.LIMIT then
 			return ("a spawn line is %d characters, over the %d the server takes: %s"):format(
-				#longest,
+				#line,
 				Commands.LIMIT,
-				longest
+				line
 			)
 		end
 		local index = #commands + 1
 		spawns[index] = display
-		if chained and joins then
-			-- The leader's own spawn goes first and alone; every later one waits for it, and
-			-- for the second as well, so a refused leader hands the lead over before the
-			-- rest go out several at a time.
-			local needs = nil
-			if index == 2 then
-				needs = { 1 }
-			elseif index > 2 then
-				needs = { 1, 2 }
-			end
-			commands[index] = {
-				needs = needs,
+		commands[index] = { text = line }
+		-- The join goes as its own command after the spawn, since the server takes no join
+		-- on a spawn line, and acts on the selection the spawn left.
+		if joins then
+			joined[index + 1] = index
+			commands[index + 1] = {
+				needs = { index },
 				text = function(results)
+					local own = Commands.GuidIn(results[index].messages)
 					local leader = leaderOf(group, results)
-					return leader and Commands.Chained(line, leader) or line
+					if not own or not leader or leader == own then
+						return nil
+					end
+					return Commands.Join(leader)
 				end,
 			}
-		else
-			commands[index] = { text = line }
-			if joins then
-				joined[index + 1] = index
-				commands[index + 1] = {
-					needs = { index },
-					text = function(results)
-						local own = Commands.GuidIn(results[index].messages)
-						local leader = leaderOf(group, results)
-						if not own or not leader or leader == own then
-							return nil
-						end
-						return Commands.Join(leader)
-					end,
-				}
-			end
 		end
 		return nil
 	end
@@ -242,7 +220,7 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 			end
 		end,
 		finished = finished,
-	}, (chained or not joins) and settings.inFlight or 1)
+	}, joins and 1 or settings.inFlight)
 	if not run then
 		return nil, reason
 	end

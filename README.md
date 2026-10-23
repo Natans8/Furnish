@@ -138,7 +138,7 @@ lead to the first doodad.
 
 | file            | role                                                                                 |
 |-----------------|--------------------------------------------------------------------------------------|
-| `Settings.lua`  | the defaults: marker, chained join, in-flight width; `FurnishSettings` keeps changes |
+| `Settings.lua`  | the defaults: marker, in-flight width; `FurnishSettings` keeps changes                |
 | `Reader.lua`    | the data addon's reader                                                              |
 | `Names.lua`     | a set's name as a player reads it: `Set(name)`                                       |
 | `Transform.lua` | the placement maths: `Place(position, rotation, scale, row)`                         |

@@ -224,9 +224,9 @@ def test_numbers_keep_nine_digits_and_drop_noise(tmp_path: Path) -> None:
 def test_the_widest_spawn_line_stays_under_the_limit(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     line = lua.eval(
-        "Furnish.Commands.Chained(Furnish.Commands.Spawn(9999999, { x = -17066.1234,"
+        "Furnish.Commands.Spawn(9999999, { x = -17066.1234,"
         " y = -17066.1234, z = -17066.1234, roll = 359.999999, pitch = 359.999999,"
-        " turn = 359.999999, scale = 0.123456789 }), '99999999')"
+        " turn = 359.999999, scale = 0.123456789 })"
     )
     assert len(line) < lua.eval("Furnish.Commands.LIMIT")
 
@@ -424,31 +424,6 @@ def test_a_refused_join_is_reported_as_unjoined(tmp_path: Path) -> None:
     assert result.unjoined[1].messages[1] == "You cannot edit this group."
 
 
-def test_chained_joins_go_out_several_at_a_time_after_the_leader(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    lua.execute("Furnish.Settings.chainedJoin = true")
-    sent = fake_server(lua)
-    result = spawn(lua, rows(lua, 2))
-    assert sent() == [
-        SPAWN_MARKER,
-        SPAWN_CHAIR + " group add 7001",
-        SPAWN_LAMP + " group add 7001",
-    ]
-    assert len(result.spawned) == 3
-
-
-def test_chained_joins_follow_a_refused_leader_to_the_next(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    lua.execute("Furnish.Settings.chainedJoin = true")
-    sent = fake_server(lua, refuse=424242)
-    result = spawn(lua, rows(lua, 1, 2))
-    # The marker is refused, the first doodad goes out alone and leads, and every later
-    # doodad chains to it.
-    assert sent()[1] == "gobject spawn -21 posx 14 posy 24 posz 31 face north"
-    assert all(s.endswith(" group add 7001") for s in sent()[2:])
-    assert result.leader == "7001" and result.pivot is None
-
-
 def test_rows_from_two_sets_spawn_as_one_collection(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     sent = fake_server(lua)
@@ -509,15 +484,15 @@ def test_an_abort_with_cleanup_deletes_what_was_spawned(tmp_path: Path) -> None:
 
 def test_settings_are_restored_from_the_saved_copy_and_then_are_it(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
-    lua.execute('FurnishSettings = { marker = 9653, chainedJoin = "yes", stray = 1 }')
+    lua.execute('FurnishSettings = { marker = 9653, inFlight = "yes", stray = 1 }')
     lua.execute('FIRE("ADDON_LOADED", "Furnish")')
     settings = lua.eval("Furnish.Settings")
     # The marker is taken; a value of the wrong type and a key the defaults lack are not.
-    assert (settings.marker, settings.chainedJoin, settings.inFlight) == (9653, False, 4)
+    assert (settings.marker, settings.inFlight) == (9653, 4)
     assert settings.stray is None
     assert lua.eval("FurnishSettings == Furnish.Settings") is True
-    lua.execute("Furnish.Settings.chainedJoin = true")
-    assert lua.eval("FurnishSettings.chainedJoin") is True
+    lua.execute("Furnish.Settings.inFlight = 2")
+    assert lua.eval("FurnishSettings.inFlight") == 2
 
 
 def test_settings_stand_on_their_defaults_with_nothing_saved(tmp_path: Path) -> None:

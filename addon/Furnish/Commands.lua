@@ -63,11 +63,6 @@ function Commands.Join(leader)
 	return "gobject group add " .. leader
 end
 
---- A spawn with the join chained onto its line, so the spawned object joins at once.
-function Commands.Chained(spawn, leader)
-	return spawn .. " group add " .. leader
-end
-
 function Commands.Delete(guid)
 	return "gobject delete " .. guid
 end
