@@ -8,6 +8,35 @@ A WMO root file names its doodad sets (`MODS`) and every placement each set hold
 as a gameobject by a display id. The build joins the two: it reads the root files, resolves
 every model to the display that spawns it, and writes one SQLite file.
 
+## Commands
+
+`/furnish`, or `/furn`, alone prints the help.
+
+| command                    | does                                                              |
+|----------------------------|-------------------------------------------------------------------|
+| `/furn list`               | the selected building's sets                                      |
+| `/furn list <entry>`       | an object's sets, by the entry on its lookup line                 |
+| `/furn <set>`              | spawn a set on the selected building                              |
+| `/furn <set> from <entry>` | spawn an object's set on the selected building                    |
+| `/furn <set> here`         | spawn the selected building's set at your feet                    |
+| `/furn <set> here <entry>` | spawn an object's set at your feet                                |
+| `/furn import`             | import the selected doodad and furnish it as the map does         |
+| `/furn stop`               | stop spawning; a second stop gives up on a reply that never comes |
+| `/furn stop delete`        | stop, and delete what was spawned                                 |
+
+A set, list or import takes any of these words after it:
+
+| word      | does                                                            |
+|-----------|-----------------------------------------------------------------|
+| `first`   | its first object leads the group, instead of an invisible pivot |
+| `attach`  | join the selected building's group                              |
+| `nogroup` | spawn every object ungrouped                                    |
+| `base`    | lay the base set under it, which an emptywmo always gets        |
+
+Each set in a list is a link: a click spawns it on the selected building, a ctrl-click at
+your feet, and resting on it says what it is. A run that leaves a group selects that group
+when it ends, in the chat as if typed, so `.gob group` commands act on it next.
+
 ## Build
 
 ```bash
@@ -87,26 +116,30 @@ Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
   first doodad leads), `None` (loose), or the GUID of an object whose group to join.
 - `send`: `function(text, callback(success, messages))`, the door to the server.
 - `hooks`: `progress(done, total)` and `finished(outcome)`, where the outcome carries
-  `spawned`, `refused` with each refusal's display and the server's words, `leader`, `pivot`
-  and `aborted`.
+  `spawned`, `refused` with each refusal's display and the server's words, `unjoined`,
+  `leader`, `joined` (how many besides the leader are in its group), `pivot` and `aborted`.
 
-It answers a handle with `Abort(cleanup)` and `Done()`, or nil and the reason. Who leads is
+It answers a handle with `Abort(cleanup)` and `Done()`, or nil and the reason; a second
+`Abort` while a reply is owed gives up on it, and a cleanup once asked for stays asked for. Who leads is
 read off the replies: the first command that answers a GUID, so a refused marker hands the
 lead to the first doodad.
 
-| file            | role                                                                       |
-|-----------------|----------------------------------------------------------------------------|
+| file            | role                                                                                 |
+|-----------------|--------------------------------------------------------------------------------------|
 | `Settings.lua`  | the defaults: marker, chained join, in-flight width; `FurnishSettings` keeps changes |
-| `Names.lua`     | a set's name as a player reads it: `Set(name)`                              |
-| `Transform.lua` | the placement maths: `Place(position, rotation, scale, row)`               |
-| `Commands.lua`  | every command spelling and every reply reader                              |
-| `Run.lua`       | any series of commands through `send`, in order, with needs and a width    |
-| `Kernel.lua`    | `Furnish.Spawn` and `Furnish.Group`                                        |
-| `Client.lua`    | the one file naming EpsilonLib and `C_Epsilon`; it reads, and never selects |
-| `Pose.lua`      | where: `At`, `Here`, `Selected`                                            |
-| `Sets.lua`      | which: `OfFile`, `Pick`, `OfEntry`, `IsEmptyShell`, `Original`, `OfPlacement` |
-| `Rows.lua`      | what: `OfSet`, `Union`, `Without`                                          |
-| `Console.lua`   | the `/run` door: `Sets`, `Spawn(index, options)`, `Here(entry, index)`, `Abort` |
+| `Reader.lua`    | the data addon's reader                                                              |
+| `Names.lua`     | a set's name as a player reads it: `Set(name)`                                       |
+| `Transform.lua` | the placement maths: `Place(position, rotation, scale, row)`                         |
+| `Commands.lua`  | every command spelling and every reply reader                                        |
+| `Run.lua`       | any series of commands through `send`, in order, with needs and a width              |
+| `Kernel.lua`    | `Furnish.Spawn` and `Furnish.Group`                                                  |
+| `Client.lua`    | the one file naming EpsilonLib and `C_Epsilon`; it reads, and never selects          |
+| `Pose.lua`      | where: `At`, `Here`, `Selected`, `OfRecord`                                          |
+| `Sets.lua`      | which: `OfFile`, `Pick`, `OfEntry`, `IsEmptyShell`, `Original`, `OfPlacement`        |
+| `Rows.lua`      | what: `OfSet`, `Union`, `Without`                                                    |
+| `Chat.lua`      | the prefix, the colours, columns of exact width, and Furnish's links                 |
+| `Console.lua`   | what the commands do: `List`, `Spawn`, `Import`, `Stop`, `Describe`                  |
+| `Command.lua`   | `/furnish` and `/furn`: reading what is typed, the help, a link's click              |
 
 ## Develop
 

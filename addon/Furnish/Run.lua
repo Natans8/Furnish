@@ -68,6 +68,9 @@ function Run.Start(commands, send, hooks, width)
 	end
 
 	local function settle(index, result)
+		if finished then
+			return
+		end
 		results[index] = result
 		done = done + 1
 		tell(hooks, "progress", done, total, index, result)
@@ -110,12 +113,16 @@ function Run.Start(commands, send, hooks, width)
 	local handle = {}
 
 	--- Stop sending. What is already in flight still answers, and then the run finishes.
+	-- A second abort while replies are still owed gives up on them and finishes at once,
+	-- since the server's door has no timeout of its own; a reply that lands afterwards is
+	-- ignored.
 	function handle.Abort()
-		if finished or aborted then
+		if finished then
 			return
 		end
+		local again = aborted
 		aborted = true
-		if inFlight == 0 then
+		if again or inFlight == 0 then
 			finish()
 		end
 	end

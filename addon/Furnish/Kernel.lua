@@ -91,8 +91,9 @@ end
 -- @param send function(text, callback(success, messages)), the door to the server
 -- @param hooks { progress = function(done, total), finished = function(outcome) }, optional.
 --   The outcome carries total, spawned (GUIDs), refused ({ display, messages }), unjoined
---   ({ display, guid, messages }: spawned, but the join was refused), leader, pivot, aborted
---   and, after a cleanup, deleted; a messages list is the server's reply lines as sent.
+--   ({ display, guid, messages }: spawned, but the join was refused), leader, joined (how
+--   many objects besides the leader are in its group), pivot, aborted and, after a cleanup,
+--   deleted; a messages list is the server's reply lines as sent.
 -- @return a handle with Abort(cleanup), Done() and total, or nil and the reason
 function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 	local wrong = check(rows, position, rotation, scale, group, send)
@@ -189,12 +190,20 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 			end
 		end
 		local first = ended.results[1]
+		local leader = joins and leaderOf(group, ended.results) or nil
+		local members = 0
+		for _, guid in ipairs(spawned) do
+			if tostring(guid) ~= tostring(leader) then
+				members = members + 1
+			end
+		end
 		return {
 			total = #rows,
 			spawned = spawned,
 			refused = refused,
 			unjoined = unjoined,
-			leader = joins and leaderOf(group, ended.results) or nil,
+			leader = leader,
+			joined = leader and members - #unjoined or 0,
 			pivot = marker and first and first.success and Commands.GuidIn(first.messages) or nil,
 			aborted = ended.aborted,
 		}
@@ -241,9 +250,10 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 	local handle = { total = #rows }
 
 	--- Stop sending. With cleanup, delete what was spawned once the commands in flight have
-	-- answered; the outcome then carries `deleted`.
+	-- answered; the outcome then carries `deleted`. A cleanup once asked for stays asked
+	-- for, so a second abort that gives up on a reply still deletes.
 	function handle.Abort(withCleanup)
-		cleanup = withCleanup == true
+		cleanup = cleanup or withCleanup == true
 		run.Abort()
 	end
 

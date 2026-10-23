@@ -17,4 +17,6 @@ Client.lua
 Pose.lua
 Sets.lua
 Rows.lua
+Chat.lua
 Console.lua
+Command.lua

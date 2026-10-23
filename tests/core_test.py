@@ -27,7 +27,9 @@ FILES = (
     "Pose.lua",
     "Sets.lua",
     "Rows.lua",
+    "Chat.lua",
     "Console.lua",
+    "Command.lua",
 )
 
 HOUSE = 900
@@ -72,6 +74,10 @@ def lua_core(tmp_path: Path) -> lua51.LuaRuntime:
           FRAMES[#FRAMES + 1] = frame
           return frame
         end
+        SlashCmdList = {}
+        HOOKS = {}
+        function hooksecurefunc(name, fn) HOOKS[name] = fn end
+        NUM_CHAT_WINDOWS = 0
         function FIRE(event, ...)
           for _, frame in ipairs(FRAMES) do
             if frame.events[event] and frame.handler then frame.handler(frame, event, ...) end
@@ -296,6 +302,27 @@ def test_width_bounds_what_is_in_flight(tmp_path: Path) -> None:
     assert (
         out.aborted is True and out.done == 3 and list(lua.eval("SENT").values()) == ["a", "b", "c"]
     )
+
+
+def test_a_second_abort_gives_up_on_the_replies_still_owed(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute(
+        """
+        SENT, PENDING = {}, {}
+        function SEND(text, callback) SENT[#SENT + 1] = text PENDING[#SENT] = callback end
+        function ANSWER(index) local cb = PENDING[index] PENDING[index] = nil cb(true, {}) end
+        """
+    )
+    start_run(lua, '{ { text = "a" }, { text = "b" }, { text = "c" } }', width=2)
+    lua.execute("HANDLE.Abort()")
+    assert lua.eval("OUT") is None  # two replies are still owed
+    lua.execute("ANSWER(1)")
+    assert lua.eval("OUT") is None
+    lua.execute("HANDLE.Abort()")
+    out = lua.eval("OUT")
+    assert out.aborted is True and out.done == 1 and list(lua.eval("SENT").values()) == ["a", "b"]
+    lua.execute("ANSWER(2)")  # the late reply changes nothing
+    assert lua.eval("OUT").done == 1
 
 
 # -- Kernel -----------------------------------------------------------------------------
@@ -630,78 +657,3 @@ def test_an_emptywmo_borrows_its_originals_sets_through_the_model_search(tmp_pat
     assert original("eps_emptywmo_barn")[1] == (
         "eps_emptywmo_barn has no original to borrow from: no model is named eps_barn"
     )
-
-
-# -- Console ----------------------------------------------------------------------------
-
-
-def test_the_console_spawns_the_selections_set_with_a_pivot_and_says_so(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    fake_client(lua)
-    lua.execute("SELECTED = 500; Furnish.Console.Spawn(1)")
-    sent = list(lua.eval("SENT").values())
-    assert sent[0] == "gobject spawn -424242 posx 10 posy 20 posz 30 face north turn 90"
-    assert len(sent) == 5
-    lines = printed(lua)
-    assert lines[0] == (
-        "|cff66ccffFurnish:|r spawning 2 objects, set 1 Full (2 objects) of root file 900,"
-        " at 10 20 30, an invisible pivot leading"
-    )
-    assert lines[-1] == "|cff66ccffFurnish:|r done: 2 of 2 spawned, group led by 7001"
-
-
-def test_the_console_refuses_with_the_way_out(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    fake_client(lua)
-    lua.execute("Furnish.Console.Spawn(1)")
-    assert printed(lua)[-1].endswith(
-        "no object is selected; select one object with gobject select <guid>"
-    )
-    lua.execute("SELECTED = 'group'; Furnish.Console.Spawn(1)")
-    assert printed(lua)[-1].endswith(
-        "a group is selected, not one object; select one object with gobject select <guid>"
-    )
-    lua.execute("SELECTED = 502; Furnish.Console.Spawn(1)")
-    assert printed(lua)[-1].endswith(
-        "chair.m2 (502) is not a WMO; a set is laid out against a building"
-    )
-    lua.execute("SELECTED = 500; Furnish.Console.Spawn(7)")
-    assert printed(lua)[-1].endswith("root file 900 has no set 7; it has 0, 1 Full")
-
-
-def test_the_console_lays_an_emptywmo_out_with_the_default_set_from_its_original(
-    tmp_path: Path,
-) -> None:
-    lua = lua_core(tmp_path)
-    fake_client(lua)
-    lua.execute("SELECTED = 501; Furnish.Console.Spawn(1, { group = Furnish.Group.None })")
-    sent = list(lua.eval("SENT").values())
-    assert [s.split()[2] for s in sent] == ["-21", "-20", "-21"]
-    assert "with the default set's 1" in printed(lua)[0]
-
-
-def test_another_objects_root_comes_from_its_record(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    fake_client(lua)
-    # Object 501 is an emptywmo; the set comes from the root file given, with no select sent.
-    lua.execute(
-        "SELECTED = 501; Furnish.Console.Spawn(1, { from = 817579, group = Furnish.Group.None })"
-    )
-    sent = list(lua.eval("SENT").values())
-    assert all(s.startswith("gobject spawn") for s in sent)
-    assert [s.split()[2] for s in sent if s.startswith("gobject spawn")] == ["-21", "-20", "-21"]
-
-
-def test_the_console_spawns_at_the_player_and_lists_sets(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    fake_client(lua)
-    lua.execute("Furnish.Console.Here(817579, 0, { group = Furnish.Group.First })")
-    assert list(lua.eval("SENT").values()) == [
-        "gobject spawn -21 posx -3 posy 6 posz 4 face north turn 90"
-    ]
-    lua.execute("Furnish.Console.Sets(817579)")
-    assert printed(lua)[-3:] == [
-        "|cff66ccffFurnish:|r entry 817579 offers 2 sets:",
-        "|cff66ccffFurnish:|r   set 0 (default, 1 objects)",
-        "|cff66ccffFurnish:|r   set 1 Full (2 objects)",
-    ]

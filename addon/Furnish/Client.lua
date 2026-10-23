@@ -16,6 +16,9 @@ local send
 -- AddonCommands swallows an error thrown inside its callback. The handler is the client's
 -- own, so BugSack and the error frame show it the way they show any addon's.
 function Client.Guarded(fn)
+	if fn == nil then
+		return nil
+	end
 	return function(...)
 		local handler = _G.geterrorhandler and _G.geterrorhandler() or print
 		local count, arguments = select("#", ...), { ... }
@@ -28,8 +31,11 @@ function Client.Guarded(fn)
 	end
 end
 
---- The door to the server: function(text, callback(success, messages)), registered once.
--- The callback is guarded, so a fault in it is reported rather than swallowed.
+--- The door to the server: function(text, callback(success, messages), shown), registered
+-- once. The server's reply is kept from chat, refusals too, since every caller reports
+-- what it asked for in its own words; shown true lets the player see it as if they had
+-- typed the command. The callback is optional and guarded, so a fault in it is reported
+-- rather than swallowed.
 -- @return the function, or nil and the reason
 function Client.Send()
 	if send then
@@ -44,12 +50,12 @@ function Client.Send()
 	if ok and registered then
 		raw = registered
 	else
-		raw = function(text, callback)
-			lib.AddonCommands.Send("Furnish", text, callback, false)
+		raw = function(text, callback, shown)
+			lib.AddonCommands.Send("Furnish", text, callback, shown)
 		end
 	end
-	send = function(text, callback)
-		raw(text, Client.Guarded(callback))
+	send = function(text, callback, shown)
+		raw(text, Client.Guarded(callback), shown or nil)
 	end
 	return send
 end
@@ -64,6 +70,42 @@ function Client.Selected()
 		return false
 	end
 	return lib.GameObject:GetSelected()
+end
+
+--- Call fn with an object's record once EpsilonLib holds it, which is once the server has
+-- pushed it for the selection. A record already selected is handed over at once.
+-- @param guid the object's GUID
+-- @param fn function(record), called once
+-- @return a function that stops waiting; or nil and the reason
+function Client.AwaitRecord(guid, fn)
+	local lib = _G.EpsilonLib
+	local events = lib and lib.EventManager
+	if not events then
+		return nil, "EpsilonLib is not loaded, and Furnish reads every object through it"
+	end
+	local wanted, reference = tostring(guid), nil
+	local function stop()
+		if reference then
+			events:Remove(reference, "EPSILON_OBJ_UPDATE")
+			reference = nil
+		end
+	end
+	local function offer(record)
+		if reference and record and tostring(record.guid) == wanted then
+			stop()
+			fn(record)
+		end
+	end
+	-- EpsilonLib calls a listener as listener(nil, event, ...), its own frame withheld.
+	local _
+	_, reference = events:Register(
+		"EPSILON_OBJ_UPDATE",
+		Client.Guarded(function(_, _, _, record)
+			offer(record)
+		end)
+	)
+	offer(Client.Selected() or nil)
+	return stop
 end
 
 --- Restore the saved copy of a settings table over its defaults, then make the live table

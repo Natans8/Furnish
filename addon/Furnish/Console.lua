@@ -1,24 +1,25 @@
--- The /run door: the providers composed for the common cases, reporting to chat.
+-- What the commands do: list a building's sets, spawn one, import a map doodad, and stop.
 --
--- This is a surface, not the API: it holds the one running run, picks defaults, and prints.
--- Every line it prints says what was asked, what was found and, on a refusal, the way out.
+-- This is the surface, not the API. It holds the one run, reads `attach` off the selection,
+-- and closes a grouped run by selecting the group in the player's sight, so the next group
+-- command acts on it; the API selects nothing. Every line it prints says what was asked and
+-- what was found, and a refusal says the way out.
 --
--- A root is the selected object's, off the record the server pushed for it, or any WMO
--- object's by its entry, the number a lookup line prints. Nothing here moves the selection.
---
---   /run Furnish.Console.Sets()                 the selected object's sets
---   /run Furnish.Console.Sets(817579)           an object's sets, by entry
---   /run Furnish.Console.Spawn(1)               set 1 of the selected object's root, on it
---   /run Furnish.Console.Spawn(1, { from = 817579 })     entry 817579's set 1, on the selection
---   /run Furnish.Console.Spawn(1, { group = Furnish.Group.First })
---   /run Furnish.Console.Here(817579, 1)        entry 817579's set 1, at the player
---   /run Furnish.Console.Abort(true)            stop, and delete what was spawned
+-- A request is plain data, as the command line and a list link both give it:
+--   index   the set's index, as a list prints it
+--   entry   an object's entry naming the root, as a lookup line prints it
+--   file    a root's file id, which a list link carries
+--   label   what to call that root in a line, which a list link carries
+--   here    true to spawn at the player rather than on the selected building
+--   group   "pivot", "first", "attach" or "nogroup"; nil is "pivot"
+--   base    true to lay the root's base set under the set
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
 local Console = {}
 Furnish.Console = Console
 
+local Reader = Furnish.Reader
 local Client = Furnish.Client
 local Pose = Furnish.Pose
 local Sets = Furnish.Sets
@@ -26,11 +27,17 @@ local Names = Furnish.Names
 local Rows = Furnish.Rows
 local Group = Furnish.Group
 local Commands = Furnish.Commands
+local Chat = Furnish.Chat
 
-local running
+local say = Chat.Say
 
-local function say(text)
-	print("|cff66ccffFurnish:|r " .. text)
+--- The run going on, if any, whether it was asked to stop, and the way to stop an import
+-- still waiting for its object.
+local running, stopping, waiting
+
+--- A set's name as a line shows it; the base set has none of its own.
+local function setName(set)
+	return set.name == "" and "Base" or Names.Set(set.name)
 end
 
 --- The server's reply lines as one quotable string, colour codes and links stripped.
@@ -45,203 +52,412 @@ local function quote(messages)
 	return '"' .. table.concat(plain, " / ") .. '"'
 end
 
-local function describe(set)
-	if set.name == "" then
-		return ("set %d (default, %d objects)"):format(set.index, set.count)
+local function objects(count)
+	return count == 1 and "1 object" or count .. " objects"
+end
+
+--- Why nothing new can start, or nil.
+local function busy()
+	if waiting then
+		return "Furnish is waiting for the imported object; /furn stop ends it"
+	elseif running and not running.Done() then
+		return "Furnish is still spawning; /furn stop ends it"
 	end
-	return ("set %d %s (%d objects)"):format(set.index, Names.Set(set.name), set.count)
+	return nil
+end
+
+--- The selected building's pose, or nil and the way out.
+-- @param otherwise another way out, said after selecting, or nil
+local function building(otherwise)
+	local pose, reason = Pose.Selected()
+	if not pose then
+		return nil,
+			reason .. "; select the building first, as with .gob select" .. (otherwise or "")
+	end
+	if not pose.wmo then
+		return nil, pose.name .. " is not a building; a set is laid out against one"
+	end
+	return pose
+end
+
+--- The root a request names, what to call it, and the list command that shows its sets;
+-- or nil and the way out. Without an entry or a file it is the selected building's own, an
+-- emptywmo's being its original's.
+local function rootOf(request, pose)
+	if request.file then
+		return request.file, request.label, "/furn list"
+	end
+	if request.entry then
+		local file = Sets.OfEntry(request.entry)
+		if not file then
+			return nil,
+				("object %d is not a building Furnish has sets for; check the entry on its lookup line"):format(
+					request.entry
+				)
+		end
+		return file, "object " .. request.entry, "/furn list " .. request.entry
+	end
+	if Sets.IsEmptyShell(pose.name) then
+		local file, reason = Sets.Original(pose.name)
+		if not file then
+			return nil, reason
+		end
+		return file, pose.name, "/furn list"
+	end
+	return pose.file, pose.name, "/furn list"
+end
+
+--- A root's sets, or nil and the way out.
+local function setsOf(file, label)
+	local sets = Sets.OfFile(file)
+	if not sets then
+		return nil, label .. " has no doodad sets in Furnish's data"
+	end
+	return sets
+end
+
+--- The kernel's group for a request, and how a line says it; or nil and the way out.
+local function groupOf(request, pose)
+	local word = request.group or "pivot"
+	if word == "pivot" then
+		return Group.Pivot, "led by an invisible pivot"
+	elseif word == "first" then
+		return Group.First, "led by its first object"
+	elseif word == "nogroup" then
+		return Group.None, "ungrouped"
+	end
+	local leader = pose.groupLeader ~= 0 and pose.groupLeader or pose.guid
+	return leader, "joining " .. pose.name .. "'s group"
+end
+
+--- Report a finished run, and select its group so the next group command acts on it.
+local function finish(result)
+	local doodads = #result.spawned - (result.pivot and 1 or 0)
+	if result.deleted == #result.spawned then
+		say(("stopped, and deleted the %s it spawned"):format(objects(result.deleted)))
+	elseif result.deleted then
+		say(
+			("stopped, and deleted %d of the %s it spawned"):format(
+				result.deleted,
+				objects(#result.spawned)
+			)
+		)
+	elseif result.aborted then
+		say(("stopped: %d of %d spawned"):format(doodads, result.total))
+	else
+		say(("done: %d of %d spawned"):format(doodads, result.total))
+	end
+	for _, refusal in ipairs(result.refused) do
+		say(("display %d was refused: %s"):format(refusal.display, quote(refusal.messages)))
+	end
+	for _, miss in ipairs(result.unjoined) do
+		say(
+			("object %s (display %d) spawned but did not join the group: %s"):format(
+				miss.guid,
+				miss.display,
+				quote(miss.messages)
+			)
+		)
+	end
+	if result.joined > 0 and not result.deleted then
+		Client.Send()(Commands.SelectGroup(result.leader), nil, true)
+	end
 end
 
 local function hooks()
 	local last = 0
 	return {
 		progress = function(done, total)
-			if done == total or done - last >= 10 then
+			if done < total and done - last >= 10 then
 				last = done
 				say(("%d of %d"):format(done, total))
 			end
 		end,
-		finished = function(result)
-			local doodads = #result.spawned - (result.pivot and 1 or 0)
-			local text = ("done: %d of %d spawned"):format(doodads, result.total)
-			if result.leader then
-				text = text .. ", group led by " .. result.leader
-			end
-			if result.aborted then
-				text = text .. ", aborted"
-			end
-			if result.deleted then
-				text = text .. (", %d deleted"):format(result.deleted)
-			end
-			say(text)
-			for _, refusal in ipairs(result.refused) do
-				say(("display %d was refused: %s"):format(refusal.display, quote(refusal.messages)))
-			end
-			for _, miss in ipairs(result.unjoined) do
-				say(
-					("%s (display %d) spawned but did not join: %s"):format(
-						miss.guid,
-						miss.display,
-						quote(miss.messages)
-					)
-				)
-			end
-		end,
+		finished = finish,
 	}
 end
 
---- The selected object's pose, or nil and a reason that names the way out.
-local function selection()
-	local pose, reason = Pose.Selected()
-	if not pose then
-		return nil, reason .. "; select one object with gobject select <guid>"
+--- Send a run, having said what it is.
+-- @param what the set as a line names it
+-- @param where "on <building>" or "at your feet"
+-- @param lead how the group is led, as groupOf says it
+local function start(rows, pose, group, what, where, lead)
+	local send, reason = Client.Send()
+	if not send then
+		return say(reason)
 	end
-	return pose
+	say(("spawning %s %s, %s"):format(what, where, lead))
+	local handle, refused =
+		Furnish.Spawn(rows, pose.position, pose.rotation, pose.scale, group, send, hooks())
+	if not handle then
+		return say("nothing was sent: " .. refused)
+	end
+	running, stopping = handle, false
 end
 
---- The rows for a set of a root: the set's own, with set 0's before them on an emptywmo or
--- when asked for. Asking for set 0 itself is just set 0.
-local function rowsFor(file, index, withDefault)
-	local set, reason = Sets.Pick(file, index)
+--- Print a root's sets, each a link that spawns it.
+-- @param request { entry } for an object's sets, or {} for the selected building's; group
+--   and base ride along on every link
+function Console.List(request)
+	local loaded, reason = Reader.Load()
+	if not loaded then
+		return say(reason)
+	end
+	local pose
+	if not request.entry then
+		pose, reason = building()
+		if not pose then
+			return say(reason)
+		end
+	end
+	local file, label = rootOf(request, pose)
+	if not file then
+		return say(label)
+	end
+	local sets
+	sets, reason = setsOf(file, label)
+	if not sets then
+		return say(reason)
+	end
+	local carried = table.concat({ request.group or "pivot", request.base and "base" or "" }, ":")
+	local indexes, links = {}, {}
+	for i, set in ipairs(sets) do
+		indexes[i] = Chat.GOLD .. set.index .. Chat.END
+		links[i] = Chat.Link(table.concat({ file, set.index, carried, label }, ":"), setName(set))
+	end
+	local widestIndex, widestLink = Chat.Widest(indexes), Chat.Widest(links)
+	say(("%s has %d sets:"):format(label, #sets))
+	for i, set in ipairs(sets) do
+		Chat.Line(
+			"  "
+				.. Chat.RightCell(indexes[i], widestIndex)
+				.. Chat.Cell(links[i], widestLink)
+				.. Chat.GREY
+				.. objects(set.count)
+				.. Chat.END
+		)
+	end
+end
+
+--- Fill a tooltip for a list link's set: its name, what it is, and what a click does.
+-- @param request a list link's request
+-- @param tooltip a tooltip owned and empty
+function Console.Describe(request, tooltip)
+	local set = Reader.Load() and Sets.Pick(request.file, request.index)
 	if not set then
-		return nil, reason
+		return
+	end
+	local about = ("set %d of %s, %s"):format(set.index, request.label, objects(set.count))
+	if set.name ~= "" then
+		about = set.name .. ", " .. about
+	end
+	local said = {}
+	if request.group ~= "pivot" then
+		said[#said + 1] = request.group
+	end
+	if request.base then
+		said[#said + 1] = "base"
+	end
+	tooltip:SetText(setName(set), 1, 1, 1)
+	tooltip:AddLine(about, 0.62, 0.62, 0.62, true)
+	if #said > 0 then
+		tooltip:AddLine("with " .. table.concat(said, " and "), 0.62, 0.62, 0.62)
+	end
+	tooltip:AddLine("Click: spawn it on the selected building", 1, 1, 1)
+	tooltip:AddLine("Ctrl-click: spawn it at your feet", 1, 1, 1)
+end
+
+--- Spawn a set on the selected building, or at the player.
+-- @param request as the head of this file describes it
+function Console.Spawn(request)
+	local blocked = busy()
+	if blocked then
+		return say(blocked)
+	end
+	local loaded, reason = Reader.Load()
+	if not loaded then
+		return say(reason)
+	end
+	-- The selected building is the target unless the set goes at the player; even then it
+	-- names the root when nothing else does, and leads the group the set attaches to.
+	local pose, target
+	if not request.here or not (request.entry or request.file) or request.group == "attach" then
+		local named = request.here and request.group ~= "attach"
+		pose, reason = building(named and ", or name it, as /furn 3 here <entry>" or nil)
+		if not pose then
+			return say(reason)
+		end
+		target = pose
+	end
+	if request.here then
+		target, reason = Pose.Here()
+		if not target then
+			return say(reason)
+		end
+	end
+	local file, label, listing = rootOf(request, pose)
+	if not file then
+		return say(label)
+	end
+	local sets
+	sets, reason = setsOf(file, label)
+	if not sets then
+		return say(reason)
+	end
+	local set = Sets.Pick(file, request.index)
+	if not set then
+		return say(
+			("%s has no set %d; %s shows its %d"):format(label, request.index, listing, #sets)
+		)
 	end
 	local rows, missing = Rows.OfSet(set.id)
 	if not rows then
-		return nil, missing
+		return say(missing)
 	end
-	local note = describe(set)
-	if withDefault and set.index ~= 0 then
-		local default = Sets.Pick(file, 0)
-		if default then
-			rows = Rows.Union(Rows.OfSet(default.id), rows)
-			note = note .. " with the default set's " .. default.count
-		end
+	local what = ("%s (set %d, %s"):format(setName(set), set.index, objects(#rows))
+	-- An emptywmo draws no base set of its own, so one standing as the target gets it.
+	local base = request.base or (not request.here and Sets.IsEmptyShell(pose.name))
+	if base and set.index ~= 0 and sets[1].index == 0 then
+		local under = Rows.OfSet(sets[1].id)
+		rows = Rows.Union(under, rows)
+		what = what .. " and the base set's " .. #under
 	end
-	return rows, note
+	what = what .. ")"
+	-- The set is named by its building wherever it is not going onto that building.
+	if request.here or label ~= pose.name then
+		what = label .. "'s " .. what
+	end
+	local group, lead = groupOf(request, pose)
+	start(rows, target, group, what, request.here and "at your feet" or ("on " .. pose.name), lead)
 end
 
-local function start(rows, pose, group, note)
-	if running and not running.Done() then
-		return say("a run is still going; /run Furnish.Console.Abort() to stop it")
+--- The sets of an imported building the map placed it with, beyond the base set it shows
+-- itself; with base, the base set as well, whether the map named it or not.
+local function placed(pose, ids, base)
+	local chosen = {}
+	for _, set in ipairs(Sets.OfFile(pose.file) or {}) do
+		local named = false
+		for _, id in ipairs(ids) do
+			named = named or id == set.id
+		end
+		if set.index == 0 and base or set.index ~= 0 and named then
+			chosen[#chosen + 1] = set
+		end
 	end
-	local send, why = Client.Send()
+	return chosen
+end
+
+--- Import the selected map doodad, then spawn on it the sets the map placed it with.
+-- @param request group and base, as for a spawn
+function Console.Import(request)
+	local blocked = busy()
+	if blocked then
+		return say(blocked)
+	end
+	local loaded, reason = Reader.Load()
+	if not loaded then
+		return say(reason)
+	end
+	local send
+	send, reason = Client.Send()
 	if not send then
-		return say(why)
-	end
-	local lead = group == Group.Pivot and "an invisible pivot leading"
-		or group == Group.First and "the first object leading"
-		or group == Group.None and "ungrouped"
-		or ("joining the group of " .. tostring(group))
-	say(
-		("spawning %d objects, %s, at %s %s %s, %s"):format(
-			#rows,
-			note,
-			Commands.Number(pose.position.x),
-			Commands.Number(pose.position.y),
-			Commands.Number(pose.position.z),
-			lead
-		)
-	)
-	local handle, reason =
-		Furnish.Spawn(rows, pose.position, pose.rotation, pose.scale, group, send, hooks())
-	if not handle then
-		return say("nothing was sent: " .. reason)
-	end
-	running = handle
-end
-
---- List the sets of the selected object's root, or of an object by entry.
-function Console.Sets(entry)
-	local function list(root, label)
-		local sets, reason = Sets.OfFile(root)
-		if not sets then
-			return say(reason)
-		end
-		say(("%s offers %d sets:"):format(label, #sets))
-		for _, set in ipairs(sets) do
-			say("  " .. describe(set))
-		end
-	end
-	if entry then
-		local file, reason = Sets.OfEntry(entry)
-		if not file then
-			return say(reason)
-		end
-		return list(file, "entry " .. tostring(entry))
-	end
-	local pose, reason = selection()
-	if not pose then
 		return say(reason)
 	end
-	list(pose.file, ("%s (root file %s)"):format(pose.name, tostring(pose.file)))
-end
-
---- Spawn a set on the selected object.
--- @param index the set's index
--- @param options { from = another object's entry, group = a Furnish.Group value or GUID,
---   withDefault = true to lay set 0 under the set asked for, as an emptywmo always does }
-function Console.Spawn(index, options)
-	options = options or {}
-	local pose, reason = selection()
-	if not pose then
-		return say(reason)
+	local _, _, _, map = Client.Position()
+	local stopped, stopWaiting = false, nil
+	waiting = function()
+		stopped = true
+		if stopWaiting then
+			stopWaiting()
+		end
 	end
-	if not pose.wmo then
-		return say(
-			("%s (%d) is not a WMO; a set is laid out against a building"):format(
-				pose.name,
-				pose.guid
+	send(Commands.IMPORT, function(_, messages)
+		if stopped then
+			return
+		end
+		local uid, guid, model = Commands.Imported(messages)
+		if not uid then
+			waiting = nil
+			return say("nothing was imported: " .. quote(messages))
+		end
+		local ids = Sets.OfPlacement(map, tonumber(uid))
+		-- The import selects the object but pushes no record of it, and the record carries
+		-- the pose; selecting it again has the server push one.
+		stopWaiting, reason = Client.AwaitRecord(guid, function(record)
+			waiting = nil
+			local pose = Pose.OfRecord(record)
+			if not pose.wmo then
+				return say(
+					("imported %s as object %s; it is not a building, so it has no sets"):format(
+						model,
+						guid
+					)
+				)
+			end
+			local chosen = ids and placed(pose, ids, request.base) or {}
+			if #chosen == 0 then
+				return say(
+					("imported %s as object %s; %s"):format(
+						model,
+						guid,
+						ids and "the map draws only its base set, which the building shows itself"
+							or "the map placed it with no set Furnish knows; /furn list shows its own"
+					)
+				)
+			end
+			local rows, names, indexes = {}, {}, {}
+			for i, set in ipairs(chosen) do
+				rows = Rows.Union(rows, Rows.OfSet(set.id))
+				names[i], indexes[i] = setName(set), set.index
+			end
+			local what = ("%s (%s %s, %s)"):format(
+				table.concat(names, " and "),
+				#chosen == 1 and "set" or "sets",
+				table.concat(indexes, " and "),
+				objects(#rows)
 			)
+			local group, lead = groupOf(request, pose)
+			start(rows, pose, group, what, "on " .. pose.name, lead)
+		end)
+		if not stopWaiting then
+			waiting = nil
+			return say(reason)
+		end
+		send(Commands.Select(guid), function(selected, replies)
+			if not selected and waiting then
+				waiting()
+				waiting = nil
+				say(
+					("imported %s as object %s, but selecting it was refused: %s"):format(
+						model,
+						guid,
+						quote(replies)
+					)
+				)
+			end
+		end)
+	end)
+end
+
+--- Stop spawning. With delete, also delete what the run spawned.
+function Console.Stop(delete)
+	if waiting then
+		waiting()
+		waiting = nil
+		return say("stopped; nothing was spawned, and an import already sent stands")
+	end
+	if not (running and not running.Done()) then
+		return say("nothing is spawning")
+	end
+	if stopping then
+		say("giving up on the replies still owed")
+	elseif delete then
+		say(
+			"stopping, then deleting what was spawned; /furn stop again gives up on a reply that never comes"
 		)
-	end
-	local empty = Sets.IsEmptyShell(pose.name)
-	local file, missing
-	if options.from then
-		file, missing = Sets.OfEntry(options.from)
-	elseif empty then
-		file, missing = Sets.Original(pose.name)
 	else
-		file = pose.file
+		say("stopping; /furn stop again gives up on a reply that never comes")
 	end
-	if not file then
-		return say(missing)
-	end
-	local rows, note = rowsFor(file, index, options.withDefault or empty)
-	if not rows then
-		return say(note)
-	end
-	start(rows, pose, options.group or Group.Pivot, note .. " of root file " .. file)
-end
-
---- Spawn a set of an object's root where the player stands, facing as the player faces.
--- @param entry the object's entry, as a lookup line prints it
--- @param index the set's index
--- @param options { group = a Furnish.Group value or GUID, withDefault = true, scale = number }
-function Console.Here(entry, index, options)
-	options = options or {}
-	local pose, reason = Pose.Here()
-	if not pose then
-		return say(reason)
-	end
-	pose.scale = options.scale or 1
-	local file, missing = Sets.OfEntry(entry)
-	if not file then
-		return say(missing)
-	end
-	local rows, note = rowsFor(file, index, options.withDefault)
-	if not rows then
-		return say(note)
-	end
-	start(rows, pose, options.group or Group.Pivot, note .. " of root file " .. file)
-end
-
---- Stop the current run. With cleanup, delete what it spawned.
-function Console.Abort(cleanup)
-	if running and not running.Done() then
-		running.Abort(cleanup)
-		say(cleanup and "aborting, and deleting what was spawned" or "aborting")
-	else
-		say("nothing is running")
-	end
+	stopping = true
+	running.Abort(delete)
 end

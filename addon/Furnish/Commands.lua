@@ -72,6 +72,32 @@ function Commands.Delete(guid)
 	return "gobject delete " .. guid
 end
 
+--- Select an object by its GUID, which also has the server push the object's record.
+function Commands.Select(guid)
+	return "gobject select " .. guid
+end
+
+--- Select the whole group a GUID leads, for the group commands that follow.
+function Commands.SelectGroup(leader)
+	return "gobject group select " .. leader
+end
+
+--- Turn the selected map doodad into a gameobject.
+Commands.IMPORT = "doodad import"
+
+--- What an import reply names: the doodad's unique id on its map and the new object's
+-- GUID, both as strings, and the model's name; or nil for any other reply.
+function Commands.Imported(messages)
+	for _, message in ipairs(messages or {}) do
+		local plain = Commands.Plain(message)
+		local uid, guid = plain:match("%(UniqueId: (%d+)%) as GUID (%d+)")
+		if uid then
+			return uid, guid, plain:match("%[(.-) %- %d+%]")
+		end
+	end
+	return nil
+end
+
 --- A reply with its colour codes and link wrappers removed, for quoting in a message.
 function Commands.Plain(text)
 	return (
