@@ -99,8 +99,8 @@ local function selection()
 	return pose
 end
 
---- The rows for a set of a root: the set's own, with the default set's before them on an
--- emptywmo or when asked for.
+--- The rows for a set of a root: the set's own, with set 0's before them on an emptywmo or
+-- when asked for. Asking for set 0 itself is just set 0.
 local function rowsFor(file, index, withDefault)
 	local set, reason = Sets.Pick(file, index)
 	if not set then
@@ -176,7 +176,7 @@ end
 --- Spawn a set on the selected object.
 -- @param index the set's index
 -- @param options { from = another root's file id, group = a Furnish.Group value or GUID,
---   default = true }
+--   withDefault = true to lay set 0 under the set asked for, as an emptywmo always does }
 function Console.Spawn(index, options)
 	options = options or {}
 	local pose, reason = selection()
@@ -203,7 +203,7 @@ function Console.Spawn(index, options)
 	if not file then
 		return say(missing)
 	end
-	local rows, note = rowsFor(file, index, options.default or empty)
+	local rows, note = rowsFor(file, index, options.withDefault or empty)
 	if not rows then
 		return say(note)
 	end
@@ -213,7 +213,7 @@ end
 --- Spawn a set of a root where the player stands, facing as the player faces.
 -- @param file the root's file id, the data's own key
 -- @param index the set's index
--- @param options { group = a Furnish.Group value or GUID, default = true, scale = number }
+-- @param options { group = a Furnish.Group value or GUID, withDefault = true, scale = number }
 function Console.Here(file, index, options)
 	options = options or {}
 	local pose, reason = Pose.Here()
@@ -221,7 +221,7 @@ function Console.Here(file, index, options)
 		return say(reason)
 	end
 	pose.scale = options.scale or 1
-	local rows, note = rowsFor(file, index, options.default)
+	local rows, note = rowsFor(file, index, options.withDefault)
 	if not rows then
 		return say(note)
 	end
