@@ -30,7 +30,7 @@ class Database:
         """
         self._path = path
         self._connection: sqlite3.Connection | None = None
-        self._sets: dict[tuple[str, tuple[tuple[int, Placement], ...]], int] = {}
+        self._sets: dict[tuple[str | None, tuple[tuple[int, Placement], ...]], int] = {}
         self.shared_sets = 0
         """How many sets were asked for that an identical one already answered."""
 
@@ -70,7 +70,7 @@ class Database:
         rows = {"format": str(FORMAT), **values}
         self._connected().executemany("INSERT INTO meta VALUES (?, ?)", rows.items())
 
-    def add_set(self, name: str, placements: Iterable[tuple[int, Placement]]) -> int:
+    def add_set(self, name: str | None, placements: Iterable[tuple[int, Placement]]) -> int:
         """Insert a set and its placements, returning the set's id.
 
         A set with the same name and the same placements as one already written, in the same
@@ -78,7 +78,8 @@ class Database:
         furnishing share it.
 
         Args:
-            name: The set's name.
+            name: The set's name, or None for the default set, whose name is a constant the
+                file need not repeat.
             placements: ``(display id, placement)`` pairs, already filtered to the spawnable.
         """
         rows = tuple(placements)

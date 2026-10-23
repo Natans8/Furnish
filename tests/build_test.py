@@ -69,10 +69,7 @@ def test_build_writes_the_four_tables(tmp_path: Path) -> None:
         "format": "1",
         "build": "9.2.7.45745",
     }
-    assert db.execute("SELECT name FROM sets ORDER BY id").fetchall() == [
-        ("Set_$DefaultGlobal",),
-        ("Set_Full",),
-    ]
+    assert db.execute("SELECT name FROM sets ORDER BY id").fetchall() == [(None,), ("Set_Full",)]
     assert db.execute('SELECT display, "index", "set" FROM wmo_sets ORDER BY 1, 2').fetchall() == [
         (10, 0, 1),
         (10, 1, 2),

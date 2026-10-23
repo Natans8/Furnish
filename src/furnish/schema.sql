@@ -11,7 +11,7 @@ CREATE TABLE meta (
 
 CREATE TABLE sets (
     id   INTEGER PRIMARY KEY,
-    name TEXT NOT NULL              -- as MODS spells it
+    name TEXT                       -- as MODS spells it; NULL for the default set, index 0
 );
 
 CREATE TABLE wmo_sets (

@@ -137,11 +137,12 @@ def _write_roots(
 
 def _spawnable(
     root: Root, displays: dict[int, int], report: Report
-) -> dict[int, tuple[str, list[tuple[int, Placement]]]]:
+) -> dict[int, tuple[str | None, list[tuple[int, Placement]]]]:
     """The root's sets that still hold a placement once the unspawnable are dropped.
 
     Keyed by the set's position in ``MODS``, which stays meaningful when a set between two
-    kept ones is dropped.
+    kept ones is dropped. Index 0 is the default set, named ``Set_$DefaultGlobal`` or
+    ``DefaultGlobal`` in every file, so its name is not carried.
     """
     kept = {}
     for index, doodad_set in enumerate(root.sets):
@@ -156,7 +157,7 @@ def _spawnable(
         if not rows:
             report.empty_sets += 1
             continue
-        kept[index] = (doodad_set.name, rows)
+        kept[index] = (doodad_set.name if index else None, rows)
         report.sets += 1
         report.placements += len(rows)
     return kept
