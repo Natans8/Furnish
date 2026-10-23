@@ -1,10 +1,10 @@
 -- Which sets: the ways a root file is found, and the sets it offers.
 --
--- The data keys sets by the root's file id. A selected object gives that file directly. An
--- object nobody selected is named by one thing off its `.lookup` line: a stock object by its
--- entry, which the data knows, and one of Epsilon's own by the model name printed beside
--- the entry, since no table carries those entries. An emptywmo gives its original's file
--- through the same name route; a map placement gives the sets the zone chose.
+-- The data keys sets by the root's file id, and a selected object's record carries that id:
+-- the record is the key, and another root is another object selected. The one root never
+-- standing in the world is an emptywmo's original, which its name gives by construction,
+-- the prefix trimmed and the rest looked up in the client's own display table. A map
+-- placement gives the sets the zone chose.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -54,25 +54,9 @@ function Sets.Pick(file, index)
 		)
 end
 
---- The root file a stock gameobject entry spawns, or nil and the reason. Epsilon's own
--- entries are in no table; they resolve by the name their line prints, through OfName.
-function Sets.OfEntry(entry)
-	local loaded, reason = Reader.Load()
-	if not loaded then
-		return nil, reason
-	end
-	local file = Reader.FileOfEntry(entry)
-	if not file then
-		return nil, ("entry %s is not a stock object with doodad sets"):format(tostring(entry))
-	end
-	return file
-end
-
---- The root file a model name spawns, through the client's own display table, which the
--- model search reads without a server round trip. A name is the file's base name, with or
--- without its folder and extension, the way `.lookup gobject` prints it beside the entry.
--- @return the file id, or nil and the reason
-function Sets.OfName(name)
+--- The root file a model name spawns, through the client's own display table. Only an
+-- emptywmo's original is reached this way, since a name is a convention and not a key.
+local function fileOfName(name)
 	local wanted = Client.ModelName(name)
 	local found = Client.SearchModels(wanted)
 	for _, row in ipairs(found) do
@@ -86,34 +70,17 @@ function Sets.OfName(name)
 				wanted
 			)
 	end
-	return nil, ("no model is named %s; the name is what .lookup gobject prints"):format(wanted)
+	return nil, ("no model is named %s"):format(wanted)
 end
 
 --- The root file an emptywmo was hollowed from, by its name with the prefix trimmed.
 function Sets.Original(name)
 	local original = name:gsub("^eps_emptywmo_", "eps_"):gsub("^emptywmo_", "")
-	local file, reason = Sets.OfName(original)
+	local file, reason = fileOfName(original)
 	if not file then
 		return nil, ("%s has no original to borrow from: %s"):format(name, reason)
 	end
 	return file
-end
-
---- The root file an object spawns, by the one thing a player has for it: a number is a
--- gameobject entry, which the data knows for stock objects; a string is a model name, the
--- word Epsilon prints beside the entry, which the client's display table resolves.
--- @return the file id, or nil and the reason
-function Sets.OfObject(object)
-	if type(object) == "number" then
-		local file, reason = Sets.OfEntry(object)
-		if not file then
-			return nil, reason .. "; for one of Epsilon's own, give its model name instead"
-		end
-		return file
-	elseif type(object) == "string" then
-		return Sets.OfName(object)
-	end
-	return nil, ("an object is an entry or a model name, not a %s"):format(type(object))
 end
 
 --- The set ids a WMO placed on the map draws, by map and ADT unique id; or nil and the

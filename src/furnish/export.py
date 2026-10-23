@@ -5,9 +5,8 @@ values. ``wmo`` lists each root file's sets with their index, set id, name and p
 count, which is everything a window needs before a set is chosen. ``blobs`` holds each
 set's placements as one printable string, decoded by the reader only when that set is
 asked for. ``maps`` says which sets each map placement draws, by map id and unique id.
-``wmo`` is keyed by the root's file id, which is what a selected object reports, and
-``entries`` turns a stock gameobject entry into that file, for a source named by its
-``.lookup`` line; Epsilon's own entries are in no table and resolve by the line's name.
+``wmo`` is keyed by the root's file id, which is what a selected object's record reports,
+and that record is the one key the addon resolves a root by.
 """
 
 import sqlite3
@@ -31,7 +30,6 @@ class Sizes:
     """What the file weighs, by part, in bytes."""
 
     wmo: int = 0
-    entries: int = 0
     blobs: int = 0
     maps: int = 0
     total: int = 0
@@ -54,12 +52,11 @@ def export(database: Path, out: Path) -> Sizes:
     ]
     sizes = Sizes()
     wmo = "".join(_wmo(connection))
-    entries = "".join(_entries(connection))
     blobs = "".join(_blobs(connection))
     maps = "".join(_maps(connection))
-    sizes.wmo, sizes.entries = len(wmo), len(entries)
+    sizes.wmo = len(wmo)
     sizes.blobs, sizes.maps = len(blobs), len(maps)
-    parts += [wmo, entries, blobs, maps]
+    parts += [wmo, blobs, maps]
     text = "".join(parts)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(text.encode("utf-8"))
@@ -80,14 +77,6 @@ def _wmo(connection: sqlite3.Connection) -> Iterable[str]:
             for _, index, set_id, name, count in group
         )
         yield f"  [{file_id}] = {{{entries} }},\n"
-    yield "}\n"
-
-
-def _entries(connection: sqlite3.Connection) -> Iterable[str]:
-    yield "FurnishData.entries = {\n"
-    rows = connection.execute("SELECT entry, file FROM entries ORDER BY entry")
-    for entry, file_id in rows:
-        yield f"  [{entry}] = {file_id},\n"
     yield "}\n"
 
 

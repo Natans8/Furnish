@@ -3,17 +3,16 @@
 -- This is a surface, not the API: it holds the one running run, picks defaults, and prints.
 -- Every line it prints says what was asked, what was found and, on a refusal, the way out.
 --
--- An object nobody has selected is one value off its `.lookup` line: a stock object's entry,
--- or the model name Epsilon prints beside its own objects' entries.
+-- A root is known by an object standing in the world, whose record carries the file id, or
+-- by that file id itself, the data's own key, which Sets() prints.
 --
---   /run Furnish.Console.Sets()                      the selected object's sets
---   /run Furnish.Console.Sets(20668)                 a stock object's sets
---   /run Furnish.Console.Sets("6dr_draenei_house2")  an Epsilon object's sets
---   /run Furnish.Console.Spawn(1)                    set 1 of the selected object's root, on it
---   /run Furnish.Console.Spawn(1, { from = "6dr_draenei_house2" })   that root's set 1, on it
+--   /run Furnish.Console.Sets()                 the selected object's sets
+--   /run Furnish.Console.Sets(849966)           a root's sets, by file id
+--   /run Furnish.Console.Spawn(1)               set 1 of the selected object's root, on it
+--   /run Furnish.Console.Spawn(1, { from = 99657 })      another object's root, by its GUID
 --   /run Furnish.Console.Spawn(1, { group = Furnish.Group.First })
---   /run Furnish.Console.Here("6dr_draenei_house2", 1)   that root's set 1, at the player
---   /run Furnish.Console.Abort(true)                 stop, and delete what was spawned
+--   /run Furnish.Console.Here(849966, 1)        a root's set 1, at the player
+--   /run Furnish.Console.Abort(true)            stop, and delete what was spawned
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -132,9 +131,8 @@ local function start(rows, pose, group, note)
 	running = handle
 end
 
---- List the sets of the selected object's root, or of the root an object spawns.
--- @param object an entry or a model name; nil for the selection
-function Console.Sets(object)
+--- List the sets of the selected object's root, or of a root by file id.
+function Console.Sets(file)
 	local function list(file, label)
 		local sets, reason = Sets.OfFile(file)
 		if not sets then
@@ -145,12 +143,8 @@ function Console.Sets(object)
 			say("  " .. describe(set))
 		end
 	end
-	if object then
-		local file, reason = Sets.OfObject(object)
-		if not file then
-			return say(reason)
-		end
-		return list(file, ("%s (root file %s)"):format(tostring(object), tostring(file)))
+	if file then
+		return list(file, "root file " .. tostring(file))
 	end
 	selection(function(pose, reason)
 		if not pose then
@@ -162,7 +156,8 @@ end
 
 --- Spawn a set on the selected object.
 -- @param index the set's index
--- @param options { from = an object, group = a Furnish.Group value or GUID, default = true }
+-- @param options { from = another object's GUID, group = a Furnish.Group value or GUID,
+--   default = true }
 function Console.Spawn(index, options)
 	options = options or {}
 	selection(function(pose, reason)
@@ -188,7 +183,15 @@ function Console.Spawn(index, options)
 			start(rows, pose, options.group or Group.Pivot, note .. " of root file " .. file)
 		end
 		if options.from then
-			return go(Sets.OfObject(options.from))
+			return Pose.Of(options.from, function(source, missing)
+				if not source then
+					return go(nil, missing)
+				end
+				if source.empty then
+					return go(Sets.Original(source.name))
+				end
+				go(source.file)
+			end)
 		end
 		if pose.empty then
 			return go(Sets.Original(pose.name))
@@ -197,22 +200,17 @@ function Console.Spawn(index, options)
 	end)
 end
 
---- Spawn a set of the root an object spawns, where the player stands, facing as the
--- player faces.
--- @param object an entry or a model name
+--- Spawn a set of a root where the player stands, facing as the player faces.
+-- @param file the root's file id, the data's own key
 -- @param index the set's index
 -- @param options { group = a Furnish.Group value or GUID, default = true, scale = number }
-function Console.Here(object, index, options)
+function Console.Here(file, index, options)
 	options = options or {}
 	local pose, reason = Pose.Here()
 	if not pose then
 		return say(reason)
 	end
 	pose.scale = options.scale or 1
-	local file, missing = Sets.OfObject(object)
-	if not file then
-		return say(missing)
-	end
 	local rows, note = rowsFor(file, index, options.default)
 	if not rows then
 		return say(note)

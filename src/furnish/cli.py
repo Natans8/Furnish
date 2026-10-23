@@ -30,11 +30,6 @@ def main(argv: list[str] | None = None) -> int:
         "--maps", type=Path, help="a directory of ADT files at their listfile paths"
     )
     builder.add_argument(
-        "--objects",
-        type=Path,
-        help="a CSV of the stock gameobject templates, entry and displayId, for entries",
-    )
-    builder.add_argument(
         "--build", default=DEFAULT_BUILD, help="the client build whose tables to fetch"
     )
     builder.add_argument(
@@ -72,7 +67,6 @@ def main(argv: list[str] | None = None) -> int:
     inputs = Inputs(
         roots=args.roots,
         maps=args.maps,
-        objects=args.objects,
         listfile=listfile(args.cache),
         extra_listfiles=args.listfile_extra,
         display_table=wago_table("GameObjectDisplayInfo", args.build, args.cache),

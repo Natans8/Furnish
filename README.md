@@ -11,13 +11,12 @@ every model to the display that spawns it, and writes one SQLite file.
 ## Build
 
 ```bash
-uv run furnish build --roots <dir of .wmo files> --maps <dir of .adt files> --objects objects.csv --out furnish.sqlite
+uv run furnish build --roots <dir of .wmo files> --maps <dir of .adt files> --out furnish.sqlite
 ```
 
 The directories hold the files at their listfile paths (`world/wmo/...`), as any CASC
 extractor writes them; a root may also be named by its file id, `849966.wmo`. `--maps` is
-optional and fills `map_sets`; `--objects` is a CSV of the stock gameobject templates,
-`entry` and `displayId`, and fills `entries`. `--listfile-extra <file>` adds a listfile the community one
+optional and fills `map_sets`. `--listfile-extra <file>` adds a listfile the community one
 lacks, a private client's own names, plain or gzipped, and may be repeated. The build fetches the community listfile and wago.tools'
 `GameObjectDisplayInfo` and `Map` exports for the build given (`--build`, default Epsilon's
 `9.2.7.45745`) into `--cache`, once.
@@ -29,7 +28,6 @@ lacks, a private client's own names, plain or gzipped, and may be repeated. The 
 | `meta`       | `format`, `build`                                             |
 | `sets`       | a doodad set and its name, NULL for the default set           |
 | `wmo_sets`   | a root file id, a set index, its set                          |
-| `entries`    | a stock gameobject entry and the furnished root it spawns     |
 | `placements` | a set's doodad in order: display, position, quaternion, scale |
 | `map_sets`   | a map id and ADT unique id, and a set it draws                |
 
@@ -51,15 +49,14 @@ uv run furnish export --db furnish.sqlite --out addon/Furnish_Data/Data.lua
 ```
 
 `addon/Furnish_Data` is the data addon: `Data.lua`, generated and not committed, declaring
-`FurnishData` with a `format` number, the `build`, each root file's sets (`wmo`), the root
-each stock gameobject entry spawns (`entries`), each set's placements as one printable string
-(`blobs`) and the sets each map placement draws (`maps`). Epsilon's own entries are in no
-table; the addon resolves them by the model name their `.lookup` line prints.
+`FurnishData` with a `format` number, the `build`, each root file's sets (`wmo`), each set's
+placements as one printable string (`blobs`) and the sets each map placement draws (`maps`).
+A root is keyed by its file id, which is what a selected object's record reports.
 It loads on demand and holds nothing else, so it changes only when the data does.
 
 `addon/Furnish/Reader.lua` is the reader and ships with the code, never with the data:
 `Furnish.Reader.Load()` loads the data addon and refuses another format, and `Sets(file)`,
-`Placements(set)`, `FileOfEntry(entry)` and `MapSets(map, uid)` on it answer from the data. A set's string is
+`Placements(set)` and `MapSets(map, uid)` on it answer from the data. A set's string is
 LibDeflate's printable encoding of a raw deflate stream over varints, decoded the first time
 the set is asked for; the layout is documented in `src/furnish/codec.py`. Nothing is
 rounded: a placement ships as the file's own float32 values, so the spawn command can be
@@ -100,10 +97,10 @@ lead to the first doodad.
 | `Kernel.lua`    | `Furnish.Spawn` and `Furnish.Group`                                        |
 | `Client.lua`    | the one file naming EpsilonLib and `C_Epsilon`                             |
 | `Pose.lua`      | where: `At`, `Here`, `Of(guid, cb)`, `OfDoodad(line)`                      |
-| `Sets.lua`      | which: `OfFile`, `Pick`, `OfEntry`, `OfName`, `OfObject`, `Original`, `OfPlacement` |
+| `Sets.lua`      | which: `OfFile`, `Pick`, `Original`, `OfPlacement`                       |
 | `Rows.lua`      | what: `OfSet`, `Union`, `Without`                                          |
 | `Group.lua`     | `Furnish.Group.Leading(guid, cb)`, the GUID that leads an object's group   |
-| `Console.lua`   | the `/run` door: `Sets`, `Spawn(index, options)`, `Here(object, index)`, `Abort` |
+| `Console.lua`   | the `/run` door: `Sets`, `Spawn(index, options)`, `Here(file, index)`, `Abort` |
 
 ## Develop
 
