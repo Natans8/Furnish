@@ -3,10 +3,11 @@
 ``Data.lua`` declares one global, ``FurnishData``, holding three tables and the two meta
 values. ``wmo`` lists each root file's sets with their index, set id, name and placement
 count, which is everything a window needs before a set is chosen. ``blobs`` holds each
-set's placements as one printable string, decoded by the reader only when that set is
-asked for. ``maps`` says which sets each map placement draws, by map id and unique id.
-``wmo`` is keyed by the root's file id, which is what a selected object's record reports,
-and ``entries`` turns a gameobject entry, the number a lookup line prints, into that file.
+set's placements as one printable string, in the order they spawn, decoded by the reader
+only when that set is asked for. ``maps`` says which sets each map placement draws, by map
+id and unique id. ``wmo`` is keyed by the root's file id, which is what a selected object's
+record reports, and ``entries`` turns a gameobject entry, the number a lookup line prints,
+into that file.
 """
 
 import sqlite3
@@ -20,6 +21,7 @@ from tqdm import tqdm
 
 from furnish import FORMAT
 from furnish.codec import Row, chunked, encode
+from furnish.order import trail
 
 LINE_WIDTH = 4000
 """How wide a blob's lines are. Lua keeps the breaks inside a long string, and the encoding
@@ -105,11 +107,14 @@ def _blobs(connection: sqlite3.Connection) -> Iterable[str]:
     sets = connection.execute("SELECT id FROM sets ORDER BY id").fetchall()
     for (set_id,) in tqdm(sets, desc="sets", unit="set"):
         rows = connection.execute(
-            'SELECT display, x, y, z, qx, qy, qz, qw, scale FROM placements WHERE "set" = ?',
+            "SELECT display, x, y, z, qx, qy, qz, qw, scale FROM placements"
+            ' WHERE "set" = ? ORDER BY seq',
             (set_id,),
         )
         blob = encode(
-            Row(d, (x, y, z), (qx, qy, qz, qw), s) for d, x, y, z, qx, qy, qz, qw, s in rows
+            trail(
+                [Row(d, (x, y, z), (qx, qy, qz, qw), s) for d, x, y, z, qx, qy, qz, qw, s in rows]
+            )
         )
         yield f"  [{set_id}] = [[\n" + "\n".join(chunked(blob, LINE_WIDTH)) + "]],\n"
     yield "}\n"

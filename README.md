@@ -121,8 +121,9 @@ stand-in EpsilonLib.
 Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 ```
 
-- `rows`: a list of `{ display, x, y, z, qx, qy, qz, qw, scale }`, relative to the anchor. A
-  set is an unordered collection of these, so rows from several sets go in together.
+- `rows`: a list of `{ display, x, y, z, qx, qy, qz, qw, scale }`, relative to the anchor,
+  spawned in the order given, so rows from several sets go in together. The data gives a
+  set's rows as a trail from the origin, each beside the one before.
 - `position` `{ x, y, z }`, `rotation` `{ roll, pitch, turn }` in degrees or nil for level,
   `scale` or nil for 1.
 - `group`: `Furnish.Group.Pivot` (an invisible marker at the anchor leads), `First` (the

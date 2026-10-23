@@ -21,8 +21,8 @@ The layout, version 1, every integer a varint unless said otherwise::
         f32     qx, qy, qz, qw     only under flag 1; identity otherwise
         f32     scale              only under flag 2; 1 otherwise
 
-Rows are sorted by model then position, so deflate meets runs of the same model; the order
-a set is spawned in does not matter.
+Rows keep the order they are given in, which is the order the addon spawns them; the export
+gives each set as a trail a player can follow.
 """
 
 import struct
@@ -62,10 +62,10 @@ def encode(rows: Iterable[Row]) -> str:
     """Spell a set's rows as the printable string the data file carries.
 
     Args:
-        rows: The set's placements, in any order. Values must be representable as float32,
-            which the database's are, since they came from float32 fields.
+        rows: The set's placements, in the order they spawn. Values must be representable as
+            float32, which the database's are, since they came from float32 fields.
     """
-    ordered = sorted(rows, key=lambda r: (r.display, r.position))
+    ordered = list(rows)
     models = sorted({r.display for r in ordered})
     index = {display: i for i, display in enumerate(models)}
     out = bytearray([VERSION])

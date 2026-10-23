@@ -17,7 +17,7 @@ def test_print_alphabet_round_trips_any_length() -> None:
         assert from_print(for_print(data)) == data
 
 
-def test_a_set_round_trips_exactly_sorted_by_model() -> None:
+def test_a_set_round_trips_exactly_in_the_order_given() -> None:
     rows = [
         Row(200, (0.05, 0.05, 0.05), IDENTITY, 1.0),
         Row(100, (-300.75, 0.0, 20.125), (0.0, 0.0, 0.5, 0.75), 1.0),
@@ -26,10 +26,9 @@ def test_a_set_round_trips_exactly_sorted_by_model() -> None:
     # 0.05 is not a float32 value; it comes back as the nearest one, which is what the
     # database holds for any value read out of a file.
     decoded = decode(encode(rows))
-    assert decoded[0] == rows[2]
-    assert decoded[1] == rows[1]
-    assert decoded[2].display == 200
-    assert abs(decoded[2].position[0] - 0.05) < 1e-8
+    assert decoded[0].display == 200
+    assert abs(decoded[0].position[0] - 0.05) < 1e-8
+    assert decoded[1:] == rows[1:]
 
 
 def test_the_empty_set_round_trips() -> None:
@@ -39,7 +38,7 @@ def test_the_empty_set_round_trips() -> None:
 @pytest.mark.parametrize("count", [1, 7, 300])
 def test_varied_sets_round_trip_exactly(count: int) -> None:
     rows = [Row(d, p.position, p.rotation, p.scale) for d, p in varied_placements(count, count)]
-    assert sorted(decode(encode(rows)), key=repr) == sorted(rows, key=repr)
+    assert decode(encode(rows)) == rows
 
 
 @pytest.mark.parametrize(

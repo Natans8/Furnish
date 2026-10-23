@@ -1,7 +1,8 @@
 -- The kernel: spawn a collection of placements at an anchor, grouped. Final values only.
 --
--- A set is nothing but an unordered collection of placements, so the kernel takes rows and
--- never asks where they came from; a surface unions, subtracts and picks before calling.
+-- A set is nothing but a collection of placements, spawned in the order given, so the kernel
+-- takes rows and never asks where they came from; a surface unions, subtracts and picks
+-- before calling.
 -- Likewise the anchor is a position, a rotation and a scale, whatever gave them, and the
 -- group is a word or a GUID. The kernel turns each row into a world pose, each pose into a
 -- spawn line, adds the joins the group needs, and hands the lines to a run.

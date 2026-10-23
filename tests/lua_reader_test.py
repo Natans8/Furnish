@@ -6,9 +6,10 @@ from pathlib import Path
 import pytest
 from lupa import lua51
 
-from furnish.codec import decode, for_print
+from furnish.codec import Row, decode, for_print
 from furnish.database import Database
 from furnish.export import LINE_WIDTH, export
+from furnish.order import trail
 from furnish.wmo import Placement
 from tests.files import varied_placements
 
@@ -122,19 +123,16 @@ def test_every_row_comes_back_bit_for_bit_through_the_exporter_and_the_reader(
     lines = stored.split("\n")
     assert all(len(line) <= LINE_WIDTH for line in lines)
     joined = "".join(lines)
-    expected = sorted((d, *p.position, *p.rotation, p.scale) for d, p in rows)
+    # Every row comes back, in the trail the exporter walked.
+    walked = trail([Row(d, p.position, p.rotation, p.scale) for d, p in rows])
+    expected = [(r.display, *r.position, *r.rotation, r.scale) for r in walked]
     read = lua.eval(f"Furnish.Reader.Placements({set_id})")
-    assert (
-        sorted(
-            (row.display, row.x, row.y, row.z, row.qx, row.qy, row.qz, row.qw, row.scale)
-            for row in read.values()
-        )
-        == expected
-    )
+    assert [
+        (row.display, row.x, row.y, row.z, row.qx, row.qy, row.qz, row.qw, row.scale)
+        for row in read.values()
+    ] == expected
     # The Python codec reads the same string to the same rows.
-    assert (
-        sorted((r.display, *r.position, *r.rotation, r.scale) for r in decode(joined)) == expected
-    )
+    assert [(r.display, *r.position, *r.rotation, r.scale) for r in decode(joined)] == expected
 
 
 def test_the_print_encoding_is_libdeflates(tmp_path: Path) -> None:
