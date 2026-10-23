@@ -39,6 +39,8 @@ class Inputs:
     Attributes:
         roots: A directory of WMO files, each at its listfile path or named ``<id>.wmo``.
         maps: A directory of ADT files at their listfile paths, or None to skip ``map_sets``.
+        objects: A CSV of the stock gameobject templates, ``entry`` and ``displayId``, or
+            None to skip ``entries``.
         listfile: The community listfile.
         extra_listfiles: More listfiles in the same shape, a private client's own names.
         display_table: wago's ``GameObjectDisplayInfo`` CSV.
@@ -52,6 +54,7 @@ class Inputs:
     listfile: Path
     display_table: Path
     map_table: Path
+    objects: Path | None = None
     extra_listfiles: list[Path] = field(default_factory=list)
     overlay: list[tuple[int, int]] = field(default_factory=list)
     build: str = ""
@@ -78,6 +81,7 @@ class Report:
     shared_sets: int = 0
     blank_slots: int = 0
     models_without_display: int = 0
+    entries: int = 0
     tiles_read: int = 0
     tiles_without_map: int = 0
     map_rows: int = 0
@@ -102,6 +106,8 @@ def build(inputs: Inputs, out: Path) -> Report:
     with Database(out) as database:
         database.meta({"build": inputs.build})
         sets_by_root = _write_roots(inputs.roots, path_to_id, displays, spawnable, database, report)
+        if inputs.objects is not None:
+            _write_entries(inputs.objects, sets_by_root, spawnable, database, report)
         if inputs.maps is not None:
             maps = {row["Directory"].lower(): int(row["ID"]) for row in read_csv(inputs.map_table)}
             _write_maps(inputs.maps, path_to_id, maps, sets_by_root, database, report)
@@ -146,6 +152,30 @@ def _write_roots(
         database.add_wmo_sets((file_id, index, set_id) for index, set_id in set_ids.items())
         database.add_root_displays((display, file_id) for display in spawners[file_id])
     return sets_by_root
+
+
+def _write_entries(
+    objects: Path,
+    sets_by_root: dict[int, dict[int, int]],
+    spawners: dict[int, tuple[int, ...]],
+    database: Database,
+    report: Report,
+) -> None:
+    """Every stock entry whose display spawns a root that has sets.
+
+    Epsilon's own entries are in no table a build can read; an addon resolves those by the
+    model name their lines print.
+    """
+    file_by_display = {
+        display: file_id for file_id in sets_by_root for display in spawners[file_id]
+    }
+    rows = []
+    for row in read_csv(objects):
+        file_id = file_by_display.get(int(row["displayId"]))
+        if file_id is not None:
+            rows.append((int(row["entry"]), file_id))
+    database.add_entries(rows)
+    report.entries = len(rows)
 
 
 def _spawnable(

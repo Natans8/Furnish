@@ -49,9 +49,13 @@ def write_inputs(tmp_path: Path) -> Inputs:
         "ID,FileDataID\n10,900\n11,900\n12,903\n13,904\n20,1001\n21,1002\n"
     )
     (tmp_path / "maps.csv").write_text("ID,Directory\n0,Azeroth\n1,Kalimdor\n")
+    (tmp_path / "objects.csv").write_text(
+        "entry,displayId\n20668,10\n20669,11\n20670,12\n20671,99\n"
+    )
     return Inputs(
         roots=roots,
         maps=maps,
+        objects=tmp_path / "objects.csv",
         listfile=tmp_path / "listfile.csv",
         display_table=tmp_path / "displays.csv",
         map_table=tmp_path / "maps.csv",
@@ -60,13 +64,13 @@ def write_inputs(tmp_path: Path) -> Inputs:
     )
 
 
-def test_build_writes_the_four_tables(tmp_path: Path) -> None:
+def test_build_writes_the_five_tables(tmp_path: Path) -> None:
     out = tmp_path / "furnish.sqlite"
     inputs = write_inputs(tmp_path)
     report = build(inputs, out)
     db = sqlite3.connect(out)
     assert dict(db.execute("SELECT key, value FROM meta")) == {
-        "format": "1",
+        "format": "2",
         "build": "9.2.7.45745",
     }
     assert db.execute("SELECT name FROM sets ORDER BY id").fetchall() == [(None,), ("Set_Full",)]
@@ -95,6 +99,13 @@ def test_build_writes_the_four_tables(tmp_path: Path) -> None:
         (11, 900),
         (13, 904),
     ]
+    # A stock entry lands only where its display spawns a root with sets: 12 is the bare
+    # root's display and 99 no root's at all.
+    assert db.execute("SELECT entry, file FROM entries ORDER BY 1").fetchall() == [
+        (20668, 900),
+        (20669, 900),
+    ]
+    assert report.entries == 2
     assert (
         report.roots_read,
         report.roots_without_display,

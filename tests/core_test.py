@@ -48,6 +48,7 @@ def write_database(path: Path) -> None:
         full = db.add_set("Set_Full", [(20, CHAIR), (21, LAMP)])
         db.add_wmo_sets([(HOUSE, 0, default), (HOUSE, 1, full)])
         db.add_root_displays([(30262, HOUSE)])
+        db.add_entries([(20668, HOUSE)])
         db.add_map_sets([(1116, 4242, full)])
 
 
@@ -564,25 +565,29 @@ def test_sets_name_what_a_root_offers_and_what_it_lacks(tmp_path: Path) -> None:
         lua.eval("select(2, Furnish.Sets.OfFile(1))")
         == "the data has no doodad sets for root file 1"
     )
-    assert lua.eval("Furnish.Sets.OfDisplay(30262)") == HOUSE
-    assert lua.eval("select(2, Furnish.Sets.OfDisplay(5))") == (
-        "display 5 spawns no root the data has sets for"
+    assert lua.eval("Furnish.Sets.OfEntry(20668)") == HOUSE
+    assert lua.eval("select(2, Furnish.Sets.OfEntry(817579))") == (
+        "entry 817579 is not a stock object with doodad sets"
     )
 
 
-def test_sets_of_entry_read_the_display_off_gobject_info(tmp_path: Path) -> None:
+def test_an_object_resolves_by_its_entry_then_by_its_name(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     fake_client(lua)
-    lua.execute(
-        "FILE, WHY = nil, nil; Furnish.Sets.OfEntry(817579, function(f, w) FILE, WHY = f, w end)"
+    of_object = lua.eval("Furnish.Sets.OfObject")
+    assert of_object(20668) == HOUSE
+    assert of_object("house.wmo") == HOUSE
+    assert of_object(lua.table(entry=817579, name="world/wmo/house.wmo")) == HOUSE
+    assert of_object(lua.table(entry=20668, name="nothing")) == HOUSE
+    assert of_object(817579)[1] == (
+        "entry 817579 is not a stock object with doodad sets; give its model name too,"
+        " the word .lookup prints beside it"
     )
-    assert (lua.eval("FILE"), lua.eval("WHY")) == (HOUSE, None)
-    assert list(lua.eval("SENT").values()) == ["gobject info 817579"]
-    lua.execute("Furnish.Sets.OfEntry(5, function(f, w) FILE, WHY = f, w end)")
-    assert (
-        lua.eval("FILE") is None
-        and lua.eval("WHY") == "display 1 spawns no root the data has sets for"
+    assert of_object(lua.table(entry=817579, name="barn"))[1] == (
+        "entry 817579 is not a stock object with doodad sets, and no model is named barn;"
+        " the name is what .lookup gobject prints"
     )
+    assert of_object(lua.table())[1] == "an object is { entry, name }, an entry, or a model name"
 
 
 def test_an_emptywmo_borrows_its_originals_sets_through_the_model_search(tmp_path: Path) -> None:
@@ -653,13 +658,16 @@ def test_the_console_lays_an_emptywmo_out_with_the_default_set_from_its_original
 def test_the_console_spawns_at_the_player_and_lists_sets(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     fake_client(lua)
-    lua.execute("Furnish.Console.Here('house', 0, { group = Furnish.Group.First })")
+    lua.execute(
+        "Furnish.Console.Here({ entry = 817579, name = 'house.wmo' }, 0,"
+        " { group = Furnish.Group.First })"
+    )
     assert list(lua.eval("SENT").values()) == [
         "gobject spawn -21 posx -3 posy 6 posz 4 face north turn 90"
     ]
-    lua.execute("Furnish.Console.Sets('house.wmo')")
+    lua.execute("Furnish.Console.Sets(20668)")
     assert printed(lua)[-3:] == [
-        "|cff66ccffFurnish:|r house.wmo (root file 900) offers 2 sets:",
+        "|cff66ccffFurnish:|r 20668 (root file 900) offers 2 sets:",
         "|cff66ccffFurnish:|r   set 0 (default, 1 objects)",
         "|cff66ccffFurnish:|r   set 1 Set_Full (2 objects)",
     ]

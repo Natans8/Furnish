@@ -1,5 +1,5 @@
--- The reader over Furnish_Data: the sets a display id offers, the placements of a set, and
--- the sets a map placement draws. A set's placements are decoded the first time they are
+-- The reader over Furnish_Data: the sets a root file offers, the root a stock gameobject
+-- entry spawns, the placements of a set, and the sets a map placement draws. A set's placements are decoded the first time they are
 -- asked for and kept; nothing is decoded at load.
 --
 -- This file ships with the code, never with the data. Furnish_Data is the folder players
@@ -13,7 +13,7 @@
 -- flag 1, and the scale as a float32 under flag 2. Nothing is rounded: the numbers are the
 -- WMO file's own. The Python side of this is furnish/codec.py.
 
-local FORMAT = 1
+local FORMAT = 2
 local decoded = {}
 
 _G.Furnish = _G.Furnish or {}
@@ -155,10 +155,11 @@ function Reader.Placements(set)
 	return rows
 end
 
---- The root file a gameobject display spawns, or nil when it spawns no furnished root.
--- @param display a gameobject display id, as gobject info prints it
-function Reader.FileOf(display)
-	return data().displays[display]
+--- The root file a stock gameobject entry spawns, or nil: the entry is Epsilon's own, or
+-- its root has no sets.
+-- @param entry a gameobject entry, as .lookup gobject prints it
+function Reader.FileOfEntry(entry)
+	return data().entries[entry]
 end
 
 --- The sets a WMO placed on a map draws, or nil when the data has none for it. Load first.

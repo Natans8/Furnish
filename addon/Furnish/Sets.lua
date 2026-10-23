@@ -1,9 +1,11 @@
 -- Which sets: the ways a root file is found, and the sets it offers.
 --
--- The data keys sets by the root's file id. A selected object gives that file directly; a
--- model name gives it through the client's own display table; a gameobject entry through
--- the display `gobject info` prints, where the server answers it; an emptywmo through the
--- original it was hollowed from; a map placement gives the sets the zone chose.
+-- The data keys sets by the root's file id. A selected object gives that file directly. An
+-- object a player names without selecting it is a `.lookup` line, an entry and a name
+-- together: a stock entry is in the data, and Epsilon's own entry is in no table, so the
+-- name the line prints resolves it through the client's own display table. An emptywmo
+-- gives its original's file through the same table; a map placement gives the sets the
+-- zone chose.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -53,49 +55,18 @@ function Sets.Pick(file, index)
 		)
 end
 
---- The root file a display spawns, or nil and the reason.
-function Sets.OfDisplay(display)
+--- The root file a stock gameobject entry spawns, or nil and the reason. Epsilon's own
+-- entries are in no table; they resolve by the name their line prints, through OfName.
+function Sets.OfEntry(entry)
 	local loaded, reason = Reader.Load()
 	if not loaded then
 		return nil, reason
 	end
-	local file = Reader.FileOf(display)
+	local file = Reader.FileOfEntry(entry)
 	if not file then
-		return nil, ("display %s spawns no root the data has sets for"):format(tostring(display))
+		return nil, ("entry %s is not a stock object with doodad sets"):format(tostring(entry))
 	end
 	return file
-end
-
---- The root file a gameobject entry spawns, through the server's `gobject info`.
--- @param callback function(file) or function(nil, reason)
-function Sets.OfEntry(entry, callback)
-	local wanted = tonumber(entry)
-	if not wanted then
-		return callback(nil, ("a gameobject entry is a number, not %s"):format(tostring(entry)))
-	end
-	local send, why = Client.Send()
-	if not send then
-		return callback(nil, why)
-	end
-	send(Commands.Info(wanted), function(success, messages)
-		if not success then
-			return callback(
-				nil,
-				("gobject info %d was refused: %s"):format(wanted, Commands.Quote(messages))
-			)
-		end
-		local display = Commands.DisplayIn(messages)
-		if not display then
-			return callback(
-				nil,
-				("gobject info %d answered %s, and no DisplayID line is in it"):format(
-					wanted,
-					Commands.Quote(messages)
-				)
-			)
-		end
-		callback(Sets.OfDisplay(display))
-	end)
 end
 
 --- The root file a model name spawns, through the client's own display table, which the
@@ -127,6 +98,42 @@ function Sets.Original(name)
 		return nil, ("%s has no original to borrow from: %s"):format(name, reason)
 	end
 	return file
+end
+
+--- The root file an object spawns, from what a `.lookup` line gives: the entry where the
+-- data knows it, else the name. A bare number is an entry, a bare string a name.
+-- @param object { entry, name }, an entry, or a name
+-- @return the file id, or nil and the reason
+function Sets.OfObject(object)
+	local entry, name
+	if type(object) == "table" then
+		entry, name = object.entry, object.name
+	elseif type(object) == "number" then
+		entry = object
+	elseif type(object) == "string" then
+		name = object
+	end
+	if entry == nil and name == nil then
+		return nil, "an object is { entry, name }, an entry, or a model name"
+	end
+	local byEntry, entryReason = nil, nil
+	if entry ~= nil then
+		byEntry, entryReason = Sets.OfEntry(entry)
+		if byEntry then
+			return byEntry
+		end
+	end
+	if name == nil then
+		return nil, entryReason .. "; give its model name too, the word .lookup prints beside it"
+	end
+	local byName, nameReason = Sets.OfName(name)
+	if byName then
+		return byName
+	end
+	if entryReason then
+		return nil, entryReason .. ", and " .. nameReason
+	end
+	return nil, nameReason
 end
 
 --- The set ids a WMO placed on the map draws, by map and ADT unique id; or nil and the

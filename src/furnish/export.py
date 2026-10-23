@@ -6,7 +6,8 @@ count, which is everything a window needs before a set is chosen. ``blobs`` hold
 set's placements as one printable string, decoded by the reader only when that set is
 asked for. ``maps`` says which sets each map placement draws, by map id and unique id.
 ``wmo`` is keyed by the root's file id, which is what a selected object reports, and
-``displays`` turns a gameobject display into that file, for a source named by its entry.
+``entries`` turns a stock gameobject entry into that file, for a source named by its
+``.lookup`` line; Epsilon's own entries are in no table and resolve by the line's name.
 """
 
 import sqlite3
@@ -30,7 +31,7 @@ class Sizes:
     """What the file weighs, by part, in bytes."""
 
     wmo: int = 0
-    displays: int = 0
+    entries: int = 0
     blobs: int = 0
     maps: int = 0
     total: int = 0
@@ -53,12 +54,12 @@ def export(database: Path, out: Path) -> Sizes:
     ]
     sizes = Sizes()
     wmo = "".join(_wmo(connection))
-    displays = "".join(_displays(connection))
+    entries = "".join(_entries(connection))
     blobs = "".join(_blobs(connection))
     maps = "".join(_maps(connection))
-    sizes.wmo, sizes.displays = len(wmo), len(displays)
+    sizes.wmo, sizes.entries = len(wmo), len(entries)
     sizes.blobs, sizes.maps = len(blobs), len(maps)
-    parts += [wmo, displays, blobs, maps]
+    parts += [wmo, entries, blobs, maps]
     text = "".join(parts)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(text.encode("utf-8"))
@@ -82,11 +83,11 @@ def _wmo(connection: sqlite3.Connection) -> Iterable[str]:
     yield "}\n"
 
 
-def _displays(connection: sqlite3.Connection) -> Iterable[str]:
-    yield "FurnishData.displays = {\n"
-    rows = connection.execute("SELECT display, file FROM root_displays ORDER BY display")
-    for display, file_id in rows:
-        yield f"  [{display}] = {file_id},\n"
+def _entries(connection: sqlite3.Connection) -> Iterable[str]:
+    yield "FurnishData.entries = {\n"
+    rows = connection.execute("SELECT entry, file FROM entries ORDER BY entry")
+    for entry, file_id in rows:
+        yield f"  [{entry}] = {file_id},\n"
     yield "}\n"
 
 
