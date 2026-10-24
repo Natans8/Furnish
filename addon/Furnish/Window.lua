@@ -69,10 +69,6 @@ local NAMED = 8
 --- How many objects a run places before the bar guesses the time left from its pace.
 local PACED = 5
 
---- How often, in seconds, the target reads the player's position again while it follows a
--- selection that is empty, so where it says the player stands is where they stand.
-local WALK = 0.5
-
 --- The position's numbers, two rows across the window's width: the axes, then the turn about
 -- each and the scale. Each is its box, its row, where the pose keeps it, and ObjectMover's colour
 -- for its axis, the same for a position and the turn about it.
@@ -568,7 +564,10 @@ local function refresh()
 		local selected = Console.Target()
 		if selected then
 			spot = copy(selected, nil, gobDetail(selected))
-		else
+		elseif not spot or spot.guid then
+			-- With nothing selected the target takes where the player stands, read once so no number
+			-- is empty, and never again while it stays so: it does not follow the player, and Here
+			-- reads it afresh.
 			local here = Pose.Here()
 			spot = here and copy(here, "Your position", "Nothing selected")
 		end
@@ -1195,27 +1194,6 @@ local function buildFooter()
 			progressText()
 		end
 	end)
-
-	-- While the target follows a selection that is empty, it is where the player stands now.
-	local walked = 0
-	frame:SetScript(
-		"OnUpdate",
-		Client.Guarded(function(_, elapsed)
-			walked = walked + elapsed
-			if walked < WALK then
-				return
-			end
-			walked = 0
-			if run or spotPinned or (spot and spot.guid) then
-				return
-			end
-			local here = Pose.Here()
-			if here then
-				spot = copy(here, "Your position", "Nothing selected")
-				updateTarget()
-			end
-		end)
-	)
 end
 
 local function build()
@@ -1253,6 +1231,11 @@ local function build()
 			local width, height = frame:GetSize()
 			if width < MIN_WIDTH or height < MIN_HEIGHT then
 				frame:SetSize(math.max(width, MIN_WIDTH), math.max(height, MIN_HEIGHT))
+			end
+			-- A position read when nothing was selected is read again when the window opens, so it is
+			-- where the player stands now rather than wherever they stood last time.
+			if not spotPinned and spot and not spot.guid then
+				spot = nil
 			end
 			-- Fitted here, once every label is set and the client's fonts are certainly loaded.
 			fitButtons()
