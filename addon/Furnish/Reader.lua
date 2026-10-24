@@ -196,3 +196,9 @@ end
 function Reader.ModelFiles()
 	return data().models
 end
+
+--- Every root the data has sets for, keyed by its file id, each its sets as Sets gives them.
+-- Load first.
+function Reader.Roots()
+	return data().wmo
+end

@@ -413,7 +413,7 @@
 			     height follows its list, set by Window.lua: the list hangs from the top, and the two
 			     buttons stand on the bottom. -->
 			<Frame parentKey="Doodad" enableMouse="true" hidden="true">
-				<Size x="210" y="300"/>
+				<Size x="300" y="300"/>
 				<Anchors>
 					<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="5" y="0"/>
 				</Anchors>

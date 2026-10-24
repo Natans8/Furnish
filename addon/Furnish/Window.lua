@@ -588,7 +588,7 @@ local function refresh()
 			-- is empty, and never again while it stays so: it does not follow the player, and Here
 			-- reads it afresh.
 			local here = Pose.Here()
-			spot = here and copy(here, "Your position", "Nothing selected")
+			spot = here and copy(here, "Your position", "No gob selected")
 		end
 		edited = false
 	end
@@ -613,7 +613,7 @@ local function refresh()
 			frame.SourceName:SetText(selected.name)
 			frame.SourceDetail:SetText(selected.wmo and "No sets" or "Not a WMO")
 		else
-			frame.SourceName:SetText("Nothing selected")
+			frame.SourceName:SetText("No WMO selected")
 			frame.SourceName:SetTextColor(0.5, 0.5, 0.5)
 			frame.SourceDetail:SetText("")
 		end
@@ -886,7 +886,7 @@ end
 local function importLines()
 	local lines = {
 		{
-			text = "Turn the doodad into a gob, selected like any other. The gob draws only its base set, so while Source follows the selection, the doodad's other sets come chosen.",
+			text = "Turn the doodad into a gob, which becomes the selected gob. The gob draws only its base set, so while Source follows the selection, the doodad's other sets come chosen.",
 		},
 	}
 	if doodad and doodad.imported then
@@ -925,7 +925,8 @@ local function initDrawn(button, set, new)
 	button.Label:SetText(set.name)
 	button.Count:SetText(thousands(set.count))
 	button.Tag:SetText(set.draws and "baked" or "")
-	button.Label:SetPoint("RIGHT", set.draws and -100 or -44, 0)
+	-- The name ends where the tag begins, which is where the count's column begins when there is none.
+	button.Label:SetPoint("RIGHT", button.Tag, "LEFT", -6, 0)
 end
 
 --- Fill the doodad panel with the doodad's name and the sets of the WMO it is, its list as tall
@@ -1110,7 +1111,7 @@ local function buildSource()
 	frame.SourceFollow:SetScript("OnClick", Client.Guarded(followSource))
 	hint(frame.SourceFollow, "Follow selection", {
 		{ text = "Ticked, the sets are those of the selected WMO." },
-		{ text = "Unticked, they stay this WMO's whatever you select." },
+		{ text = "Unticked, they stay this WMO's whatever gob is selected." },
 	})
 	listOf(list, provider, "FurnishSetRowTemplate", initRow)
 	list:SetBackdropColor(0, 0, 0, 0.25)
@@ -1143,7 +1144,7 @@ local function buildTarget()
 		{
 			text = "Ticked, the target is the selected gob, or where you stand while no gob is selected.",
 		},
-		{ text = "Unticked, the target stays as it is whatever you select." },
+		{ text = "Unticked, the target stays as it is whatever gob is selected." },
 	})
 	for order, number in ipairs(NUMBERS) do
 		local box = frame[number.box]
@@ -1253,7 +1254,7 @@ local function buildDoodad()
 	panel.Import:SetScript("OnClick", Client.Guarded(importDoodad))
 	hint(panel.UseSource, "Use as source", {
 		{
-			text = "Show the sets of the doodad's WMO as the source, kept whatever you select, with the sets the doodad drew beyond its base chosen.",
+			text = "Show the sets of the doodad's WMO as the source, kept whatever gob is selected, with the sets the doodad drew beyond its base chosen.",
 		},
 		{ text = "The target stays as it is." },
 	})
@@ -1346,10 +1347,15 @@ local function build()
 			-- Fitted here, once every label is set and the client's fonts are certainly loaded.
 			fitButtons()
 			layoutNumbers()
-			-- Started now, so the models are usually named by the time a set is rested on.
-			Console.NameModels(function() end)
 			listen()
 			refresh()
+			-- Started now, so the models are usually named by the time a set is rested on; a WMO
+			-- shown by its entry takes its name from the same walk, once it ends.
+			Console.NameModels(Client.Guarded(function()
+				if frame:IsShown() and pinned and pinned.entry and not pinned.placement then
+					refresh()
+				end
+			end))
 		end)
 	)
 	frame:SetScript(

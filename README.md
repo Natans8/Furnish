@@ -137,8 +137,8 @@ It loads on demand and holds nothing else, so it changes only when the data does
 
 `addon/Furnish/Reader.lua` is the reader and ships with the code, never with the data:
 `Furnish.Reader.Load()` loads the data addon and refuses another format, and `Sets(file)`,
-`Placements(set)`, `IsBlank(file)`, `FileOfEntry(entry)`, `MapSets(map, uid)` and
-`ModelFile(display)` and `ModelFiles()` on it
+`Placements(set)`, `IsBlank(file)`, `FileOfEntry(entry)`, `MapSets(map, uid)`,
+`ModelFile(display)`, `ModelFiles()` and `Roots()` on it
 answer from the data. A set's string is
 LibDeflate's printable encoding of a raw deflate stream over varints, decoded the first time
 the set is asked for; the layout is documented in `src/furnish/codec.py`. Nothing is

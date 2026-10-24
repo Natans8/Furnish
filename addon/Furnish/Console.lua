@@ -358,7 +358,8 @@ end
 -- @param of nil for the selection; { file, name } for a root by its file id and what to call it;
 --   or { entry } for the WMO a gameobject's entry names, the number a lookup line prints. Any
 --   of them may carry a placement, a doodad as Commands.SelectedDoodad reads it, whose sets are
---   marked placed; with an entry, the doodad's name also names the source
+--   marked placed; with an entry, the doodad names the source, or else its WMO's file as the
+--   client's catalogue names it once Console.NameModels has ended, or else the entry itself
 -- @return { name, file, blank, sets }, each set { id, index, name, count, canonical, placed }, the
 --   name as a line shows it, canonical as the file spells it, empty for the base set, and placed
 --   true for a set the doodad shows now; blank is true for a WMO Epsilon emptied, which always gets its
@@ -375,11 +376,10 @@ function Console.Source(of)
 		if not file then
 			return nil, reason
 		end
-		return described(
-			file,
-			placement and Client.ModelName(placement.name) or ("object %d"):format(of.entry),
-			drawn
-		)
+		local name = placement and Client.ModelName(placement.name)
+			or Client.FileName(file)
+			or ("object %d"):format(of.entry)
+		return described(file, name, drawn)
 	end
 	local pose, reason = selectedPose()
 	if not pose then
@@ -391,22 +391,26 @@ function Console.Source(of)
 	return described(pose.file, pose.name, drawn)
 end
 
---- Every model file the data's sets place, as a set, gathered once.
-local placedFiles
+--- Every file the catalogue is asked to name, as a set, gathered once: each model the data's sets
+-- place and each WMO root it has sets for.
+local wantedFiles
 
---- Learn the name of every model the data places, by one walk of the client's own catalogue a
--- session, then call done; at once where the walk has ended.
+--- Learn the name of every model the data places and every WMO it has sets for, by one walk of
+-- the client's own catalogue a session, then call done; at once where the walk has ended.
 function Console.NameModels(done)
 	if not Reader.Load() then
 		return done()
 	end
-	if not placedFiles then
-		placedFiles = {}
+	if not wantedFiles then
+		wantedFiles = {}
 		for _, file in pairs(Reader.ModelFiles()) do
-			placedFiles[file] = true
+			wantedFiles[file] = true
+		end
+		for file in pairs(Reader.Roots()) do
+			wantedFiles[file] = true
 		end
 	end
-	Client.NameFiles(placedFiles, done)
+	Client.NameFiles(wantedFiles, done)
 end
 
 --- Whether the walk Console.NameModels starts has ended, so a model it did not name has none.
