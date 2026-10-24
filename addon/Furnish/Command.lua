@@ -14,6 +14,7 @@ local Chat = Furnish.Chat
 
 --- What can be typed after the command, in the order the help says it.
 Command.USAGE = {
+	{ "", "open the window" },
 	{ "help", "this help" },
 	{ "list", "the selected building's sets" },
 	{ "list <entry>", "an object's sets, by the entry on its lookup line" },
@@ -159,8 +160,7 @@ function Command.Run(text)
 		return Chat.Say(reason)
 	end
 	if request.action == "window" then
-		-- TODO: open the window, once it is built.
-		Chat.Say("the window is not built yet; " .. Chat.Typed("help") .. " lists the commands")
+		Furnish.Window.Toggle()
 	elseif request.action == "help" then
 		for _, line in ipairs(helpLines()) do
 			Chat.Line(line)

@@ -101,6 +101,28 @@ function Client.Selected()
 	return lib.GameObject:GetSelected()
 end
 
+--- Call fn whenever EpsilonLib says the selection changed, until the function returned is
+-- called; or nil and the reason.
+function Client.OnSelection(fn)
+	local lib = _G.EpsilonLib
+	local events = lib and lib.EventManager
+	if not events then
+		return nil, "EpsilonLib is not loaded, and Furnish reads every object through it"
+	end
+	local _, reference = events:Register(
+		"EPSILON_OBJ_UPDATE",
+		Client.Guarded(function()
+			fn()
+		end)
+	)
+	return function()
+		if reference then
+			events:Remove(reference, "EPSILON_OBJ_UPDATE")
+			reference = nil
+		end
+	end
+end
+
 --- The GUID of the selected group's leader, or nil when no group is selected.
 function Client.SelectedGroup()
 	local lib = _G.EpsilonLib

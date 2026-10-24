@@ -14,6 +14,10 @@
 --   here    true to spawn at the player rather than on the selected object
 --   group   "pivot", "first", "attach" or "nogroup"; nil is "pivot"
 --   base    true to lay the root's base set under the set
+--   quiet   true when a window shows the run's progress, so the chat leaves it out
+--
+-- A window reads Target for what to show, Busy for whether it may start, and Watch for the
+-- run it started; it spawns and stops through the same doors as the commands.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -34,8 +38,20 @@ local say = Chat.Say
 
 --- The run going on, if any, and whether it was asked to stop. A wait for an object's record:
 -- { what it waits for, what a stop leaves standing or nil, stop }. The group the last run
--- selected and the object that run was anchored on: { leader, guid }.
+-- selected and the object that run was anchored on: { leader, guid, pose }.
 local running, stopping, waiting, anchored
+
+--- Who hears a run besides the chat, as a window registers: { started(total, what),
+-- progress(done, total), finished(result, seconds) }, each optional.
+local watchers = {}
+
+local function tell(name, ...)
+	for _, watcher in ipairs(watchers) do
+		if watcher[name] then
+			watcher[name](...)
+		end
+	end
+end
 
 --- A set's name as a line shows it; the base set has none of its own.
 local function setName(set)
@@ -212,43 +228,107 @@ local function finish(result, started, anchor)
 	end
 	if result.joined > 0 and not result.deleted then
 		Client.Send()(Commands.SelectGroup(result.leader), nil, true)
-		anchored = anchor and { leader = tostring(result.leader), guid = tostring(anchor.guid) }
+		anchored = anchor
+				and { leader = tostring(result.leader), guid = tostring(anchor.guid), pose = anchor }
 			or nil
 	end
 end
 
-local function hooks(anchor)
+local function hooks(about)
 	local last, started = 0, Client.Now()
 	return {
 		progress = function(done, total)
-			if done < total and done - last >= 10 then
+			tell("progress", done, total)
+			if not about.quiet and done < total and done - last >= 10 then
 				last = done
 				say(("%d of %d"):format(done, total))
 			end
 		end,
 		finished = function(result)
-			finish(result, started, anchor)
+			finish(result, started, about.anchor)
+			tell("finished", result, Client.Now() - started)
 		end,
 	}
 end
 
 --- Send a run, having said what it is.
--- @param what the set as a line names it
--- @param where "on <building>" or "at your feet"
--- @param lead how the group is led, as groupOf says it
--- @param anchor the selected object the run is anchored on, or nil
-local function start(rows, pose, group, what, where, lead, anchor)
+-- @param target the pose the rows are placed at
+-- @param about { what, the set as a line names it; where, "on <building>" or "at your feet";
+--   lead, how the group is led as groupOf says it; anchor, the selected object the run is
+--   anchored on, or nil; quiet, true when a window shows the progress instead }
+local function start(rows, target, group, about)
 	local send, reason = Client.Send()
 	if not send then
 		return say(reason)
 	end
-	say(("spawning %s %s, %s"):format(what, where, lead))
-	local handle, refused =
-		Furnish.Spawn(rows, pose.position, pose.rotation, pose.scale, group, send, hooks(anchor))
+	say(("spawning %s %s, %s"):format(about.what, about.where, about.lead))
+	-- Told before the run, which may answer whole before Spawn returns.
+	tell("started", #rows, about.what)
+	local handle, refused = Furnish.Spawn(
+		rows,
+		target.position,
+		target.rotation,
+		target.scale,
+		group,
+		send,
+		hooks(about)
+	)
 	if not handle then
+		tell("finished", nil, 0)
 		return say("nothing was sent: " .. refused)
 	end
 	running, stopping = handle, false
+end
+
+--- What a window shows: the selected building and its sets, or nil and why there are none.
+-- While the group the last run selected stays selected, it is the building that run was on.
+-- @return { name, file, blank, sets }, each set { index, name, count }; blank is true for a
+--   building Epsilon emptied, which always gets its base set
+function Console.Target()
+	local pose, reason = Pose.Selected()
+	if not pose and anchored and Client.SelectedGroup() == anchored.leader then
+		pose = anchored.pose
+	end
+	if not pose then
+		return nil, reason
+	end
+	if not pose.wmo then
+		return nil, pose.name .. " is not a building, so it has no sets"
+	end
+	local loaded, why = Reader.Load()
+	if not loaded then
+		return nil, why
+	end
+	local sets = Sets.OfFile(pose.file)
+	if not sets then
+		return nil, pose.name .. " has no doodad sets in Furnish's data"
+	end
+	local shown = {}
+	for i, set in ipairs(sets) do
+		shown[i] = { index = set.index, name = setName(set), count = set.count }
+	end
+	return { name = pose.name, file = pose.file, blank = Sets.IsBlank(pose.file), sets = shown }
+end
+
+--- Why nothing new can start, or nil.
+function Console.Busy()
+	return busy()
+end
+
+--- Hear every run besides the chat.
+-- @param watcher { started(total, what), progress(done, total), finished(result, seconds) },
+--   each optional; finished has no result for a run refused before anything was sent
+-- @return a function that stops hearing
+function Console.Watch(watcher)
+	watchers[#watchers + 1] = watcher
+	return function()
+		for i, known in ipairs(watchers) do
+			if known == watcher then
+				table.remove(watchers, i)
+				return
+			end
+		end
+	end
 end
 
 --- Print a root's sets, each a link that spawns it; pose is the selected building's, or nil
@@ -387,15 +467,13 @@ local function spawnOn(request, pose)
 		what = label .. "'s " .. what
 	end
 	local group, lead = groupOf(request, pose)
-	start(
-		rows,
-		target,
-		group,
-		what,
-		request.here and "at your feet" or ("on " .. pose.name),
-		lead,
-		pose
-	)
+	start(rows, target, group, {
+		what = what,
+		where = request.here and "at your feet" or ("on " .. pose.name),
+		lead = lead,
+		anchor = pose,
+		quiet = request.quiet,
+	})
 end
 
 --- Spawn a set on the selected object, or at the player.
@@ -529,7 +607,12 @@ function Console.Import(request)
 			objects(#rows)
 		)
 		local group, lead = groupOf({ group = request.group or "attach" }, pose)
-		start(rows, pose, group, what, "on " .. pose.name, lead, pose)
+		start(
+			rows,
+			pose,
+			group,
+			{ what = what, where = "on " .. pose.name, lead = lead, anchor = pose }
+		)
 	end
 
 	-- The import selects the object but pushes no record of it, and the record carries the

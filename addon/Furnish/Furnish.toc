@@ -20,4 +20,6 @@ Sets.lua
 Rows.lua
 Chat.lua
 Console.lua
+Window.xml
+Window.lua
 Command.lua

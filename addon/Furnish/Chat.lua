@@ -20,8 +20,11 @@ Chat.GOLD, Chat.WHITE, Chat.BLUE, Chat.GREY, Chat.PREFIX =
 Chat.END = "|r"
 
 --- What a player types for an action, as a message spells it: the command's first name, as
--- Command.lua registers it, and the words.
+-- Command.lua registers it, and the words, if any.
 function Chat.Typed(words)
+	if words == "" then
+		return _G.SLASH_FURNISH1
+	end
 	return _G.SLASH_FURNISH1 .. " " .. words
 end
 

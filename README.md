@@ -16,6 +16,7 @@ reads the first.
 
 | command                    | does                                                              |
 |----------------------------|-------------------------------------------------------------------|
+| `/furn`                    | open the window: the selected building's sets, grouping, progress |
 | `/furn list`               | the selected building's sets                                      |
 | `/furn list <entry>`       | an object's sets, by the entry on its lookup line                 |
 | `/furn <set>`              | spawn a set on the selected building                              |
@@ -152,7 +153,9 @@ lead to the first doodad.
 | `Sets.lua`      | which: `OfFile`, `Pick`, `OfEntry`, `IsBlank`, `OfPlacement`                         |
 | `Rows.lua`      | what: `OfSet`, `Union`, `Without`                                                    |
 | `Chat.lua`      | the prefix, the colours, columns of exact width, and Furnish's links                 |
-| `Console.lua`   | what the commands do: `List`, `Spawn`, `Import`, `Stop`, `Describe`                  |
+| `Console.lua`   | what the commands and the window do: `List`, `Spawn`, `Import`, `Stop`, `Target`     |
+| `Window.xml`    | the window's layout, after ObjectMover's: a dark dialog of bordered panels           |
+| `Window.lua`    | the window: reads `Target`, `Busy` and `Watch`, spawns and stops through `Console`   |
 | `Command.lua`   | `/furnish` and `/furn`: reading what is typed, the help, a link's click              |
 
 ## Develop

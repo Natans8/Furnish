@@ -158,16 +158,78 @@ def test_the_help_names_every_command_and_word(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lines = run(lua, "help")
     assert lines[0] == "|cffffd100Furnish|r|cff9d9d9d spawns a building's doodad sets as objects|r"
-    assert lines[1] == "  |cffffd100/furn help|r this help"
-    assert lines[2] == "  |cffffd100/furn list|r the selected building's sets"
+    assert lines[1] == "  |cffffd100/furn|r open the window"
+    assert lines[2] == "  |cffffd100/furn help|r this help"
+    assert lines[3] == "  |cffffd100/furn list|r the selected building's sets"
     assert "  |cffffd100attach|r join the selected object's group" in lines
     assert lines[-2].endswith("click it to spawn it, ctrl-click to spawn it at your feet.|r")
-    assert len(lines) == 1 + 10 + 1 + 4 + 2
+    assert len(lines) == 1 + 11 + 1 + 4 + 2
 
 
-def test_the_command_alone_is_the_windows(tmp_path: Path) -> None:
+def test_the_command_alone_opens_the_window(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
-    assert run(lua, "") == [PREFIX + "the window is not built yet; /furn help lists the commands"]
+    lua.execute("TOGGLED = 0; Furnish.Window = { Toggle = function() TOGGLED = TOGGLED + 1 end }")
+    assert run(lua, "") == []
+    assert lua.eval("TOGGLED") == 1
+
+
+# -- What a window reads -----------------------------------------------------------------
+
+
+def test_a_window_sees_the_selected_building_and_its_sets(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    assert lua.eval("select(2, Furnish.Console.Target())") == "no object is selected"
+    lua.execute("SELECTED = 502")
+    assert (
+        lua.eval("select(2, Furnish.Console.Target())")
+        == "chair.m2 is not a building, so it has no sets"
+    )
+    lua.execute("SELECTED = 500")
+    target = lua.eval("Furnish.Console.Target()")
+    assert (target.name, target.file, target.blank) == ("house", 900, False)
+    assert [(s.index, s.name, s.count) for s in target.sets.values()] == [
+        (0, "Base", 1),
+        (1, "Full", 2),
+    ]
+    # The group the run selects stands for the building it was on.
+    run(lua, "1")
+    assert lua.eval("Furnish.Console.Target()").name == "house"
+    lua.execute("GROUP_LEADER = 12345")
+    assert lua.eval("select(2, Furnish.Console.Target())") == "a group is selected, not one object"
+
+
+def test_a_window_hears_the_run_it_started_until_it_stops_hearing(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute(
+        """
+        HEARD = {}
+        local function hear(line) HEARD[#HEARD + 1] = line end
+        STOP = Furnish.Console.Watch({
+          started = function(total, what) hear("started " .. total .. " " .. what) end,
+          progress = function(done, total) hear(done .. "/" .. total) end,
+          finished = function(result) hear("finished " .. #result.spawned) end,
+        })
+        SELECTED = 500
+        """
+    )
+    run(lua, "1")
+    assert list(lua.eval("HEARD").values()) == [
+        "started 2 Full (set 1, 2 objects)",
+        "1/2",
+        "2/2",
+        "finished 3",
+    ]
+    lua.execute("STOP(); HEARD = {}; SELECTED = 500")
+    run(lua, "1")
+    assert list(lua.eval("HEARD").values()) == []
+
+
+def test_a_window_is_told_when_it_may_not_start(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path, deferred=True)
+    assert lua.eval("Furnish.Console.Busy()") is None
+    lua.execute("SELECTED = 500")
+    run(lua, "1")
+    assert lua.eval("Furnish.Console.Busy()") == "Furnish is still spawning; /furn stop ends it"
 
 
 # -- Listing -----------------------------------------------------------------------------
