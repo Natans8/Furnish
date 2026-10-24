@@ -44,8 +44,9 @@ A WMO's doodad line, from `.doodad select` or `.doodad near`, carries a `[Furnis
 that imports that WMO by its unique id and furnishes it as `/furn import` does.
 
 The window shows a WMO's sets: the one an object ID typed into it names, or else the selected
-WMO, kept when the selection moves off it. A click chooses a set or lets it go, any number of
-them, and a double-click spawns one alone. Under the list are the grouping and where the sets
+WMO, kept when the selection moves off it. The list selects as a file list does: a click
+selects one set, a ctrl-click adds or removes one, a shift-click selects a run of them, and the
+spawn button spawns what is selected. Under the list are the grouping and where the sets
 go, on the target gob, which is whatever object is selected, or on the player; the choices that
 act on the target gob grey out while nothing is selected. During a run a bar counts the objects
 and the clock, the spawn button stops it, and the bar says how it ended. Every choice's tooltip

@@ -91,8 +91,8 @@ local provider = _G.CreateDataProvider()
 
 --- The WMO the sets come from, kept when the selection moves off it; the entry it was typed
 -- as, if it was; the target gob's name, nil while nothing is selected; the sets chosen, by
--- index; and the option taken in each choice, by field.
-local source, entry, target, chosen = nil, nil, nil, {}
+-- index, and the one a shift-click runs from; and the option taken in each choice, by field.
+local source, entry, target, chosen, anchor = nil, nil, nil, {}, nil
 local taken = { group = "pivot", place = "target" }
 
 --- Every radio button, each knowing its choice and its option.
@@ -210,10 +210,10 @@ local function updateHint()
 	end
 	local indexes, count = chosenSets()
 	if #indexes == 0 then
-		return frame.Hint:SetText("Click sets to choose them")
+		return frame.Hint:SetText("Click a set; ctrl-click adds another")
 	end
 	frame.Hint:SetText(
-		("%d %s chosen, %s"):format(#indexes, #indexes == 1 and "set" or "sets", objects(count))
+		("%d %s selected, %s"):format(#indexes, #indexes == 1 and "set" or "sets", objects(count))
 	)
 end
 
@@ -264,10 +264,10 @@ end
 --- What is chosen when a WMO is first shown: its first set past the base, and the base too
 -- where Epsilon emptied the WMO, since it draws none of its own.
 local function chooseFirst(found)
-	chosen = {}
+	chosen, anchor = {}, nil
 	for _, set in ipairs(found.sets) do
 		if set.index ~= 0 then
-			chosen[set.index] = true
+			chosen[set.index], anchor = true, set.index
 			break
 		end
 	end
@@ -361,17 +361,34 @@ local function finished(result, seconds)
 	refresh()
 end
 
+--- Where a set stands in the list, or nil.
+local function positionOf(index)
+	for position, set in ipairs(source.sets) do
+		if set.index == index then
+			return position
+		end
+	end
+	return nil
+end
+
+--- Select as a file list does: a click selects the one set, a ctrl-click adds or removes one,
+-- and a shift-click selects the run from the last set clicked.
 local function rowClick(button)
 	_G.PlaySound(_G.SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 	local index = button:GetElementData().index
-	chosen[index] = not chosen[index] or nil
+	local from = anchor and positionOf(anchor)
+	if _G.IsShiftKeyDown() and from then
+		local to = positionOf(index)
+		chosen = {}
+		for position = math.min(from, to), math.max(from, to) do
+			chosen[source.sets[position].index] = true
+		end
+	elseif _G.IsControlKeyDown() then
+		chosen[index], anchor = not chosen[index] or nil, index
+	else
+		chosen, anchor = { [index] = true }, index
+	end
 	update()
-end
-
-local function rowDoubleClick(button)
-	chosen = { [button:GetElementData().index] = true }
-	update()
-	spawn()
 end
 
 local function rowEnter(button)
@@ -383,14 +400,14 @@ local function rowEnter(button)
 	if set.canonical ~= "" then
 		tooltip:AddLine(("Named %s in the WMO's file"):format(set.canonical), 0.62, 0.62, 0.62)
 	end
-	tooltip:AddLine("Click to choose it; double-click to spawn it alone", 0.62, 0.62, 0.62)
+	tooltip:AddLine("Click to select it, ctrl-click to add or remove it", 0.62, 0.62, 0.62)
+	tooltip:AddLine("Shift-click selects every set from the last one clicked", 0.62, 0.62, 0.62)
 	tooltip:Show()
 end
 
 local function initRow(button, set, new)
 	if new then
 		button:SetScript("OnClick", Client.Guarded(rowClick))
-		button:SetScript("OnDoubleClick", Client.Guarded(rowDoubleClick))
 		button:SetScript("OnEnter", Client.Guarded(rowEnter))
 		button:SetScript("OnLeave", _G.GameTooltip_Hide)
 	end
