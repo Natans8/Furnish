@@ -187,9 +187,9 @@ def test_a_window_sees_the_selected_building_and_its_sets(tmp_path: Path) -> Non
     lua.execute("SELECTED = 500")
     target = lua.eval("Furnish.Console.Target()")
     assert (target.name, target.file, target.blank) == ("house", 900, False)
-    assert [(s.index, s.name, s.count) for s in target.sets.values()] == [
-        (0, "Base", 1),
-        (1, "Full", 2),
+    assert [(s.index, s.name, s.count, s.canonical) for s in target.sets.values()] == [
+        (0, "Base", 1, ""),
+        (1, "Full", 2, "Set_Full"),
     ]
     # The group the run selects stands for the building it was on.
     run(lua, "1")

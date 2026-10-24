@@ -282,8 +282,9 @@ end
 
 --- What a window shows: the selected building and its sets, or nil and why there are none.
 -- While the group the last run selected stays selected, it is the building that run was on.
--- @return { name, file, blank, sets }, each set { index, name, count }; blank is true for a
---   building Epsilon emptied, which always gets its base set
+-- @return { name, file, blank, sets }, each set { index, name, count, canonical }, the name as
+--   a line shows it and canonical as the file spells it, empty for the base set; blank is true
+--   for a building Epsilon emptied, which always gets its base set
 function Console.Target()
 	local pose, reason = Pose.Selected()
 	if not pose and anchored and Client.SelectedGroup() == anchored.leader then
@@ -305,7 +306,8 @@ function Console.Target()
 	end
 	local shown = {}
 	for i, set in ipairs(sets) do
-		shown[i] = { index = set.index, name = setName(set), count = set.count }
+		shown[i] =
+			{ index = set.index, name = setName(set), count = set.count, canonical = set.name }
 	end
 	return { name = pose.name, file = pose.file, blank = Sets.IsBlank(pose.file), sets = shown }
 end

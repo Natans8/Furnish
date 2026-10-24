@@ -13,6 +13,7 @@ Furnish.Window = Window
 
 local Console = Furnish.Console
 local Client = Furnish.Client
+local Chat = Furnish.Chat
 
 --- The border every panel wears, ObjectMover's: a tooltip's edge over a faint shade.
 local PANEL = {
@@ -25,21 +26,26 @@ local PANEL = {
 	insets = { left = 5, right = 5, top = 5, bottom = 5 },
 }
 
---- The groupings a run may take, in the order the menu offers them.
+--- The groupings a run may take, a radio button each, in the order the window lays them out:
+-- the request's group value, what the button says, and what its tooltip says it does.
 local GROUPS = {
 	{
-		word = "pivot",
+		value = "pivot",
 		label = "Pivot",
 		hint = "An invisible marker at the building leads the group.",
 	},
-	{ word = "first", label = "First object", hint = "The first object spawned leads the group." },
+	{ value = "first", label = "First object", hint = "The first object spawned leads the group." },
 	{
-		word = "attach",
+		value = "attach",
 		label = "The building's group",
 		hint = "The objects join the building's own group.",
 	},
-	{ word = "nogroup", label = "No group", hint = "The objects stand loose." },
+	{ value = "nogroup", label = "No group", hint = "The objects stand loose." },
 }
+
+--- Where the radio buttons sit in their panel: two to a row from the first one's corner, the
+-- second column a gap past the widest label of the first, measured in the player's own font.
+local RADIO_LEFT, RADIO_TOP, RADIO_ROW, RADIO_GAP = 64, -30, 22, 16
 
 local frame = _G.FurnishFrame
 local building, sets = frame.BuildingPanel, frame.SetsPanel
@@ -47,6 +53,9 @@ local provider = _G.CreateDataProvider()
 
 --- What the window shows and what is chosen in it.
 local target, chosen, grouping, base = nil, nil, "pivot", false
+
+--- The grouping's radio buttons, in GROUPS' order.
+local radios = {}
 
 --- The run going on, as the window draws it: { total, done, started, what }.
 local run
@@ -76,13 +85,15 @@ local function objects(count)
 	return count == 1 and "1 object" or thousands(count) .. " objects"
 end
 
-local function labelOf(word)
-	for _, group in ipairs(GROUPS) do
-		if group.word == word then
-			return group.label
+--- How a command spells a choice, read off the command's own words: "/furn <set> first", or
+-- the bare spawn for the default, which takes no word.
+local function typed(field, value)
+	for _, each in ipairs(Furnish.Command.WORDS) do
+		if each.field == field and each.value == value then
+			return Chat.Typed("<set> " .. each.word)
 		end
 	end
-	return word
+	return Chat.Typed("<set>") .. ", with no word"
 end
 
 local function setAt(index)
@@ -110,6 +121,14 @@ local function updateBase()
 	check:SetChecked((target ~= nil and target.blank) or (usable and base))
 	check:SetEnabled(usable)
 	check.text:SetFontObject(usable and _G.GameFontHighlightSmall or _G.GameFontDisableSmall)
+end
+
+local function updateGroup()
+	for _, radio in ipairs(radios) do
+		radio:SetChecked(radio.group.value == grouping)
+		radio:SetEnabled(not run)
+		radio.text:SetFontObject(run and _G.GameFontDisableSmall or _G.GameFontHighlightSmall)
+	end
 end
 
 local function updateButton()
@@ -217,7 +236,7 @@ local function started(total, what)
 	frame.Progress:SetValue(0)
 	frame.Progress:Show()
 	progressText()
-	_G.UIDropDownMenu_DisableDropDown(frame.Options.GroupMenu)
+	updateGroup()
 	updateBase()
 	updateButton()
 end
@@ -235,7 +254,7 @@ end
 local function finished(result, seconds)
 	local was = run
 	run = nil
-	_G.UIDropDownMenu_EnableDropDown(frame.Options.GroupMenu)
+	updateGroup()
 	if not (result and was) then
 		frame.Progress:Hide()
 		frame.Hint:Show()
@@ -275,6 +294,9 @@ local function rowEnter(button)
 	tooltip:SetOwner(button, "ANCHOR_RIGHT")
 	tooltip:SetText(set.name, 1, 1, 1)
 	tooltip:AddLine(("Set %d of %s, %s"):format(set.index, target.name, objects(set.count)))
+	if set.canonical ~= "" then
+		tooltip:AddLine(("Named %s in the building's file"):format(set.canonical), 0.62, 0.62, 0.62)
+	end
 	tooltip:AddLine("Double-click to spawn it", 0.62, 0.62, 0.62)
 	tooltip:Show()
 end
@@ -292,21 +314,20 @@ local function initRow(button, set, new)
 	mark(button, set)
 end
 
-local function initMenu(menu)
-	for _, group in ipairs(GROUPS) do
-		local info = _G.UIDropDownMenu_CreateInfo()
-		info.text = group.label
-		info.value = group.word
-		info.checked = group.word == grouping
-		info.tooltipTitle = group.label
-		info.tooltipText = group.hint
-		info.tooltipOnButton = true
-		info.func = function()
-			grouping = group.word
-			_G.UIDropDownMenu_SetText(menu, group.label)
-		end
-		_G.UIDropDownMenu_AddButton(info)
-	end
+local function groupClick(radio)
+	_G.PlaySound(_G.SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+	grouping = radio.group.value
+	updateGroup()
+end
+
+local function groupEnter(radio)
+	local group = radio.group
+	local tooltip = _G.GameTooltip
+	tooltip:SetOwner(radio, "ANCHOR_RIGHT")
+	tooltip:SetText(group.label, 1, 1, 1)
+	tooltip:AddLine(group.hint, nil, nil, nil, true)
+	tooltip:AddLine("Typed: " .. typed("group", group.value), 0.62, 0.62, 0.62)
+	tooltip:Show()
 end
 
 local function baseEnter(check)
@@ -328,6 +349,7 @@ local function baseEnter(check)
 	else
 		tooltip:SetText("Spawn the building's base set under the chosen one.", 1, 1, 1, 1, true)
 	end
+	tooltip:AddLine("Typed: " .. typed("base", true), 0.62, 0.62, 0.62)
 	tooltip:Show()
 end
 
@@ -359,10 +381,33 @@ local function build()
 	empty:SetJustifyV("MIDDLE")
 	frame.Empty = empty
 
-	local menu = frame.Options.GroupMenu
-	_G.UIDropDownMenu_SetWidth(menu, 170)
-	_G.UIDropDownMenu_Initialize(menu, initMenu)
-	_G.UIDropDownMenu_SetText(menu, labelOf(grouping))
+	for i, group in ipairs(GROUPS) do
+		local radio = _G.CreateFrame(
+			"CheckButton",
+			"FurnishFrameGroup" .. i,
+			frame.Options,
+			"UIRadioButtonTemplate"
+		)
+		radio.group = group
+		radio.text:SetText(group.label)
+		radio:SetScript("OnClick", Client.Guarded(groupClick))
+		radio:SetScript("OnEnter", Client.Guarded(groupEnter))
+		radio:SetScript("OnLeave", _G.GameTooltip_Hide)
+		radios[i] = radio
+	end
+	updateGroup()
+	local widest = 0
+	for i = 1, #radios, 2 do
+		widest = math.max(widest, radios[i].text:GetStringWidth())
+	end
+	local second = RADIO_LEFT + radios[1]:GetWidth() + 5 + widest + RADIO_GAP
+	for i, radio in ipairs(radios) do
+		radio:SetPoint(
+			"TOPLEFT",
+			i % 2 == 1 and RADIO_LEFT or second,
+			RADIO_TOP - math.floor((i - 1) / 2) * RADIO_ROW
+		)
+	end
 
 	local check = frame.Options.Base
 	check.text:SetText("Lay the base set under it")

@@ -100,7 +100,7 @@
 			<Frame parentKey="SetsPanel" inherits="BackdropTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeKey="$parent.BuildingPanel" relativePoint="BOTTOMLEFT" y="-8"/>
-					<Anchor point="BOTTOMRIGHT" x="-14" y="142"/>
+					<Anchor point="BOTTOMRIGHT" x="-14" y="158"/>
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
@@ -128,7 +128,7 @@
 			</Frame>
 
 			<Frame parentKey="Options" inherits="BackdropTemplate">
-				<Size y="92"/>
+				<Size y="108"/>
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeKey="$parent.SetsPanel" relativePoint="BOTTOMLEFT" y="-8"/>
 					<Anchor point="TOPRIGHT" relativeKey="$parent.SetsPanel" relativePoint="BOTTOMRIGHT" y="-8"/>
@@ -143,21 +143,18 @@
 						<FontString parentKey="GroupLabel" inherits="GameFontHighlightSmall" justifyH="LEFT">
 							<Size x="44"/>
 							<Anchors>
-								<Anchor point="TOPLEFT" x="14" y="-36"/>
+								<Anchor point="TOPLEFT" x="14" y="-33"/>
 							</Anchors>
 						</FontString>
 					</Layer>
 				</Layers>
 				<Frames>
-					<Frame name="FurnishFrameGroupMenu" parentKey="GroupMenu" inherits="UIDropDownMenuTemplate">
-						<Anchors>
-							<Anchor point="LEFT" relativeKey="$parent.GroupLabel" relativePoint="RIGHT" x="-12" y="-2"/>
-						</Anchors>
-					</Frame>
+					<!-- The grouping's radio buttons are made in Window.lua, one per grouping it offers,
+					     in two rows from x 64, y -30. -->
 					<CheckButton name="FurnishFrameBase" parentKey="Base" inherits="UICheckButtonTemplate">
 						<Size x="26" y="26"/>
 						<Anchors>
-							<Anchor point="TOPLEFT" x="9" y="-58"/>
+							<Anchor point="TOPLEFT" x="9" y="-74"/>
 						</Anchors>
 					</CheckButton>
 				</Frames>
