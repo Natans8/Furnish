@@ -48,20 +48,21 @@ that imports that WMO by its unique id and furnishes it as `/furn import` does, 
 selection line, from `.gob select`, one that lists its sets.
 
 The window reads top to bottom as where the sets come from, which to spawn, and where they go.
-Source is the selected WMO, a doodad `.doodad select` picked, or a WMO searched by name or
-entry; a name lists the WMOs with sets that the client's own catalogue names like it, the first
+Source is the selected WMO or a WMO searched by name or entry; a name lists the WMOs with sets that the client's own catalogue names like it, the first
 lit so Enter takes it and Up and Down moving the light, and those that come unfurnished
-marked. A set the source draws already, as part of its model, is marked baked: a gob's base
-set, or a doodad's base set and the sets its map chose. A click chooses one set and a
+marked. A set the selected WMO draws already, as part of its model, is marked baked: its
+base set, unless it comes unfurnished. A click chooses one set and a
 ctrl-click adds or removes one, a strip at either end of the list counts the chosen sets
 scrolled out of view, and resting on a set names the models it holds, as the client's own
 catalogue names them once a walk of it, started when the window opens, has ended. Target is the selected
 gob, or where you stand while nothing is selected, so every number always holds a value: X, Y
 and Z, then the roll, pitch and turn about each in ObjectMover's colours, then the scale. Here
 and Use selected gob fill it once; typing a number keeps what was typed; Tab moves through the
-boxes. Either block's Follow selection, unticked, keeps what it shows whatever you select. A
-picked doodad adds Import doodad, which turns it into a gob that is selected and followed like
-any other, with the sets the doodad drew chosen. Group on spawn makes the objects one group,
+boxes. Either block's Follow selection, unticked, keeps what it shows whatever you select. The
+doodad `.doodad select` picks is a selection of its own, held beside the gob's: it never changes
+Source or Target, and it adds Import doodad, whose tooltip names the sets the doodad draws
+already. Importing turns it into a gob that is selected and followed like any other, with the
+doodad's sets chosen; the doodad is hidden, not gone, and stays selected. Group on spawn makes the objects one group,
 led by a pivot the button counts; Include the target makes the target lead it instead, and
 where the target is in a group already a mark warns and Spawn asks first. The status row
 holds Highlighting, which toggles the client's outline on selected objects, beside a run's
