@@ -19,9 +19,4 @@ Furnish.Settings = {
 	-- bounds how far ahead of the replies a run gets, so a stop lands within a few lines,
 	-- since a line already queued cannot be taken back.
 	inFlight = 4,
-
-	--- How many objects a run spawns from which Furnish reminds the player that highlighting can
-	-- crash the client. A run ends by selecting its group, and ObjectMover warns that highlighting
-	-- a selection this large can crash the client; turning it off is the player's call.
-	highlightLimit = 100,
 }

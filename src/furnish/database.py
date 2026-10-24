@@ -134,11 +134,11 @@ class Database:
         """
         self._connected().executemany("INSERT INTO root_displays VALUES (?, ?)", rows)
 
-    def add_models(self, rows: Iterable[tuple[int, str]]) -> None:
-        """Insert ``(display, name)`` rows, the model each spawned display draws.
+    def add_models(self, rows: Iterable[tuple[int, int]]) -> None:
+        """Insert ``(display, file)`` rows, the model file each spawned display draws.
 
         Args:
-            rows: One per display, its model file's name without folder or extension.
+            rows: One per display a placement spawns.
         """
         self._connected().executemany("INSERT INTO models VALUES (?, ?)", rows)
 

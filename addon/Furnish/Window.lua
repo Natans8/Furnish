@@ -314,13 +314,11 @@ local function updateMore()
 end
 
 --- What a set holds, by model, the most numerous first: a list of { name, count }, and how many
--- of its objects no listfile names.
+-- of its objects the client's catalogue does not name.
 local function holds(set)
 	local counts, unnamed = {}, 0
 	for _, row in ipairs(Rows.OfSet(set.id) or {}) do
-		-- The listfile cases names as whoever named the file did; lower case reads as one list.
-		local name = Reader.ModelName(row.display)
-		name = name and name:lower()
+		local name = Console.ModelName(row.display)
 		if name then
 			counts[name] = (counts[name] or 0) + 1
 		else
@@ -351,21 +349,23 @@ local function sameSets(a, b)
 	return true
 end
 
---- What to know before the next spawn, the weightiest first.
+--- What to know before the next spawn, the weightiest first, each { text, colour }.
 local function warnings()
 	local said = {}
 	if run or not shown or not spot then
 		return said
 	end
 	if spot.wmo and spot.file ~= shown.file and not sameSets(spot.file, shown.file) then
-		said[#said + 1] = ("These sets are %s's, not %s's, so they may not fit."):format(
+		local text = ("These sets are %s's, not %s's, so they may not fit."):format(
 			shown.name,
 			spot.name
 		)
+		said[#said + 1] = { text = text, colour = WARN }
 	end
-	local _, count = chosenSets()
-	if count >= Furnish.Settings.highlightLimit then
-		said[#said + 1] = ("Highlighting %s can crash the game."):format(objects(count))
+	-- A reminder, not a warning: whether highlighting is on is the player's call.
+	if #(chosenSets()) > 0 then
+		said[#said + 1] =
+			{ text = "Highlighting too many objects can crash the game.", colour = GREY }
 	end
 	return said
 end
@@ -376,7 +376,11 @@ local function updateStatus()
 	local said = warnings()
 	frame.Notice.said = said
 	frame.Notice:SetShown(#said > 0)
-	frame.Notice.Text:SetText(said[1] or "")
+	local first = said[1]
+	frame.Notice.Text:SetText(first and first.text or "")
+	if first then
+		frame.Notice.Text:SetTextColor(first.colour[1], first.colour[2], first.colour[3])
+	end
 	frame.Progress:SetShown(run ~= nil or (#said == 0 and frame.Progress.ended == true))
 end
 
@@ -443,11 +447,10 @@ local function update()
 	local text, enabled = action()
 	frame.SpawnButton:SetText(text)
 	frame.SpawnButton:SetEnabled(enabled)
-	local last = not run and Console.Last()
-	frame.DeleteButton:SetShown(run ~= nil or last ~= nil)
-	frame.DeleteButton:SetText(run and "Stop and delete" or "Delete last spawn")
-	frame.DeleteButton.last = last
-	frame.SpawnButton:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", (run or last) and -142 or -18, 38)
+	-- A run's objects can be taken back only while it goes; once it ends, its group is the
+	-- player's, and nothing here knows what has been done to it since.
+	frame.DeleteButton:SetShown(run ~= nil)
+	frame.SpawnButton:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", run and -142 or -18, 38)
 end
 
 --- The spawn the window describes, as Console takes it.
@@ -647,9 +650,7 @@ local function finished(result, seconds)
 	local placed = #result.spawned - (result.pivot and 1 or 0)
 	local pivot = result.pivot and " and a pivot" or ""
 	local line
-	if result.undone then
-		line = ("Deleted %s"):format(objects(result.deleted))
-	elseif result.deleted then
+	if result.deleted then
 		line = ("Stopped, %s deleted"):format(objects(result.deleted))
 	elseif result.aborted then
 		line = ("Stopped: %s of %s%s"):format(thousands(placed), objects(result.total), pivot)
@@ -700,20 +701,31 @@ local function rowEnter(button)
 		lines[#lines + 1] =
 			{ text = "The doodad this gob was imported from drew this set.", colour = GREEN }
 	end
-	local held, unnamed = holds(set)
-	if #held > 0 then
-		lines[#lines + 1] = { text = "Holds", colour = GOLD }
-		for i = 1, math.min(NAMED, #held) do
-			lines[#lines + 1] = { label = held[i].name, value = held[i].count }
+	if Console.ModelsNamed() then
+		local held, unnamed = holds(set)
+		if #held > 0 then
+			lines[#lines + 1] = { text = "Holds", colour = GOLD }
+			for i = 1, math.min(NAMED, #held) do
+				lines[#lines + 1] = { label = held[i].name, value = held[i].count }
+			end
+			if #held > NAMED then
+				lines[#lines + 1] =
+					{ text = ("and %d more models"):format(#held - NAMED), colour = GREY }
+			end
 		end
-		if #held > NAMED then
-			lines[#lines + 1] =
-				{ text = ("and %d more models"):format(#held - NAMED), colour = GREY }
+		if unnamed > 0 then
+			local text = ("and %s the client does not name"):format(objects(unnamed))
+			lines[#lines + 1] = { text = text, colour = GREY }
 		end
-	end
-	if unnamed > 0 then
-		lines[#lines + 1] =
-			{ text = ("and %s no listfile names"):format(objects(unnamed)), colour = GREY }
+	else
+		-- The names come from one walk of the client's catalogue; the tooltip redraws when it ends,
+		-- if the row is still the one under the cursor.
+		lines[#lines + 1] = { text = "Naming the models...", colour = GREY }
+		Console.NameModels(function()
+			if _G.GameTooltip:IsOwned(button) and button:GetElementData() == set then
+				rowEnter(button)
+			end
+		end)
 	end
 	lines[#lines + 1] = { text = "Click: choose this set alone", colour = GREEN }
 	lines[#lines + 1] = { text = "Ctrl-click: add or remove this set", colour = GREEN }
@@ -1007,7 +1019,7 @@ local function buildSource()
 	frame.SourceFollow.Label:SetText("Follow selection")
 	frame.SourceFollow:SetScript("OnClick", Client.Guarded(followSource))
 	hint(frame.SourceFollow, "Follow selection", {
-		{ text = "Ticked, the sets are those of the WMO or doodad you select." },
+		{ text = "Ticked, the sets are those of the selected WMO or doodad." },
 		{ text = "Unticked, they stay this WMO's whatever you select." },
 	})
 	listOf(list, provider, "FurnishSetRowTemplate", initRow)
@@ -1038,8 +1050,10 @@ local function buildTarget()
 	frame.TargetFollow.Label:SetText("Follow selection")
 	frame.TargetFollow:SetScript("OnClick", Client.Guarded(followTarget))
 	hint(frame.TargetFollow, "Follow selection", {
-		{ text = "Ticked, the target is the gob you select, or where you stand while nothing is." },
-		{ text = "Unticked, it stays as it is whatever you select." },
+		{
+			text = "Ticked, the target is the selected gob, or where you stand while no gob is selected.",
+		},
+		{ text = "Unticked, the target stays as it is whatever you select." },
 	})
 	for order, number in ipairs(NUMBERS) do
 		local box = frame[number.box]
@@ -1062,7 +1076,7 @@ local function buildTarget()
 		)
 	end
 	frame.Here:SetText("Here")
-	frame.UseSelected:SetText("Use selected")
+	frame.UseSelected:SetText("Use selected gob")
 	frame.Import:SetText("Import doodad")
 	frame.Here:SetScript(
 		"OnClick",
@@ -1087,7 +1101,7 @@ local function buildTarget()
 	)
 	hint(
 		frame.UseSelected,
-		"Use selected",
+		"Use selected gob",
 		{ { text = "Fill the target with the selected gob's position, once." } }
 	)
 	hint(frame.Import, "Import doodad", function()
@@ -1148,51 +1162,29 @@ local function buildFooter()
 	hint(frame.Highlight, "Highlighting", {
 		{ text = "The client's outline on selected objects, on or off." },
 		{
-			text = "Turn it off before a big spawn: highlighting this many objects at once can crash the game.",
+			text = "Highlighting too many objects can crash the game, so you may want it off before a big spawn.",
 		},
 	})
-	frame.Notice.Text:SetTextColor(WARN[1], WARN[2], WARN[3])
 	frame.Notice:SetScript(
 		"OnEnter",
 		Client.Guarded(function(button)
-			local lines = {}
-			for i, line in ipairs(button.said or {}) do
-				lines[i] = { text = line, colour = WARN }
-			end
-			tip(button, "Before you spawn", lines)
+			tip(button, "Before you spawn", button.said or {})
 		end)
 	)
 	frame.Notice:SetScript("OnLeave", _G.GameTooltip_Hide)
 	frame.SpawnButton:SetScript("OnClick", Client.Guarded(spawn))
+	frame.DeleteButton:SetText("Stop and delete")
 	frame.DeleteButton:SetScript(
 		"OnClick",
 		Client.Guarded(function()
-			if run then
-				return Console.Stop(true)
-			end
-			Console.DeleteLast()
+			Console.Stop(true)
 		end)
 	)
-	frame.DeleteButton:SetScript(
-		"OnEnter",
-		Client.Guarded(function(button)
-			if run then
-				return tip(
-					button,
-					"Stop and delete",
-					{ { text = "Stop, then delete everything this run spawned." } }
-				)
-			end
-			tip(button, "Delete last spawn", {
-				{
-					text = ("Delete the %s the last run spawned."):format(
-						objects(button.last or 0)
-					),
-				},
-			})
-		end)
+	hint(
+		frame.DeleteButton,
+		"Stop and delete",
+		{ { text = "Stop, then delete everything this run spawned." } }
 	)
-	frame.DeleteButton:SetScript("OnLeave", _G.GameTooltip_Hide)
 
 	-- The clock on the bar moves between replies too.
 	local since = 0
@@ -1265,6 +1257,8 @@ local function build()
 			-- Fitted here, once every label is set and the client's fonts are certainly loaded.
 			fitButtons()
 			layoutNumbers()
+			-- Started now, so the models are usually named by the time a set is rested on.
+			Console.NameModels(function() end)
 			listen()
 			refresh()
 		end)

@@ -59,6 +59,8 @@ def write_database(path: Path, layered: bool = False) -> None:
         db.add_root_displays([(30262, HOUSE)])
         db.add_entries([(817579, HOUSE)])
         db.add_map_sets([(1116, 4242, full)])
+        # The model file each display draws, as the build writes it.
+        db.add_models([(20, 1001), (21, 1002), (22, 1003)])
         if layered:
             lights = db.add_set("Set_Lights", [(22, GLOW)])
             db.add_wmo_sets([(HOUSE, 2, lights)])
@@ -151,8 +153,14 @@ def spawn(lua: lua51.LuaRuntime, rows_expr: str, group: str = "Furnish.Group.Piv
     return lua.eval("RESULT")
 
 
-def printed(lua: lua51.LuaRuntime) -> list[str]:
-    return list(lua.eval("PRINTED").values())
+HIGHLIGHT_REMINDER = "highlighting too many objects can crash the game"
+"""The words of the reminder a session's first run prints, which only its own test reads."""
+
+
+def printed(lua: lua51.LuaRuntime, reminders: bool = False) -> list[str]:
+    """The lines printed so far, the highlighting reminder left out unless asked for."""
+    lines = list(lua.eval("PRINTED").values())
+    return lines if reminders else [line for line in lines if HIGHLIGHT_REMINDER not in line]
 
 
 # -- Transform --------------------------------------------------------------------------
@@ -837,35 +845,34 @@ C_Epsilon.GODI_RetrieveSearch = function(i) return FOUND[i + 1] end
 """
 
 
-def test_a_display_in_an_ordered_catalogue_is_found_by_halves(tmp_path: Path) -> None:
+def test_one_walk_names_the_wanted_files_and_a_second_ask_walks_nothing(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     fake_client(lua)
     lua.execute(
-        "ROWS = {}; for i = 1, 1000 do"
-        " ROWS[i] = { displayid = i * 2, fileid = i, name = 'model' .. i .. '.m2' } end"
-    )
-    lua.execute(CATALOGUE)
-    assert lua.eval("Furnish.Client.DisplayModel(1000)") == "model500.m2"
-    assert lua.eval("CATALOGUE_READS") <= 11
-    assert lua.eval("Furnish.Client.DisplayModel(1001)") is None
-
-
-def test_a_walk_names_what_an_unordered_catalogue_hides_and_rules_out_the_rest(
-    tmp_path: Path,
-) -> None:
-    lua = lua_core(tmp_path)
-    fake_client(lua)
-    lua.execute(
-        "ROWS = { { displayid = 20, fileid = 2, name = 'b.m2' },"
-        " { displayid = 30, fileid = 3, name = 'c.m2' },"
+        "ROWS = { { displayid = 20, fileid = 2, name = 'world/b.m2' },"
+        " { displayid = 30, fileid = 3, name = '[tag] C.m2\\r' },"
         " { displayid = 10, fileid = 1, name = 'a.m2' } }"
     )
     lua.execute(CATALOGUE)
-    assert lua.eval("Furnish.Client.DisplayModel(10)") is None
-    lua.execute("DONE = 0; Furnish.Client.WalkDisplays({ 10, 99 }, function() DONE = DONE + 1 end)")
+    assert lua.eval("Furnish.Client.FilesNamed()") is False
+    lua.execute("DONE = 0; COUNT = function() DONE = DONE + 1 end")
+    lua.execute("Furnish.Client.NameFiles({ [3] = true, [9] = true }, COUNT)")
     assert lua.eval("DONE") == 1
-    assert lua.eval("Furnish.Client.DisplayModel(10)") == "a.m2"
-    assert lua.eval("Furnish.Client.DisplayModel(99)") is None
-    # Nothing is left to look for, so a second ask walks nothing.
-    lua.execute("CATALOGUE_READS = 0; Furnish.Client.WalkDisplays({ 10, 99 }, function() end)")
-    assert lua.eval("CATALOGUE_READS") == 0
+    assert lua.eval("Furnish.Client.FilesNamed()") is True
+    # Named as a player reads it, kept only where wanted, and nil where the catalogue lacks it.
+    assert lua.eval("Furnish.Client.FileName(3)") == "c"
+    assert lua.eval("Furnish.Client.FileName(2)") is None
+    assert lua.eval("Furnish.Client.FileName(9)") is None
+    lua.execute("CATALOGUE_READS = 0; Furnish.Client.NameFiles({ [2] = true }, COUNT)")
+    assert (lua.eval("CATALOGUE_READS"), lua.eval("DONE")) == (0, 2)
+
+
+def test_a_set_names_its_models_by_the_files_the_data_carries(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    fake_client(lua)
+    lua.execute("ROWS = { { displayid = 99999, fileid = 1001, name = 'world/chair.m2' } }")
+    lua.execute(CATALOGUE)
+    assert lua.eval("Furnish.Console.ModelName(20)") is None
+    lua.execute("Furnish.Console.NameModels(function() end)")
+    assert lua.eval("Furnish.Console.ModelName(20)") == "chair"
+    assert lua.eval("Furnish.Console.ModelName(21)") is None

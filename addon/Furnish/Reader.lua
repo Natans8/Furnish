@@ -1,6 +1,6 @@
 -- The reader over Furnish_Data: the sets a root file offers, the root a gameobject entry
--- spawns, the placements of a set, the sets a map placement draws, and the model a display
--- draws. A set's placements are decoded the first time they are
+-- spawns, the placements of a set, the sets a map placement draws, and the model file a
+-- display draws. A set's placements are decoded the first time they are
 -- asked for and kept; nothing is decoded at load.
 --
 -- This file ships with the code, never with the data. Furnish_Data is the folder players
@@ -14,7 +14,7 @@
 -- flag 1, and the scale as a float32 under flag 2. Nothing is rounded: the numbers are the
 -- WMO file's own. The Python side of this is furnish/codec.py.
 
-local FORMAT = 6
+local FORMAT = 7
 local decoded = {}
 
 _G.Furnish = _G.Furnish or {}
@@ -185,9 +185,14 @@ function Reader.MapSets(map, uid)
 	return byMap and byMap[uid]
 end
 
---- The name of the model a display draws, its file's name with no folder or extension, or nil
--- where no listfile names it. Load first.
+--- The model file a display draws, the id a model frame renders and the client's catalogue names,
+-- or nil for a display no placement spawns. Load first.
 -- @param display a display id, as a placement carries it
-function Reader.ModelName(display)
+function Reader.ModelFile(display)
 	return data().models[display]
+end
+
+--- Every display a placement spawns and the model file it draws, as one table. Load first.
+function Reader.ModelFiles()
+	return data().models
 end

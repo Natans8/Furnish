@@ -42,9 +42,8 @@ local say = Chat.Say
 
 --- The run going on, if any, and whether it was asked to stop. A wait for an object's record:
 -- { what it waits for, what a stop leaves standing or nil, stop }. The group the last run
--- selected and the object that run was anchored on: { leader, guid, pose }. The GUIDs the last
--- run left standing, until they are deleted or another run starts.
-local running, stopping, waiting, anchored, last
+-- selected and the object that run was anchored on: { leader, guid, pose }.
+local running, stopping, waiting, anchored
 
 --- Who hears a run besides the chat, as a window registers: { started(total, what),
 -- progress(done, total), finished(result, seconds) }, each optional.
@@ -198,7 +197,7 @@ local function groupOf(request, pose)
 		return Group.None, "ungrouped"
 	end
 	if not pose.guid then
-		return nil, "the target is a position, not a gob, so it cannot be in the group"
+		return nil, "a spawn at your feet has no selected gob to include in the group"
 	end
 	if pose.groupLeader ~= 0 then
 		return pose.groupLeader, "joining the group " .. pose.name .. " is in"
@@ -211,8 +210,7 @@ local function modelOf(display)
 	if display == Furnish.Settings.marker then
 		return "the pivot"
 	end
-	local name = Reader.ModelName(display)
-	return name and name:lower() or "a model no listfile names"
+	return Console.ModelName(display) or "a model the client's catalogue does not name"
 end
 
 --- Report a finished run, how long it took, and select its group so the next group
@@ -253,7 +251,6 @@ local function finish(result, started, anchor)
 			)
 		)
 	end
-	last = not result.deleted and #result.spawned > 0 and result.spawned or nil
 	if result.joined > 0 and not result.deleted then
 		Client.Send()(Commands.SelectGroup(result.leader), nil, true)
 		anchored = anchor
@@ -279,6 +276,9 @@ local function hooks(about)
 	}
 end
 
+--- Whether this session has reminded the player that highlighting can crash the game.
+local reminded = false
+
 --- Send a run, having said what it is.
 -- @param target the pose the rows are placed at
 -- @param about { what, the set as a line names it; where, "on <WMO>" or "at your feet";
@@ -290,14 +290,14 @@ local function start(rows, target, group, about)
 		return say(reason)
 	end
 	say(("spawning %s %s, %s"):format(about.what, about.where, about.lead))
-	-- The run ends by selecting its group, and highlighting a selection this large can crash the
-	-- client. Whether it is on is the player's to decide, so this only reminds them.
-	if #rows >= Furnish.Settings.highlightLimit then
-		say(
-			"highlighting this many objects at once can crash the game; .toggle highlight off turns it off"
-		)
+	-- A run ends by selecting its group, and highlighting too many objects can crash the client.
+	-- Whether it is on is the player's to decide, so the first run of a session only reminds them.
+	if not reminded then
+		reminded = true
+		say("highlighting too many objects can crash the game; .toggle highlight off turns it off")
 	end
-	last = nil
+	-- Started now, so a refusal at the end of the run can name its model.
+	Console.NameModels(function() end)
 	-- Told before the run, which may answer whole before Spawn returns.
 	tell("started", #rows, about.what)
 	local handle, refused = Furnish.Spawn(
@@ -391,6 +391,36 @@ function Console.Source(of)
 	return described(pose.file, pose.name, drawn)
 end
 
+--- Every model file the data's sets place, as a set, gathered once.
+local placedFiles
+
+--- Learn the name of every model the data places, by one walk of the client's own catalogue a
+-- session, then call done; at once where the walk has ended.
+function Console.NameModels(done)
+	if not Reader.Load() then
+		return done()
+	end
+	if not placedFiles then
+		placedFiles = {}
+		for _, file in pairs(Reader.ModelFiles()) do
+			placedFiles[file] = true
+		end
+	end
+	Client.NameFiles(placedFiles, done)
+end
+
+--- Whether the walk Console.NameModels starts has ended, so a model it did not name has none.
+function Console.ModelsNamed()
+	return Client.FilesNamed()
+end
+
+--- The name of the model a display draws, as the client's catalogue spells it; nil until
+-- Console.NameModels has ended, or where the catalogue does not carry the file.
+function Console.ModelName(display)
+	local file = Reader.Load() and Reader.ModelFile(display)
+	return file and Client.FileName(file) or nil
+end
+
 --- The WMOs Furnish has sets for whose names hold some words, as the client's own catalogue of
 -- gameobject displays names them; each WMO once, however many displays draw it.
 -- @return a list of { file, name, sets, blank }, sets being how many it has, ordered by name
@@ -415,55 +445,6 @@ function Console.Find(words)
 		return a.name < b.name
 	end)
 	return found
-end
-
---- How many objects the last run left standing, or nil when it left none, was deleted, or
--- another run has started since.
-function Console.Last()
-	return last and #last or nil
-end
-
---- Delete what the last run left standing.
-function Console.DeleteLast()
-	local blocked = busy()
-	if blocked then
-		return say(blocked)
-	end
-	if not last then
-		return say("nothing to delete; the last run left nothing standing")
-	end
-	local send, reason = Client.Send()
-	if not send then
-		return say(reason)
-	end
-	local guids, commands, started = last, {}, Client.Now()
-	last = nil
-	for i, guid in ipairs(guids) do
-		commands[i] = { text = Commands.Delete(guid) }
-	end
-	say(("deleting the %s the last run spawned"):format(objects(#guids)))
-	tell("started", #guids, "deleting")
-	local handle, refused = Furnish.Run.Start(commands, send, {
-		progress = function(done, total)
-			tell("progress", done, total)
-		end,
-		finished = function(outcome)
-			local deleted = 0
-			for _, result in pairs(outcome.results) do
-				deleted = deleted + (result.success and 1 or 0)
-			end
-			say(("deleted %d of %d"):format(deleted, #guids))
-			local result = { total = #guids, spawned = {}, refused = {}, unjoined = {} }
-			result.deleted, result.undone = deleted, true
-			tell("finished", result, Client.Now() - started)
-		end,
-	}, Furnish.Settings.inFlight)
-	if not handle then
-		last = guids
-		tell("finished", nil, 0)
-		return say("nothing was sent: " .. refused)
-	end
-	running, stopping = handle, false
 end
 
 --- What a window's sets may spawn on and whose group they may join: the selected object's
@@ -515,22 +496,14 @@ local function list(request, pose)
 		return say(reason)
 	end
 	local carried = table.concat({ request.group or "pivot", request.base and "base" or "" }, ":")
-	local indexes, links = {}, {}
+	-- A menu of buttons, one a set; its index and its objects are in its tooltip.
+	local buttons = {}
 	for i, set in ipairs(sets) do
-		indexes[i] = Chat.GOLD .. set.index .. Chat.END
-		links[i] = Chat.Link(table.concat({ file, set.index, carried, label }, ":"), setName(set))
+		buttons[i] = Chat.Link(table.concat({ file, set.index, carried, label }, ":"), setName(set))
 	end
-	local widestIndex, widestLink = Chat.Widest(indexes), Chat.Widest(links)
 	say(("%s has %d sets:"):format(label, #sets))
-	for i, set in ipairs(sets) do
-		Chat.Line(
-			"  "
-				.. Chat.RightCell(indexes[i], widestIndex)
-				.. Chat.Cell(links[i], widestLink)
-				.. Chat.GREY
-				.. objects(set.count)
-				.. Chat.END
-		)
+	for _, line in ipairs(Chat.Menu(buttons)) do
+		Chat.Line(line)
 	end
 end
 
@@ -578,8 +551,8 @@ function Console.Describe(request, tooltip)
 	if #said > 0 then
 		tooltip:AddLine("with " .. table.concat(said, " and "), 0.62, 0.62, 0.62)
 	end
-	tooltip:AddLine("Click: spawn it on the selected object", 1, 1, 1)
-	tooltip:AddLine("Ctrl-click: spawn it at your feet", 1, 1, 1)
+	tooltip:AddLine("Click: spawn the set onto the selected gob", 1, 1, 1)
+	tooltip:AddLine("Ctrl-click: spawn the set at your feet", 1, 1, 1)
 end
 
 --- Fill a tooltip for the button on a WMO's doodad line.

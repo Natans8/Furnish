@@ -29,7 +29,7 @@ def write_database(path: Path) -> None:
         db.add_root_displays([(10, 900), (11, 900)])
         db.add_entries([(817579, 900)])
         db.add_map_sets([(0, 4242, full), (0, 4243, default), (0, 4243, full)])
-        db.add_models([(20, "6dr_draenei_chair01"), (21, 'lamp "tall"')])
+        db.add_models([(20, 1001), (21, 1002)])
 
 
 def lua_with(data: Path, format_override: str = "") -> lua51.LuaRuntime:
@@ -70,9 +70,9 @@ def test_reader_loads_and_answers(tmp_path: Path) -> None:
     assert lua.eval("Furnish.Reader.FileOfEntry(817579)") == 900
     assert lua.eval("Furnish.Reader.FileOfEntry(1)") is None
     assert lua.eval("Furnish.Reader.Sets(999)") is None
-    assert lua.eval("Furnish.Reader.ModelName(20)") == "6dr_draenei_chair01"
-    assert lua.eval("Furnish.Reader.ModelName(21)") == 'lamp "tall"'
-    assert lua.eval("Furnish.Reader.ModelName(22)") is None
+    assert lua.eval("Furnish.Reader.ModelFile(20)") == 1001
+    assert lua.eval("Furnish.Reader.ModelFile(21)") == 1002
+    assert lua.eval("Furnish.Reader.ModelFile(22)") is None
 
 
 def test_reader_refuses_another_format(tmp_path: Path) -> None:

@@ -7,8 +7,8 @@ set's placements as one printable string, in the order they spawn, decoded by th
 only when that set is asked for. ``maps`` says which sets each map placement draws, by map
 id and unique id. ``wmo`` is keyed by the root's file id, which is what a selected object's
 record reports, and ``entries`` turns a gameobject entry, the number a lookup line prints,
-into that file. ``models`` names the model each spawned display draws, so a set can say
-what it holds without the client's help.
+into that file. ``models`` gives the model file each spawned display draws, which a model
+frame renders and the client's own catalogue names.
 """
 
 import sqlite3
@@ -137,8 +137,8 @@ def _maps(connection: sqlite3.Connection) -> Iterable[str]:
 
 def _models(connection: sqlite3.Connection) -> Iterable[str]:
     yield "FurnishData.models = {\n"
-    for display, name in connection.execute("SELECT display, name FROM models ORDER BY display"):
-        yield f"  [{display}] = {_string(name)},\n"
+    for display, file_id in connection.execute("SELECT display, file FROM models ORDER BY display"):
+        yield f"  [{display}] = {file_id},\n"
     yield "}\n"
 
 

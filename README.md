@@ -36,11 +36,11 @@ A set, list or import takes any of these words after it:
 | `nogroup` | spawn every object ungrouped                                            |
 | `base`    | spawn the base set as well, as a WMO that comes unfurnished always gets |
 
-Each set in a list is a link: a click spawns the set onto the selected gob, WMO or not, a
-ctrl-click at your feet, and resting on it says what it is. Without a word, a pivot leads the
-group: one extra invisible object where the WMO stands, turned and scaled with the set. A run
-of 100 objects or more reminds you that highlighting that many can crash the game; turning it
-off is yours to do. A run that leaves a group selects that group
+A list is a menu of buttons, one a set: a click spawns the set onto the selected gob, WMO or
+not, a ctrl-click at your feet, and resting on one says its index, its objects and what it is.
+Without a word, a pivot leads the group: one extra invisible object where the WMO stands,
+turned and scaled with the set. The first run of a session reminds you that highlighting too
+many objects can crash the game; turning it off is yours to do. A run that leaves a group selects that group
 when it ends, in the chat as if typed, so `.gob group` commands act on it next. While it stays
 selected it stands for the object the run was on, so the next set or list needs no reselecting.
 A WMO's doodad line, from `.doodad select` or `.doodad near`, carries a `[Furnish]` button
@@ -54,20 +54,21 @@ lit so Enter takes it and Up and Down moving the light, and those that come unfu
 marked. A set the source draws already, as part of its model, is marked baked: a gob's base
 set, or a doodad's base set and the sets its map chose. A click chooses one set and a
 ctrl-click adds or removes one, a strip at either end of the list counts the chosen sets
-scrolled out of view, and resting on a set names the models it holds. Target is the selected
+scrolled out of view, and resting on a set names the models it holds, as the client's own
+catalogue names them once a walk of it, started when the window opens, has ended. Target is the selected
 gob, or where you stand while nothing is selected, so every number always holds a value: X, Y
 and Z, then the roll, pitch and turn about each in ObjectMover's colours, then the scale. Here
-and Use selected fill it once; typing a number keeps what was typed; Tab moves through the
+and Use selected gob fill it once; typing a number keeps what was typed; Tab moves through the
 boxes. Either block's Follow selection, unticked, keeps what it shows whatever you select. A
 picked doodad adds Import doodad, which turns it into a gob that is selected and followed like
 any other, with the sets the doodad drew chosen. Group on spawn makes the objects one group,
 led by a pivot the button counts; Include the target makes the target lead it instead, and
 where the target is in a group already a mark warns and Spawn asks first. The status row
 holds Highlighting, which toggles the client's outline on selected objects, beside a run's
-progress with its time left, or a reminder before a big spawn or onto a WMO the sets were not
-made for. During a run every control holds still and Stop and delete stands beside Stop;
-after one, Delete last spawn deletes what it left. The window resizes from its corner, and
-the game keeps its size and place.
+progress with its time left, a warning before spawning onto a WMO the sets were not made for,
+or the reminder that highlighting too many objects can crash the game. During a run every
+control holds still and Stop and delete stands beside Stop; once the run ends, its group is
+yours to manage. The window resizes from its corner, and the game keeps its size and place.
 
 ## Build
 
@@ -96,7 +97,7 @@ lacks, a private client's own names, plain or gzipped, and may be repeated. The 
 | `entries`     | a gameobject entry and the furnished root it spawns           |
 | `placements`  | a set's doodad in order: display, position, quaternion, scale |
 | `map_sets`    | a map id and ADT unique id, and a set it draws                |
-| `models`      | a display a placement spawns, and its model file's name       |
+| `models`      | a display a placement spawns, and the model file it draws     |
 
 Epsilon empties a WMO by copying its root with every doodad at scale 0, an emptywmo
 twin's also sunk below the ground. Such a root ships none of its own rows: its `wmo_sets`
@@ -125,7 +126,7 @@ uv run furnish export --db furnish.sqlite --out addon/Furnish_Data/Data.lua
 each gameobject entry spawns (`entries`), the roots Epsilon emptied (`blank`), each
 set's placements as one printable string
 (`blobs`), the sets each map placement draws (`maps`) and the model each spawned display draws
-(`models`), by its file's name, so a set names what it holds without the client's help. A root is keyed by its file id,
+(`models`), by its file id, which a model frame renders and the client's own catalogue names. A root is keyed by its file id,
 which is what a selected object's record reports; an entry, the number a lookup line
 prints, reaches it through `entries`.
 It loads on demand and holds nothing else, so it changes only when the data does.
@@ -133,7 +134,7 @@ It loads on demand and holds nothing else, so it changes only when the data does
 `addon/Furnish/Reader.lua` is the reader and ships with the code, never with the data:
 `Furnish.Reader.Load()` loads the data addon and refuses another format, and `Sets(file)`,
 `Placements(set)`, `IsBlank(file)`, `FileOfEntry(entry)`, `MapSets(map, uid)` and
-`ModelName(display)` on it
+`ModelFile(display)` and `ModelFiles()` on it
 answer from the data. A set's string is
 LibDeflate's printable encoding of a raw deflate stream over varints, decoded the first time
 the set is asked for; the layout is documented in `src/furnish/codec.py`. Nothing is

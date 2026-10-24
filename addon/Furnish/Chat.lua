@@ -107,13 +107,33 @@ function Chat.Widest(texts)
 	return widest
 end
 
---- Text set at the right of its column, which is how a number reads.
-function Chat.RightCell(text, widest)
-	local column, drawn = width(widest), width(text)
-	if not column or not drawn then
-		return text .. " "
+--- Buttons laid out as a menu under a heading: indented, a gutter between each, and as many to
+-- a line as the chat frame holds, so no button breaks across two lines. Outside the client,
+-- where nothing measures, every button goes on one line.
+-- @param buttons links, each drawn as its label in brackets
+-- @return the lines to print
+function Chat.Menu(buttons)
+	local chat, indent = frame(), "  "
+	local first = buttons[1] and width(buttons[1])
+	if not (chat and first) then
+		return { indent .. table.concat(buttons, " ") }
 	end
-	return gap(column - drawn) .. text .. gap(gutter())
+	local space = gutter()
+	local room = chat:GetWidth() - width(indent) - space
+	local lines, line, used = {}, {}, 0
+	for _, button in ipairs(buttons) do
+		local drawn = width(button)
+		if #line > 0 and used + space + drawn > room then
+			lines[#lines + 1] = indent .. table.concat(line, gap(space))
+			line, used = {}, 0
+		end
+		used = used + (#line > 0 and space or 0) + drawn
+		line[#line + 1] = button
+	end
+	if #line > 0 then
+		lines[#lines + 1] = indent .. table.concat(line, gap(space))
+	end
+	return lines
 end
 
 local LINK = "garrmission:furnish"

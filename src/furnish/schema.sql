@@ -1,7 +1,7 @@
 -- The furnishing database. One row of meta, then the tables: a set is a named list of
 -- doodad placements, shared by every root that holds the same one; a display id and a
 -- gameobject entry each reach the sets of the file they spawn; a map placement names the
--- sets its zone chose; and every display a placement spawns names its model.
+-- sets its zone chose; and every display a placement spawns names its model file.
 
 PRAGMA foreign_keys = ON;
 
@@ -53,7 +53,7 @@ CREATE TABLE placements (
 
 CREATE TABLE models (
     display INTEGER PRIMARY KEY,    -- a display some placement spawns
-    name    TEXT NOT NULL           -- its model file's name, with no folder or extension
+    file    INTEGER NOT NULL        -- the model file it draws, which a model frame renders
 ) WITHOUT ROWID;
 
 CREATE TABLE map_sets (

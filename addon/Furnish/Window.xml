@@ -216,8 +216,8 @@
 				</FontString>
 				<FontString parentKey="SourceDetail" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false">
 					<Anchors>
-						<Anchor point="TOPLEFT" x="76" y="-98"/>
-						<Anchor point="TOPRIGHT" x="-150" y="-98"/>
+						<Anchor point="TOPLEFT" x="76" y="-92"/>
+						<Anchor point="TOPRIGHT" x="-150" y="-92"/>
 					</Anchors>
 				</FontString>
 				<!-- Where the sets go, the same two lines over the position below them. -->
@@ -234,8 +234,8 @@
 				</FontString>
 				<FontString parentKey="TargetDetail" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false">
 					<Anchors>
-						<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="76" y="186"/>
-						<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-150" y="186"/>
+						<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="76" y="192"/>
+						<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-150" y="192"/>
 					</Anchors>
 				</FontString>
 			</Layer>
@@ -261,7 +261,7 @@
 
 			<CheckButton parentKey="SourceFollow" inherits="FurnishFollowTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" x="-20" y="-90"/>
+					<Anchor point="TOPRIGHT" x="-20" y="-84"/>
 				</Anchors>
 			</CheckButton>
 
@@ -276,7 +276,7 @@
 
 			<CheckButton parentKey="TargetFollow" inherits="FurnishFollowTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-20" y="194"/>
+					<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-20" y="200"/>
 				</Anchors>
 			</CheckButton>
 

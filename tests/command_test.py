@@ -264,7 +264,7 @@ def test_a_set_spawns_at_a_pose_given_with_no_object_behind_it(tmp_path: Path) -
     # With no object behind the pose there is no group to join, and a pose names no WMO.
     spawn(lua, "{ index = 1, file = 900, at = Furnish.Pose.At(1, 2, 3), group = 'attach' }")
     assert printed(lua)[-1] == (
-        PREFIX + "the target is a position, not a gob, so it cannot be in the group"
+        PREFIX + "a spawn at your feet has no selected gob to include in the group"
     )
     spawn(lua, "{ index = 1, at = Furnish.Pose.At(1, 2, 3) }")
     assert printed(lua)[-1] == (
@@ -329,15 +329,13 @@ def test_a_window_is_told_when_it_may_not_start(tmp_path: Path) -> None:
 # -- Listing -----------------------------------------------------------------------------
 
 
-def test_a_list_prints_each_set_as_a_link_carrying_the_words(tmp_path: Path) -> None:
+def test_a_list_prints_a_menu_of_set_buttons_carrying_the_words(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 500")
     assert run(lua, "list attach") == [
         PREFIX + "house has 2 sets:",
-        "  |cffffd1000|r |cff71d5ff|Hgarrmission:furnish:900:0:attach::house|h[Base]|h|r "
-        "|cff9d9d9d1 object|r",
-        "  |cffffd1001|r |cff71d5ff|Hgarrmission:furnish:900:1:attach::house|h[Full]|h|r "
-        "|cff9d9d9d2 objects|r",
+        "  |cff71d5ff|Hgarrmission:furnish:900:0:attach::house|h[Base]|h|r "
+        "|cff71d5ff|Hgarrmission:furnish:900:1:attach::house|h[Full]|h|r",
     ]
     assert run(lua, "list 817579 base")[0] == PREFIX + "object 817579 has 2 sets:"
     assert sent(lua) == []
@@ -524,9 +522,14 @@ def test_a_run_in_flight_blocks_another_and_stops_with_its_objects_deleted(tmp_p
 
 
 def link_words(lua: lua51.LuaRuntime, index: int = 1) -> str:
-    line = run(lua, "list")[index + 1]
-    start = line.index("garrmission:furnish:") + len("garrmission:furnish:")
-    return line[start : line.index("|h", start)]
+    """The words the list's button for set number index carries, counted from 0."""
+    menu = "".join(run(lua, "list")[1:])
+    marker = "garrmission:furnish:"
+    start = -1
+    for _ in range(index + 1):
+        start = menu.index(marker, start + 1)
+    start += len(marker)
+    return menu[start : menu.index("|h", start)]
 
 
 def test_a_click_spawns_on_the_selection_and_ctrl_at_the_feet(tmp_path: Path) -> None:
@@ -565,7 +568,7 @@ def test_a_shift_click_and_another_link_do_nothing(tmp_path: Path) -> None:
 def test_resting_on_a_link_says_the_set_and_the_clicks(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 500")
-    words = run(lua, "list base")[2].split("garrmission:furnish:")[1].split("|h")[0]
+    words = run(lua, "list base")[1].split("garrmission:furnish:")[2].split("|h")[0]
     lua.execute(
         """
         TIP = {}
@@ -580,8 +583,8 @@ def test_resting_on_a_link_says_the_set_and_the_clicks(tmp_path: Path) -> None:
         "Full",
         "Set_Full, set 1 of house, 2 objects",
         "with base",
-        "Click: spawn it on the selected object",
-        "Ctrl-click: spawn it at your feet",
+        "Click: spawn the set onto the selected gob",
+        "Ctrl-click: spawn the set at your feet",
     ]
 
 
@@ -706,7 +709,7 @@ def test_an_import_waiting_for_its_object_says_so_to_another_command(tmp_path: P
 
 def test_a_named_set_spawns_on_any_selected_object(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
-    words = run(lua, "list 817579")[2].split("garrmission:furnish:")[1].split("|h")[0]
+    words = run(lua, "list 817579")[1].split("garrmission:furnish:")[2].split("|h")[0]
     lua.execute("SELECTED = 502")
     lua.globals().HOOKS.SetItemRef("garrmission:furnish:" + words)
     assert printed(lua)[-2] == (
@@ -821,20 +824,6 @@ def test_a_name_search_lists_each_wmo_with_sets_once(tmp_path: Path) -> None:
     ]
 
 
-def test_what_the_last_run_left_can_be_deleted(tmp_path: Path) -> None:
-    lua = command_lua(tmp_path)
-    lua.execute("SELECTED = 500")
-    run(lua, "1 nogroup")
-    assert lua.eval("Furnish.Console.Last()") == 2
-    before = len(sent(lua))
-    lua.execute("Furnish.Console.DeleteLast()")
-    assert sent(lua)[before:] == ["gobject delete 7001", "gobject delete 7002"]
-    assert printed(lua)[-1] == PREFIX + "deleted 2 of 2"
-    assert lua.eval("Furnish.Console.Last()") is None
-    lua.execute("Furnish.Console.DeleteLast()")
-    assert printed(lua)[-1] == PREFIX + "nothing to delete; the last run left nothing standing"
-
-
 def test_an_import_alone_spawns_nothing(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("Furnish.Console.Import({ only = true })")
@@ -864,14 +853,16 @@ def test_a_wmo_gobs_selection_line_carries_a_button_that_lists_its_sets(tmp_path
     assert shown_line(lua, chair) == chair
 
 
-def test_a_big_run_reminds_about_highlighting_and_leaves_it_to_the_player(tmp_path: Path) -> None:
+def test_the_first_run_reminds_about_highlighting_and_leaves_it_to_the_player(
+    tmp_path: Path,
+) -> None:
     lua = command_lua(tmp_path)
-    lua.execute("SELECTED = 500; Furnish.Settings.highlightLimit = 2")
-    lines = run(lua, "1")
-    assert lines[1] == (
-        PREFIX + "highlighting this many objects at once can crash the game; "
+    lua.execute("SELECTED = 500")
+    run(lua, "1")
+    run(lua, "1")
+    reminders = [line for line in printed(lua, reminders=True) if "highlighting" in line]
+    assert reminders == [
+        PREFIX + "highlighting too many objects can crash the game; "
         ".toggle highlight off turns it off"
-    )
+    ]
     assert not any("highlight" in line for line in sent(lua))
-    lua.execute("Furnish.Settings.highlightLimit = 3")
-    assert not any("highlighting" in line for line in run(lua, "1"))
