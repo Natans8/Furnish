@@ -191,45 +191,64 @@ end
 local function groupOf(request, pose)
 	local word = request.group or "pivot"
 	if word == "pivot" then
-		return Group.Pivot, "led by an invisible pivot"
+		return Group.Pivot, "led by a pivot, one extra invisible object"
 	elseif word == "first" then
-		return Group.First, "led by its first object"
+		return Group.First, "led by the set's first object"
 	elseif word == "nogroup" then
 		return Group.None, "ungrouped"
 	end
 	if not pose.guid then
-		return nil, "the position is no object's, so there is no group to join"
+		return nil, "the target is a position, not a gob, so it cannot be in the group"
 	end
-	local leader = pose.groupLeader ~= 0 and pose.groupLeader or pose.guid
-	return leader, "joining " .. pose.name .. "'s group"
+	if pose.groupLeader ~= 0 then
+		return pose.groupLeader, "joining the group " .. pose.name .. " is in"
+	end
+	return pose.guid, "led by " .. pose.name
+end
+
+--- What a line calls the model a display draws: its name, the pivot, or what it is not.
+local function modelOf(display)
+	if display == Furnish.Settings.marker then
+		return "the pivot"
+	end
+	local name = Reader.ModelName(display)
+	return name and name:lower() or "a model no listfile names"
 end
 
 --- Report a finished run, how long it took, and select its group so the next group
 -- command acts on it, the group standing for the object the run was anchored on, if any.
 local function finish(result, started, anchor)
 	local doodads = #result.spawned - (result.pivot and 1 or 0)
+	local pivot = result.pivot and ", and the pivot," or ""
 	if result.deleted == #result.spawned then
-		say(("stopped, and deleted the %s it spawned"):format(objects(result.deleted)))
+		say(("stopped, and deleted the %s spawned"):format(objects(result.deleted)))
 	elseif result.deleted then
 		say(
-			("stopped, and deleted %d of the %s it spawned"):format(
+			("stopped, and deleted %d of the %s spawned"):format(
 				result.deleted,
 				objects(#result.spawned)
 			)
 		)
 	elseif result.aborted then
-		say(("stopped: %d of %d spawned in %s"):format(doodads, result.total, since(started)))
+		say(
+			("stopped: %d of %d spawned%s in %s"):format(
+				doodads,
+				result.total,
+				pivot,
+				since(started)
+			)
+		)
 	else
-		say(("done: %d of %d spawned in %s"):format(doodads, result.total, since(started)))
+		say(("done: %d of %d spawned%s in %s"):format(doodads, result.total, pivot, since(started)))
 	end
 	for _, refusal in ipairs(result.refused) do
-		say(("display %d was refused: %s"):format(refusal.display, quote(refusal.messages)))
+		say(("%s was refused: %s"):format(modelOf(refusal.display), quote(refusal.messages)))
 	end
 	for _, miss in ipairs(result.unjoined) do
 		say(
-			("object %s (display %d) spawned but did not join the group: %s"):format(
+			("%s, object %s, spawned but did not join the group: %s"):format(
+				modelOf(miss.display),
 				miss.guid,
-				miss.display,
 				quote(miss.messages)
 			)
 		)
@@ -271,6 +290,13 @@ local function start(rows, target, group, about)
 		return say(reason)
 	end
 	say(("spawning %s %s, %s"):format(about.what, about.where, about.lead))
+	-- The run ends by selecting its group, and highlighting a selection this large can crash the
+	-- client. Whether it is on is the player's to decide, so this only reminds them.
+	if #rows >= Furnish.Settings.highlightLimit then
+		say(
+			"highlighting this many objects at once can crash the game; .toggle highlight off turns it off"
+		)
+	end
 	last = nil
 	-- Told before the run, which may answer whole before Spawn returns.
 	tell("started", #rows, about.what)
@@ -450,6 +476,15 @@ end
 --- Why nothing new can start, or nil.
 function Console.Busy()
 	return busy()
+end
+
+--- Turn the client's highlighting of the selection on or off, as Tiler and ObjectMover do.
+function Console.ToggleHighlight()
+	local send, reason = Client.Send()
+	if not send then
+		return say(reason)
+	end
+	send(Commands.Highlight(), nil, true)
 end
 
 --- Hear every run besides the chat.
@@ -750,7 +785,7 @@ function Console.Import(request)
 		local pose = Pose.OfRecord(record)
 		if not pose.wmo then
 			return say(
-				("imported %s as object %s; it is not a WMO, so it has no sets"):format(model, guid)
+				("imported %s as object %s, which is not a WMO and has no sets"):format(model, guid)
 			)
 		end
 		if request.indexes then
@@ -768,11 +803,11 @@ function Console.Import(request)
 				("imported %s as object %s; %s"):format(
 					model,
 					guid,
-					ids and "the doodad shows only its base set, which the WMO shows itself"
+					ids and "the doodad drew only its base set, which the gob draws itself"
 						or (
-							"the doodad shows no set Furnish knows; "
+							"the doodad drew no set Furnish knows; "
 							.. Chat.Typed("list")
-							.. " shows its own"
+							.. " lists the WMO's own"
 						)
 				)
 			)

@@ -72,6 +72,11 @@ function Commands.Select(guid)
 	return "gobject select " .. guid
 end
 
+--- Turn the client's highlighting of the selection on if it is off, or off if it is on.
+function Commands.Highlight()
+	return "toggle highlight"
+end
+
 --- Select the whole group a GUID leads, for the group commands that follow.
 function Commands.SelectGroup(leader)
 	return "gobject group select " .. leader

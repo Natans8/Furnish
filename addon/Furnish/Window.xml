@@ -1,10 +1,12 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
-	<!-- The window's layout, after ObjectMover's: a dark dialog read top to bottom as where the
-	     sets come from, which of them, and where they go. What it does is in Window.lua, which
-	     loads after this file and sets every word. -->
+	<!-- The window's layout, read top to bottom as where the sets come from, which of them, and
+	     where they go. Every offset is the design's, at the 400 by 600 the window opens at: what
+	     hangs from the top stays there, what stands on the bottom stays there, and the set list
+	     takes whatever height the window gains. What it does is in Window.lua, which loads after
+	     this file and sets every word. -->
 
-	<!-- One row of a list: a set's index, name and object count, or a found WMO's name and set
-	     count. -->
+	<!-- One row of the set list: a set's index, name, whether the WMO draws it already, and its
+	     object count. -->
 	<Button name="FurnishSetRowTemplate" virtual="true">
 		<Size y="22"/>
 		<Layers>
@@ -27,7 +29,7 @@
 				<FontString parentKey="Index" inherits="GameFontNormal" justifyH="RIGHT">
 					<Size x="26"/>
 					<Anchors>
-						<Anchor point="LEFT" x="4"/>
+						<Anchor point="LEFT"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="Count" inherits="GameFontDisableSmall" justifyH="RIGHT">
@@ -37,110 +39,122 @@
 				</FontString>
 				<FontString parentKey="Tag" inherits="GameFontGreenSmall" justifyH="RIGHT">
 					<Anchors>
-						<Anchor point="RIGHT" relativeKey="$parent.Count" relativePoint="LEFT" x="-8"/>
+						<Anchor point="RIGHT" x="-44"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="Label" inherits="GameFontHighlight" justifyH="LEFT" wordwrap="false">
 					<Anchors>
-						<Anchor point="LEFT" relativeKey="$parent.Index" relativePoint="RIGHT" x="10"/>
-						<Anchor point="RIGHT" relativeKey="$parent.Tag" relativePoint="LEFT" x="-6"/>
+						<Anchor point="LEFT" x="36"/>
+						<Anchor point="RIGHT" x="-44"/>
 					</Anchors>
 				</FontString>
 			</Layer>
 			<Layer level="HIGHLIGHT">
 				<Texture setAllPoints="true">
-					<Color r="1" g="1" b="1" a="0.06"/>
+					<Color r="1" g="1" b="1" a="0.07"/>
 				</Texture>
 			</Layer>
 		</Layers>
 	</Button>
 
-	<!-- One WMO a search found: its name, marked where Epsilon emptied it, and its set count. -->
+	<!-- One WMO a search found: its name, marked where it comes unfurnished, and its set count.
+	     Picked is the match Enter takes, lit as Blizzard's own search lists light it. -->
 	<Button name="FurnishResultRowTemplate" virtual="true">
 		<Size y="22"/>
 		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Picked" atlas="search-highlight" setAllPoints="true" hidden="true"/>
+			</Layer>
 			<Layer level="ARTWORK">
 				<FontString parentKey="Count" inherits="GameFontDisableSmall" justifyH="RIGHT">
 					<Anchors>
-						<Anchor point="RIGHT" x="-8" y="0"/>
+						<Anchor point="RIGHT" x="-8"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="Tag" inherits="GameFontGreenSmall" justifyH="RIGHT">
 					<Anchors>
-						<Anchor point="RIGHT" relativeKey="$parent.Count" relativePoint="LEFT" x="-8" y="0"/>
+						<Anchor point="RIGHT" x="-56"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="Label" inherits="GameFontHighlight" justifyH="LEFT" wordwrap="false">
 					<Anchors>
-						<Anchor point="LEFT" x="8" y="0"/>
-						<Anchor point="RIGHT" relativeKey="$parent.Tag" relativePoint="LEFT" x="-6" y="0"/>
+						<Anchor point="LEFT" x="8"/>
+						<Anchor point="RIGHT" x="-60"/>
 					</Anchors>
 				</FontString>
 			</Layer>
 			<Layer level="HIGHLIGHT">
 				<Texture setAllPoints="true">
-					<Color r="1" g="1" b="1" a="0.08"/>
+					<Color r="1" g="1" b="1" a="0.07"/>
 				</Texture>
 			</Layer>
 		</Layers>
 	</Button>
 
-	<!-- Follow selection: ticked, the line it stands on follows what is selected, as
-	     ObjectMover's Auto Update does; unticked, it stays as it is. Its words stand to its left,
-	     so it sits at the right edge of the line. -->
+	<!-- Follow selection: ticked, the block it stands in follows what is selected; unticked, it
+	     keeps what it shows. Its words stand to its left, so it sits at the right edge. -->
 	<CheckButton name="FurnishFollowTemplate" inherits="UICheckButtonTemplate" virtual="true">
 		<Size x="22" y="22"/>
 		<Layers>
 			<Layer level="ARTWORK">
 				<FontString parentKey="Label" inherits="GameFontNormalSmall" justifyH="RIGHT">
 					<Anchors>
-						<Anchor point="RIGHT" relativePoint="LEFT" x="-1" y="1"/>
+						<Anchor point="RIGHT" relativePoint="LEFT" x="-3" y="0"/>
 					</Anchors>
 				</FontString>
 			</Layer>
 		</Layers>
 	</CheckButton>
 
-	<!-- One number of the position, its name to its left. -->
+	<!-- One number of the position: its axis word inside the box's left edge, in the box's own
+	     font so the two share a baseline, and the value set in after it by Window.lua. -->
 	<EditBox name="FurnishNumberTemplate" inherits="InputBoxTemplate" autoFocus="false" letters="14" virtual="true">
-		<Size x="62" y="20"/>
+		<Size x="100" y="20"/>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString parentKey="Name" inherits="GameFontDisableSmall" justifyH="RIGHT">
+				<FontString parentKey="Axis" inherits="ChatFontNormal" justifyH="LEFT">
 					<Anchors>
-						<Anchor point="RIGHT" relativePoint="LEFT" x="-8"/>
+						<Anchor point="LEFT" x="2" y="0"/>
 					</Anchors>
 				</FontString>
 			</Layer>
 		</Layers>
 	</EditBox>
 
-	<!-- How many chosen sets a list hides past one of its ends, beside an arrow pointing there;
-	     a click scrolls to them. -->
+	<!-- How many chosen sets a list hides past one of its ends, a whole row high, beside an arrow
+	     pointing there; a click scrolls to the nearest. -->
 	<Button name="FurnishMoreTemplate" virtual="true" hidden="true">
-		<Size y="16"/>
+		<Size y="22"/>
 		<Layers>
 			<Layer level="BACKGROUND">
 				<Texture setAllPoints="true">
-					<Color r="0" g="0" b="0" a="0.8"/>
+					<Color r="0.043" g="0.043" b="0.043" a="1"/>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture parentKey="Edge">
+					<Size y="1"/>
+					<Color r="1" g="0.82" b="0" a="0.45"/>
 				</Texture>
 			</Layer>
 			<Layer level="ARTWORK">
 				<Texture parentKey="Arrow">
-					<Size x="16" y="16"/>
+					<Size x="14" y="14"/>
 					<Anchors>
 						<Anchor point="LEFT" x="6" y="0"/>
 					</Anchors>
 				</Texture>
+				<FontString parentKey="Label" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="LEFT" x="24" y="0"/>
+					</Anchors>
+				</FontString>
 			</Layer>
 		</Layers>
-		<ButtonText parentKey="Text"/>
-		<NormalFont style="GameFontNormalSmall"/>
-		<HighlightFont style="GameFontHighlightSmall"/>
 	</Button>
 
-	<!-- A list in a bordered box, with its scroll bar, its edge markers and a line said where it
-	     is empty. -->
+	<!-- A list in a bordered box, with its scroll bar, its edge counts and a line said where it is
+	     empty. The scroll bar shows only while there is somewhere to scroll. -->
 	<Frame name="FurnishListTemplate" inherits="BackdropTemplate" virtual="true">
 		<Layers>
 			<Layer level="OVERLAY">
@@ -156,13 +170,13 @@
 			<Frame parentKey="ScrollBox" inherits="WowScrollBoxList">
 				<Anchors>
 					<Anchor point="TOPLEFT" x="8" y="-8"/>
-					<Anchor point="BOTTOMRIGHT" x="-28" y="8"/>
+					<Anchor point="BOTTOMRIGHT" x="-22" y="8"/>
 				</Anchors>
 			</Frame>
 			<EventFrame parentKey="ScrollBar" inherits="WowTrimScrollBar">
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeKey="$parent.ScrollBox" relativePoint="TOPRIGHT" x="4" y="2"/>
-					<Anchor point="BOTTOMLEFT" relativeKey="$parent.ScrollBox" relativePoint="BOTTOMRIGHT" x="4" y="-2"/>
+					<Anchor point="TOPRIGHT" x="-4" y="-6"/>
+					<Anchor point="BOTTOMRIGHT" x="-4" y="6"/>
 				</Anchors>
 			</EventFrame>
 			<Button parentKey="Above" inherits="FurnishMoreTemplate">
@@ -185,191 +199,189 @@
 		<Anchors>
 			<Anchor point="CENTER"/>
 		</Anchors>
+		<Layers>
+			<Layer level="ARTWORK">
+				<!-- Where the sets come from: the WMO's name across the width, then what it is with
+				     its follow box on the line below. -->
+				<FontString parentKey="SourceLabel" inherits="GameFontNormal" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="20" y="-74"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="SourceName" inherits="GameFontHighlightMedium" justifyH="LEFT" wordwrap="false">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="76" y="-72"/>
+						<Anchor point="TOPRIGHT" x="-20" y="-72"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="SourceDetail" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="76" y="-98"/>
+						<Anchor point="TOPRIGHT" x="-150" y="-98"/>
+					</Anchors>
+				</FontString>
+				<!-- Where the sets go, the same two lines over the position below them. -->
+				<FontString parentKey="TargetLabel" inherits="GameFontNormal" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="20" y="210"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="TargetName" inherits="GameFontHighlightMedium" justifyH="LEFT" wordwrap="false">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="76" y="212"/>
+						<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-20" y="212"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="TargetDetail" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="76" y="186"/>
+						<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-150" y="186"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
 		<Frames>
 			<Frame parentKey="Border" inherits="DialogBorderTranslucentTemplate"/>
 			<Frame parentKey="Header" inherits="DialogHeaderTemplate"/>
 			<Button parentKey="CloseButton" inherits="UIPanelCloseButton">
 				<Anchors>
-					<Anchor point="TOPRIGHT" x="-2" y="-2"/>
+					<Anchor point="TOPRIGHT" x="-5" y="-5"/>
 				</Anchors>
 			</Button>
 
-			<!-- A name or an entry: what to show the sets of instead of the selection's. -->
+			<!-- A name or an entry: the WMO to show the sets of instead of the selection's. The
+			     box's border art reaches five units left of the box itself. -->
 			<EditBox parentKey="Search" inherits="SearchBoxTemplate" autoFocus="false" letters="60">
 				<Size y="20"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" x="26" y="-34"/>
-					<Anchor point="TOPRIGHT" x="-22" y="-34"/>
+					<Anchor point="TOPLEFT" x="25" y="-40"/>
+					<Anchor point="TOPRIGHT" x="-20" y="-40"/>
 				</Anchors>
 			</EditBox>
 
-			<!-- Where the sets come from. -->
-			<Frame parentKey="Source">
-				<Size y="46"/>
+			<CheckButton parentKey="SourceFollow" inherits="FurnishFollowTemplate">
 				<Anchors>
-					<Anchor point="TOPLEFT" x="20" y="-62"/>
-					<Anchor point="TOPRIGHT" x="-20" y="-62"/>
+					<Anchor point="TOPRIGHT" x="-20" y="-90"/>
 				</Anchors>
-				<Layers>
-					<Layer level="ARTWORK">
-						<!-- The whole width: a WMO's name has no spaces to wrap at. -->
-						<FontString parentKey="Name" inherits="GameFontHighlightMedium" justifyH="LEFT" wordwrap="false">
-							<Anchors>
-								<Anchor point="TOPLEFT" x="0" y="0"/>
-								<Anchor point="TOPRIGHT" x="0" y="0"/>
-							</Anchors>
-						</FontString>
-						<FontString parentKey="Detail" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false">
-							<Anchors>
-								<Anchor point="TOPLEFT" x="0" y="-24"/>
-								<Anchor point="TOPRIGHT" x="-130" y="-24"/>
-							</Anchors>
-						</FontString>
-					</Layer>
-				</Layers>
-				<Frames>
-					<CheckButton parentKey="Follow" inherits="FurnishFollowTemplate">
-						<Anchors>
-							<Anchor point="TOPRIGHT" x="0" y="-18"/>
-						</Anchors>
-					</CheckButton>
-				</Frames>
-			</Frame>
+			</CheckButton>
 
-			<!-- The sets, or a line saying why there are none. -->
+			<!-- The sets, eleven rows at the size the window opens at, or a line saying why there
+			     are none. -->
 			<Frame parentKey="Sets" inherits="FurnishListTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" x="14" y="-114"/>
-					<Anchor point="BOTTOMRIGHT" x="-14" y="240"/>
+					<Anchor point="BOTTOMRIGHT" x="-14" y="228"/>
 				</Anchors>
 			</Frame>
 
-			<!-- What the chosen sets hold; resting on it lists every model. -->
-			<Button parentKey="Contents">
+			<CheckButton parentKey="TargetFollow" inherits="FurnishFollowTemplate">
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-20" y="194"/>
+				</Anchors>
+			</CheckButton>
+
+			<!-- The position's boxes, laid across the window's width by Window.lua. -->
+			<EditBox parentKey="X" inherits="FurnishNumberTemplate"/>
+			<EditBox parentKey="Y" inherits="FurnishNumberTemplate"/>
+			<EditBox parentKey="Z" inherits="FurnishNumberTemplate"/>
+			<EditBox parentKey="Roll" inherits="FurnishNumberTemplate"/>
+			<EditBox parentKey="Pitch" inherits="FurnishNumberTemplate"/>
+			<EditBox parentKey="Turn" inherits="FurnishNumberTemplate"/>
+			<EditBox parentKey="Scale" inherits="FurnishNumberTemplate"/>
+
+			<!-- What fills the position, once each, each button as wide as its words, laid left to
+			     right by Window.lua. Import shows once `.doodad select` picks a WMO. -->
+			<Button parentKey="Here" inherits="UIPanelButtonTemplate">
+				<Size y="22"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="18" y="118"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="UseSelected" inherits="UIPanelButtonTemplate">
+				<Size y="22"/>
+				<Anchors>
+					<Anchor point="LEFT" relativeKey="$parent.Here" relativePoint="RIGHT" x="4" y="0"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="Import" inherits="UIPanelButtonTemplate" hidden="true">
+				<Size y="22"/>
+				<Anchors>
+					<Anchor point="LEFT" relativeKey="$parent.UseSelected" relativePoint="RIGHT" x="4" y="0"/>
+				</Anchors>
+			</Button>
+
+			<!-- Whether the objects form a group, and whether the target is in it. -->
+			<CheckButton parentKey="Grouped" inherits="UICheckButtonTemplate">
+				<Size x="22" y="22"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="16" y="92"/>
+				</Anchors>
+			</CheckButton>
+			<CheckButton parentKey="Include" inherits="UICheckButtonTemplate">
+				<Size x="22" y="22"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="150" y="92"/>
+				</Anchors>
+			</CheckButton>
+			<!-- Shown where the target is in a group already; Window.lua stands it after the
+			     include box's words. -->
+			<Button parentKey="Warning" hidden="true">
+				<Size x="18" y="18"/>
+				<NormalTexture file="Interface\DialogFrame\UI-Dialog-Icon-AlertNew"/>
+			</Button>
+
+			<!-- The status row: the client's highlighting at its right, as Tiler offers it; beside it a
+			     run's progress, or what to know before the next. -->
+			<Button parentKey="Highlight" inherits="UIPanelButtonTemplate">
+				<Size y="20"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-18" y="64"/>
+				</Anchors>
+			</Button>
+			<Button parentKey="Notice" hidden="true">
 				<Size y="16"/>
 				<Anchors>
-					<Anchor point="BOTTOMLEFT" x="20" y="220"/>
-					<Anchor point="BOTTOMRIGHT" x="-20" y="220"/>
+					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="20" y="62"/>
+					<Anchor point="RIGHT" relativeKey="$parent.Highlight" relativePoint="LEFT" x="-8" y="0"/>
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
-						<FontString parentKey="Text" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false" setAllPoints="true"/>
+						<FontString parentKey="Text" inherits="GameFontNormalSmall" justifyH="LEFT" wordwrap="false" setAllPoints="true"/>
 					</Layer>
 				</Layers>
 			</Button>
-
-			<!-- Where the sets go: the object or spot, its position, where to fill it from, and how
-			     the sets are grouped. -->
-			<Frame parentKey="Onto">
-				<Size y="148"/>
-				<Anchors>
-					<Anchor point="BOTTOMLEFT" x="20" y="64"/>
-					<Anchor point="BOTTOMRIGHT" x="-20" y="64"/>
-				</Anchors>
-				<Layers>
-					<Layer level="ARTWORK">
-						<FontString parentKey="Label" inherits="GameFontNormal" justifyH="LEFT">
-							<Anchors>
-								<Anchor point="TOPLEFT" x="0" y="-3"/>
-							</Anchors>
-						</FontString>
-						<FontString parentKey="Name" inherits="GameFontHighlight" justifyH="LEFT" wordwrap="false">
-							<Anchors>
-								<Anchor point="TOPLEFT" x="48" y="-3"/>
-								<Anchor point="TOPRIGHT" x="-130" y="-3"/>
-							</Anchors>
-						</FontString>
-						<FontString parentKey="FillLabel" inherits="GameFontDisableSmall" justifyH="LEFT">
-							<Anchors>
-								<Anchor point="TOPLEFT" x="0" y="-105"/>
-							</Anchors>
-						</FontString>
-						<FontString parentKey="GroupLabel" inherits="GameFontNormal" justifyH="LEFT">
-							<Anchors>
-								<Anchor point="TOPLEFT" x="0" y="-131"/>
-							</Anchors>
-						</FontString>
-					</Layer>
-				</Layers>
-				<Frames>
-					<CheckButton parentKey="Follow" inherits="FurnishFollowTemplate">
-						<Anchors>
-							<Anchor point="TOPRIGHT" x="0" y="3"/>
-						</Anchors>
-					</CheckButton>
-					<!-- The position's boxes, laid out across the frame's width by Window.lua. -->
-					<EditBox parentKey="X" inherits="FurnishNumberTemplate"/>
-					<EditBox parentKey="Y" inherits="FurnishNumberTemplate"/>
-					<EditBox parentKey="Z" inherits="FurnishNumberTemplate"/>
-					<EditBox parentKey="Turn" inherits="FurnishNumberTemplate"/>
-					<EditBox parentKey="Pitch" inherits="FurnishNumberTemplate"/>
-					<EditBox parentKey="Roll" inherits="FurnishNumberTemplate"/>
-					<EditBox parentKey="Scale" inherits="FurnishNumberTemplate"/>
-					<Button parentKey="FromPlayer" inherits="UIPanelButtonTemplate">
-						<Size x="44" y="20"/>
-						<Anchors>
-							<Anchor point="TOPLEFT" x="48" y="-100"/>
-						</Anchors>
-					</Button>
-					<Button parentKey="FromSelection" inherits="UIPanelButtonTemplate">
-						<Size x="70" y="20"/>
-						<Anchors>
-							<Anchor point="LEFT" relativeKey="$parent.FromPlayer" relativePoint="RIGHT" x="4" y="0"/>
-						</Anchors>
-					</Button>
-					<!-- Shown once `.doodad select` picks a WMO: imports it, the target it becomes. -->
-					<Button parentKey="FromDoodad" inherits="UIPanelButtonTemplate" hidden="true">
-						<Size y="20"/>
-						<Anchors>
-							<Anchor point="LEFT" relativeKey="$parent.FromSelection" relativePoint="RIGHT" x="4" y="0"/>
-							<Anchor point="RIGHT" x="0" y="0"/>
-						</Anchors>
-					</Button>
-					<!-- Whether the objects form a group, and whether it is the target's own. -->
-					<CheckButton parentKey="Grouped" inherits="UICheckButtonTemplate">
-						<Size x="22" y="22"/>
-						<Anchors>
-							<Anchor point="TOPLEFT" x="44" y="-126"/>
-						</Anchors>
-					</CheckButton>
-					<CheckButton parentKey="Join" inherits="UICheckButtonTemplate">
-						<Size x="22" y="22"/>
-						<Anchors>
-							<Anchor point="TOPLEFT" x="170" y="-126"/>
-						</Anchors>
-					</CheckButton>
-					<!-- Shown where joining the target's group joins a group it is in already;
-					     Window.lua stands it after the join's words. -->
-					<Button parentKey="Warning" hidden="true">
-						<Size x="18" y="18"/>
-						<NormalTexture file="Interface\DialogFrame\UI-Dialog-Icon-AlertNew"/>
-					</Button>
-				</Frames>
-			</Frame>
-
-			<!-- A run's progress; it says how the run ended until the next starts. -->
+			<!-- A run's progress, Blizzard's status bar; it says how the run ended until the next. -->
 			<StatusBar parentKey="Progress" minValue="0" maxValue="1" defaultValue="0" hidden="true">
-				<Size y="12"/>
+				<Size y="14"/>
 				<Anchors>
-					<Anchor point="BOTTOMLEFT" x="20" y="46"/>
-					<Anchor point="BOTTOMRIGHT" x="-20" y="46"/>
+					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="20" y="61"/>
+					<Anchor point="RIGHT" relativeKey="$parent.Highlight" relativePoint="LEFT" x="-8" y="0"/>
 				</Anchors>
-				<BarTexture file="Interface\Buttons\WHITE8X8"/>
-				<BarColor r="0.85" g="0.65" b="0.13"/>
+				<BarTexture file="Interface\TargetingFrame\UI-StatusBar"/>
+				<BarColor r="0.72" g="0.53" b="0.04"/>
 				<Layers>
 					<Layer level="BACKGROUND">
+						<Texture parentKey="Rim">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="-2" y="2"/>
+								<Anchor point="BOTTOMRIGHT" x="2" y="-2"/>
+							</Anchors>
+							<Color r="0.47" g="0.47" b="0.47" a="0.5"/>
+						</Texture>
+					</Layer>
+					<Layer level="BORDER">
 						<Texture parentKey="Background">
 							<Anchors>
 								<Anchor point="TOPLEFT" x="-1" y="1"/>
 								<Anchor point="BOTTOMRIGHT" x="1" y="-1"/>
 							</Anchors>
-							<Color r="0" g="0" b="0" a="0.7"/>
+							<Color r="0" g="0" b="0" a="1"/>
 						</Texture>
 					</Layer>
 					<Layer level="OVERLAY">
-						<FontString parentKey="Text" inherits="GameFontHighlightSmall">
+						<FontString parentKey="Text" inherits="TextStatusBarText">
 							<Anchors>
-								<Anchor point="CENTER" x="0" y="1"/>
+								<Anchor point="CENTER" x="0" y="0"/>
 							</Anchors>
 						</FontString>
 					</Layer>
@@ -379,26 +391,25 @@
 			<!-- Spawn, or stop a run; beside it, stop and delete during a run, or delete what the
 			     last run left after one. -->
 			<Button parentKey="DeleteButton" inherits="UIPanelButtonTemplate" hidden="true">
-				<Size x="120" y="24"/>
+				<Size x="120" y="22"/>
 				<Anchors>
-					<Anchor point="BOTTOMRIGHT" x="-18" y="14"/>
+					<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-18" y="38"/>
 				</Anchors>
 			</Button>
 			<Button parentKey="SpawnButton" inherits="UIPanelButtonTemplate">
-				<Size y="24"/>
+				<Size y="22"/>
 				<Anchors>
-					<Anchor point="BOTTOMLEFT" x="18" y="14"/>
-					<Anchor point="BOTTOMRIGHT" x="-18" y="14"/>
+					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="18" y="38"/>
+					<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-18" y="38"/>
 				</Anchors>
 			</Button>
 
-			<!-- The WMOs a name finds, under the search box, the window's width, over everything
-			     else. -->
+			<!-- The WMOs a name finds, under the search box, opaque, over everything else. -->
 			<Frame parentKey="Results" inherits="FurnishListTemplate" frameStrata="DIALOG" hidden="true">
 				<Size y="200"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" x="14" y="-56"/>
-					<Anchor point="TOPRIGHT" x="-14" y="-56"/>
+					<Anchor point="TOPLEFT" x="14" y="-62"/>
+					<Anchor point="TOPRIGHT" x="-14" y="-62"/>
 				</Anchors>
 			</Frame>
 

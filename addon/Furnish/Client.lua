@@ -268,7 +268,11 @@ end)
 --- The player's position as the server places by, and the map: x, y, z, map. Blizzard's
 -- UnitPosition answers nothing useful on a phase, which is an instanced map.
 function Client.Position()
-	return _G.C_Epsilon.GetPosition()
+	local epsilon = _G.C_Epsilon
+	if not (epsilon and epsilon.GetPosition) then
+		return nil
+	end
+	return epsilon.GetPosition()
 end
 
 --- The client's clock, in seconds.

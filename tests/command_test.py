@@ -166,10 +166,10 @@ def test_the_help_names_every_command_and_word(tmp_path: Path) -> None:
     assert lines[0] == "|cffffd100Furnish|r|cff9d9d9d spawns a WMO's doodad sets as objects|r"
     assert lines[1] == "  |cffffd100/furn|r open the window"
     assert lines[2] == "  |cffffd100/furn help|r this help"
-    assert lines[3] == "  |cffffd100/furn list|r the selected WMO's sets"
-    assert "  |cffffd100attach|r join the selected object's group" in lines
-    assert lines[-2].endswith("click it to spawn it, ctrl-click to spawn it at your feet.|r")
-    assert len(lines) == 1 + 11 + 1 + 4 + 2
+    assert lines[3] == "  |cffffd100/furn list|r list the selected WMO's sets"
+    assert "  |cffffd100attach|r include the selected gob in the group, so no pivot spawns" in lines
+    assert lines[-3].endswith("ctrl-click spawns the set at your feet.|r")
+    assert len(lines) == 1 + 11 + 1 + 4 + 3
 
 
 def test_the_command_alone_opens_the_window(tmp_path: Path) -> None:
@@ -257,13 +257,14 @@ def test_a_set_spawns_at_a_pose_given_with_no_object_behind_it(tmp_path: Path) -
     spawn(lua, "{ index = 1, file = 900, label = 'house', at = Furnish.Pose.At(1, 2, 3, 0) }")
     assert printed(lua)[-2] == (
         PREFIX
-        + "spawning house's Full (set 1, 2 objects) at 1.0, 2.0, 3.0, led by an invisible pivot"
+        + "spawning house's Full (set 1, 2 objects) at 1.0, 2.0, 3.0, "
+        + "led by a pivot, one extra invisible object"
     )
     assert sent(lua)[0] == "gobject spawn -424242 posx 1 posy 2 posz 3 face north"
     # With no object behind the pose there is no group to join, and a pose names no WMO.
     spawn(lua, "{ index = 1, file = 900, at = Furnish.Pose.At(1, 2, 3), group = 'attach' }")
     assert printed(lua)[-1] == (
-        PREFIX + "the position is no object's, so there is no group to join"
+        PREFIX + "the target is a position, not a gob, so it cannot be in the group"
     )
     spawn(lua, "{ index = 1, at = Furnish.Pose.At(1, 2, 3) }")
     assert printed(lua)[-1] == (
@@ -276,9 +277,7 @@ def test_a_pose_read_off_an_object_joins_that_objects_group(tmp_path: Path) -> N
     lua.execute("SELECTED = 500")
     lua.execute("AT = Furnish.Console.Target(); SELECTED = 502")
     spawn(lua, "{ index = 1, file = 900, label = 'house', at = AT, group = 'attach' }")
-    assert printed(lua)[-2] == (
-        PREFIX + "spawning Full (set 1, 2 objects) on house, joining house's group"
-    )
+    assert printed(lua)[-2] == (PREFIX + "spawning Full (set 1, 2 objects) on house, led by house")
     assert "gobject group add 500" in sent(lua)
 
 
@@ -366,10 +365,13 @@ def test_a_spawn_says_what_it_sends_and_selects_its_group_in_sight(tmp_path: Pat
     lua.execute("SELECTED = 500")
     lines = run(lua, "1")
     assert lines == [
-        PREFIX + "spawning Full (set 1, 2 objects) on house, led by an invisible pivot",
-        PREFIX + "done: 2 of 2 spawned in 0.0 s",
+        PREFIX
+        + "spawning Full (set 1, 2 objects) on house, led by a pivot, one extra invisible object",
+        PREFIX + "done: 2 of 2 spawned, and the pivot, in 0.0 s",
     ]
-    assert sent(lua)[0] == "gobject spawn -424242 posx 10 posy 20 posz 30 face north turn 90"
+    assert (
+        sent(lua)[0] == "gobject spawn -424242 scale 2 posx 10 posy 20 posz 30 face north turn 90"
+    )
     assert shown(lua) == ["gobject group select 7001"]
 
 
@@ -383,7 +385,7 @@ def test_an_ungrouped_spawn_selects_nothing(tmp_path: Path) -> None:
 def test_attach_joins_the_wmos_own_group(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 501")
-    assert run(lua, "1 attach")[0].endswith("joining emptywmo_house's group")
+    assert run(lua, "1 attach")[0].endswith("joining the group emptywmo_house is in")
     assert "gobject group add 333" in sent(lua)
     assert shown(lua) == ["gobject group select 333"]
 
@@ -420,7 +422,8 @@ def test_a_set_at_the_players_feet_needs_no_selection(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     assert run(lua, "0 here 817579 first")[0] == (
         PREFIX
-        + "spawning object 817579's Base (set 0, 1 object) at your feet, led by its first object"
+        + "spawning object 817579's Base (set 0, 1 object) at your feet, "
+        + "led by the set's first object"
     )
     assert sent(lua) == ["gobject spawn -21 posx -3 posy 6 posz 4 face north turn 90"]
 
@@ -454,11 +457,12 @@ def test_the_group_a_run_selected_stands_for_its_wmo_read_fresh(tmp_path: Path) 
     lua.execute("RECORDS[500].transform.position.x = 99")
     before = len(sent(lua))
     assert run(lua, "1")[0] == (
-        PREFIX + "spawning Full (set 1, 2 objects) on house, led by an invisible pivot"
+        PREFIX
+        + "spawning Full (set 1, 2 objects) on house, led by a pivot, one extra invisible object"
     )
     assert sent(lua)[before : before + 2] == [
         "gobject select 500",
-        "gobject spawn -424242 posx 99 posy 20 posz 30 face north turn 90",
+        "gobject spawn -424242 scale 2 posx 99 posy 20 posz 30 face north turn 90",
     ]
     assert run(lua, "list")[0] == PREFIX + "house has 2 sets:"
 
@@ -510,7 +514,7 @@ def test_a_run_in_flight_blocks_another_and_stops_with_its_objects_deleted(tmp_p
         "/furn stop again gives up on a reply that never comes"
     ]
     lua.execute("FLUSH()")
-    assert printed(lua)[-1] == PREFIX + "stopped, and deleted the 1 object it spawned"
+    assert printed(lua)[-1] == PREFIX + "stopped, and deleted the 1 object spawned"
     assert sent(lua)[-1] == "gobject delete 7001"
     assert shown(lua) == []
     assert run(lua, "stop") == [PREFIX + "nothing is spawning"]
@@ -533,14 +537,16 @@ def test_a_click_spawns_on_the_selection_and_ctrl_at_the_feet(tmp_path: Path) ->
     click("garrmission:furnish:" + words)
     assert (
         printed(lua)[-2]
-        == PREFIX + "spawning Full (set 1, 2 objects) on house, led by an invisible pivot"
+        == PREFIX
+        + "spawning Full (set 1, 2 objects) on house, led by a pivot, one extra invisible object"
     )
     lua.execute("MODIFIER = 'ctrl'")
     click("garrmission:furnish:" + words)
     assert (
         printed(lua)[-2]
         == PREFIX
-        + "spawning house's Full (set 1, 2 objects) at your feet, led by an invisible pivot"
+        + "spawning house's Full (set 1, 2 objects) at your feet, "
+        + "led by a pivot, one extra invisible object"
     )
 
 
@@ -587,7 +593,7 @@ def test_an_import_furnishes_the_object_with_the_sets_the_map_placed(tmp_path: P
     lines = run(lua, "import")
     assert sent(lua)[:2] == ["doodad import", "gobject select 500"]
     assert lines == [
-        PREFIX + "spawning Full (set 1, 2 objects) on house, joining house's group",
+        PREFIX + "spawning Full (set 1, 2 objects) on house, led by house",
         PREFIX + "done: 2 of 2 spawned in 0.0 s",
     ]
     assert "gobject group add 500" in sent(lua)
@@ -602,7 +608,7 @@ def test_an_import_the_map_did_not_furnish_spawns_nothing(tmp_path: Path) -> Non
     lua.execute("IMPORT_UID = 1")
     assert run(lua, "import") == [
         PREFIX + "imported house.wmo as object 500; "
-        "the doodad shows no set Furnish knows; /furn list shows its own"
+        "the doodad drew no set Furnish knows; /furn list lists the WMO's own"
     ]
     assert sent(lua) == ["doodad import", "gobject select 500"]
 
@@ -626,7 +632,7 @@ def test_a_second_stop_gives_up_on_the_reply_and_still_deletes(tmp_path: Path) -
     assert run(lua, "stop") == [PREFIX + "giving up on the replies still owed"]
     lua.execute("FLUSH()")
     assert "gobject delete 7001" in sent(lua)
-    assert printed(lua)[-1] == PREFIX + "stopped, and deleted the 1 object it spawned"
+    assert printed(lua)[-1] == PREFIX + "stopped, and deleted the 1 object spawned"
 
 
 def test_a_set_at_the_feet_with_nothing_selected_offers_naming_it(tmp_path: Path) -> None:
@@ -641,14 +647,13 @@ def test_an_import_of_a_placement_drawing_several_sets_spawns_every_one(tmp_path
     lua = command_lua(tmp_path, layered=True)
     lua.execute("IMPORT_UID = 4343")
     assert run(lua, "import") == [
-        PREFIX
-        + "spawning Full and Lights (sets 1 and 2, 3 objects) on house, joining house's group",
+        PREFIX + "spawning Full and Lights (sets 1 and 2, 3 objects) on house, led by house",
         PREFIX + "done: 3 of 3 spawned in 0.0 s",
     ]
     # The base is laid once beside them, not once a set.
     assert run(lua, "import base")[0] == (
         PREFIX + "spawning Base and Full and Lights (sets 0 and 1 and 2, 4 objects) on house,"
-        " joining house's group"
+        " led by house"
     )
 
 
@@ -665,7 +670,7 @@ def test_an_import_spawns_the_sets_named_in_place_of_the_maps(tmp_path: Path) ->
 def test_an_import_with_base_lays_the_base_set_the_map_did_not_name(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     assert run(lua, "import base")[0] == (
-        PREFIX + "spawning Base and Full (sets 0 and 1, 3 objects) on house, joining house's group"
+        PREFIX + "spawning Base and Full (sets 0 and 1, 3 objects) on house, led by house"
     )
 
 
@@ -673,7 +678,7 @@ def test_an_imported_doodad_that_is_no_wmo_is_said_so(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("IMPORT_GUID = 502")
     assert run(lua, "import") == [
-        PREFIX + "imported house.wmo as object 502; it is not a WMO, so it has no sets"
+        PREFIX + "imported house.wmo as object 502, which is not a WMO and has no sets"
     ]
 
 
@@ -706,7 +711,8 @@ def test_a_named_set_spawns_on_any_selected_object(tmp_path: Path) -> None:
     lua.globals().HOOKS.SetItemRef("garrmission:furnish:" + words)
     assert printed(lua)[-2] == (
         PREFIX
-        + "spawning object 817579's Full (set 1, 2 objects) on chair, led by an invisible pivot"
+        + "spawning object 817579's Full (set 1, 2 objects) on chair, "
+        + "led by a pivot, one extra invisible object"
     )
     assert run(lua, "1 from 817579 nogroup")[0] == (
         PREFIX + "spawning object 817579's Full (set 1, 2 objects) on chair, ungrouped"
@@ -766,9 +772,7 @@ def test_a_wmos_doodad_line_carries_a_button_that_imports_and_furnishes_it(
     assert line == WMO_LINE + " - |cff71d5ff|Hgarrmission:furnish:import:4242|h[Furnish]|h|r"
     lua.globals().HOOKS.SetItemRef("garrmission:furnish:import:4242")
     assert sent(lua)[:2] == ["doodad import 4242", "gobject select 500"]
-    assert printed(lua)[-2] == (
-        PREFIX + "spawning Full (set 1, 2 objects) on house, joining house's group"
-    )
+    assert printed(lua)[-2] == (PREFIX + "spawning Full (set 1, 2 objects) on house, led by house")
 
 
 def test_a_line_whose_entry_is_no_furnished_wmo_is_left_as_it_came(tmp_path: Path) -> None:
@@ -784,9 +788,7 @@ def test_an_import_hears_its_line_when_the_server_sends_it_apart(tmp_path: Path)
     lua.execute("IMPORT_APART = true")
     lua.globals().HOOKS.SetItemRef("garrmission:furnish:import:4242")
     assert sent(lua)[:2] == ["doodad import 4242", "gobject select 500"]
-    assert printed(lua)[-2] == (
-        PREFIX + "spawning Full (set 1, 2 objects) on house, joining house's group"
-    )
+    assert printed(lua)[-2] == (PREFIX + "spawning Full (set 1, 2 objects) on house, led by house")
 
 
 def test_any_true_answer_to_the_permission_check_is_permission(tmp_path: Path) -> None:
@@ -800,7 +802,7 @@ def test_a_run_says_how_long_it_took(tmp_path: Path) -> None:
     lua.execute("SELECTED = 500; CLOCK = 2")
     run(lua, "1")
     lua.execute("CLOCK = 14.5; FLUSH()")
-    assert printed(lua)[-1] == PREFIX + "done: 2 of 2 spawned in 12.5 s"
+    assert printed(lua)[-1] == PREFIX + "done: 2 of 2 spawned, and the pivot, in 12.5 s"
 
 
 def test_a_name_search_lists_each_wmo_with_sets_once(tmp_path: Path) -> None:
@@ -860,3 +862,16 @@ def test_a_wmo_gobs_selection_line_carries_a_button_that_lists_its_sets(tmp_path
     # A gob whose entry is no furnished WMO is left as it came.
     chair = selected.replace("817579", "717747")
     assert shown_line(lua, chair) == chair
+
+
+def test_a_big_run_reminds_about_highlighting_and_leaves_it_to_the_player(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("SELECTED = 500; Furnish.Settings.highlightLimit = 2")
+    lines = run(lua, "1")
+    assert lines[1] == (
+        PREFIX + "highlighting this many objects at once can crash the game; "
+        ".toggle highlight off turns it off"
+    )
+    assert not any("highlight" in line for line in sent(lua))
+    lua.execute("Furnish.Settings.highlightLimit = 3")
+    assert not any("highlighting" in line for line in run(lua, "1"))

@@ -16,29 +16,34 @@ local Chat = Furnish.Chat
 Command.USAGE = {
 	{ "", "open the window" },
 	{ "help", "this help" },
-	{ "list", "the selected WMO's sets" },
-	{ "list <entry>", "an object's sets, by the entry on its lookup line" },
-	{ "<set>", "spawn a set on the selected WMO" },
-	{ "<set> from <entry>", "spawn an object's set on the selected object" },
+	{ "list", "list the selected WMO's sets" },
+	{ "list <entry>", "list the sets of the WMO an entry names, the number on a lookup line" },
+	{ "<set>", "spawn one of the selected WMO's sets onto that WMO" },
+	{ "<set> from <entry>", "spawn a set of the WMO an entry names onto the selected gob" },
 	{ "<set> here", "spawn the selected WMO's set at your feet" },
-	{ "<set> here <entry>", "spawn an object's set at your feet" },
-	{ "import", "import the selected doodad and furnish it, grouped on it" },
+	{ "<set> here <entry>", "spawn a set of the WMO an entry names at your feet" },
+	{ "import", "turn the selected doodad into a gob, then spawn the doodad's sets onto the gob" },
 	{ "stop", "stop spawning" },
-	{ "stop delete", "stop, and delete what was spawned" },
+	{ "stop delete", "stop spawning, and delete what was spawned" },
 }
 
 --- The words that may follow a set, a list or an import, in the order the help says them.
 -- Each sets one field of the request; the three that say who leads the group share one.
 Command.WORDS = {
-	{ word = "first", field = "group", value = "first", hint = "its first object leads the group" },
+	{
+		word = "first",
+		field = "group",
+		value = "first",
+		hint = "the set's first object leads the group, so no pivot spawns",
+	},
 	{
 		word = "attach",
 		field = "group",
 		value = "attach",
-		hint = "join the selected object's group",
+		hint = "include the selected gob in the group, so no pivot spawns",
 	},
 	{ word = "nogroup", field = "group", value = "nogroup", hint = "spawn every object ungrouped" },
-	{ word = "base", field = "base", value = true, hint = "lay the base set under it" },
+	{ word = "base", field = "base", value = true, hint = "spawn the base set as well" },
 }
 
 local WORD = {}
@@ -145,10 +150,13 @@ local function helpLines()
 		lines[#lines + 1] = "  " .. Chat.Cell(lefts[#Command.USAGE + i], widest) .. each.hint
 	end
 	lines[#lines + 1] = Chat.GREY
-		.. "A set in a list is a link: click it to spawn it, ctrl-click to spawn it at your feet."
+		.. "Click a set in a list to spawn the set onto the selected WMO; ctrl-click spawns the set at your feet."
 		.. Chat.END
 	lines[#lines + 1] = Chat.GREY
-		.. "A WMO's doodad line carries a [Furnish] button: it imports the WMO and furnishes it."
+		.. "A .gob select line for a WMO carries a [Furnish] button, which lists the WMO's sets."
+		.. Chat.END
+	lines[#lines + 1] = Chat.GREY
+		.. "A .doodad select line for a WMO carries one too, which imports the doodad and spawns its sets onto the new gob."
 		.. Chat.END
 	return lines
 end
