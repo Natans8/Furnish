@@ -186,6 +186,12 @@ local function pivots(group)
 	return group == "pivot" and Furnish.Settings.marker ~= nil
 end
 
+--- What Use selected fills the target from: the selected gob, or else a selected group, whose
+-- pose says group; nil when neither is selected. The target never follows a group by itself.
+local function selectedForTarget()
+	return Console.Target() or Console.Group()
+end
+
 --- Show a tooltip: a title, label and value pairs, and lines in a colour of their own.
 -- @param lines each { label, value } for a pair, or { text, colour } for a line of its own
 local function tip(owner, title, lines)
@@ -211,6 +217,7 @@ local function hint(owner, title, lines, words)
 	owner:SetScript(
 		"OnEnter",
 		Client.Guarded(function()
+			local shownTitle = type(title) == "function" and title() or title
 			local shownLines = type(lines) == "function" and lines() or lines
 			local all = {}
 			for i, line in ipairs(shownLines) do
@@ -219,7 +226,7 @@ local function hint(owner, title, lines, words)
 			if words then
 				all[#all + 1] = { text = "Typed: " .. Chat.Typed(words), colour = GREY }
 			end
-			tip(owner, title, all)
+			tip(owner, shownTitle, all)
 		end)
 	)
 	owner:SetScript("OnLeave", _G.GameTooltip_Hide)
@@ -432,7 +439,16 @@ local function updateTarget()
 		box.Axis:SetTextColor(colour[1], colour[2], colour[3])
 		box:SetTextColor(run and 0.5 or 1, run and 0.5 or 1, run and 0.5 or 1)
 	end
-	frame.UseSelected:SetEnabled(not run and Console.Target() ~= nil)
+	-- The button names what it reads, a gob or a group, and is as wide as its words.
+	local from = selectedForTarget()
+	local label = from and from.group and "Use selected group" or "Use selected gob"
+	if frame.UseSelected:GetText() ~= label then
+		frame.UseSelected:SetText(label)
+		frame.UseSelected:SetWidth(
+			math.ceil(frame.UseSelected:GetFontString():GetStringWidth()) + CAPS
+		)
+	end
+	frame.UseSelected:SetEnabled(not run and from ~= nil)
 	local canInclude = not run and frame.Grouped:GetChecked() and not cannotInclude()
 	frame.Include:SetEnabled(canInclude)
 	checkText(frame.Include, canInclude)
@@ -605,7 +621,12 @@ local function refresh()
 			-- is empty, and never again while it stays so: it does not follow the player, and Here
 			-- reads it afresh.
 			local here = Pose.Here()
-			spot = here and copy(here, "Your position", "No gob selected")
+			spot = here and copy(here, "Your position", "")
+		end
+		-- Without a gob to follow, the target says why: none is selected, or a group is, which the
+		-- target never follows by itself.
+		if spot and not selected then
+			spot.detail = Console.Group() and "A group is selected" or "No gob selected"
 		end
 		edited = false
 	end
@@ -631,14 +652,16 @@ local function refresh()
 			frame.SourceName:SetText(selected.name)
 			frame.SourceDetail:SetText(selected.wmo and "No sets" or "Not a WMO")
 		else
-			frame.SourceName:SetText("No WMO selected")
+			-- A group is no source, whatever leads it, as a model is not.
+			local group = not pinned and Console.Group()
+			frame.SourceName:SetText(group and "A group" or "No WMO selected")
 			frame.SourceName:SetTextColor(0.5, 0.5, 0.5)
-			frame.SourceDetail:SetText("")
+			frame.SourceDetail:SetText(group and "Led by " .. group.name or "")
 		end
 		list.Empty:SetText(
 			pinned and pinned.empty and "Search a WMO, or tick Follow selection."
 				or pinned and "Search another WMO."
-				or "Select a WMO, or search one."
+				or "Select one WMO, or search one."
 		)
 	end
 	list.Empty:SetShown(not shown)
@@ -1220,8 +1243,11 @@ local function buildTarget()
 	frame.UseSelected:SetScript(
 		"OnClick",
 		Client.Guarded(function()
-			local selected = Console.Target()
-			fillTarget(selected and copy(selected, nil, gobDetail(selected)))
+			local from = selectedForTarget()
+			if from and from.group then
+				return fillTarget(copy(from, "A group", "Led by " .. from.name))
+			end
+			fillTarget(from and copy(from, nil, gobDetail(from)))
 		end)
 	)
 	hint(
@@ -1230,11 +1256,19 @@ local function buildTarget()
 		{ { text = "Fill the target with where you stand and the way you face, once." } },
 		"<set> here"
 	)
-	hint(
-		frame.UseSelected,
-		"Use selected gob",
-		{ { text = "Fill the target with the selected gob's position, once." } }
-	)
+	hint(frame.UseSelected, function()
+		return frame.UseSelected:GetText()
+	end, function()
+		local from = selectedForTarget()
+		if from and from.group then
+			return {
+				{ text = "Fill the target with the selected group's position and facing, once." },
+				{ text = "A group has no roll or pitch of its own, so the target is level." },
+				{ text = "With Include the target, the objects join that group." },
+			}
+		end
+		return { { text = "Fill the target with the selected gob's position, once." } }
+	end)
 
 	frame.Grouped.text:SetText("Group on spawn")
 	frame.Grouped:SetChecked(true)

@@ -60,6 +60,19 @@ function Pose.OfRecord(object)
 	}
 end
 
+--- A group's pose, from its leader's record: where the leader stands, the way it faces and its
+-- scale, which a group scales relative to, but level, since a group has no roll or pitch of its
+-- own and the leader's are only the leader's. Beside it: guid and groupLeader, both the
+-- leader's GUID, so a run that includes it joins the group; the leader's name; and group, true.
+-- It is no WMO, whatever leads it.
+function Pose.OfGroup(leader)
+	local pose = Pose.OfRecord(leader)
+	pose.rotation.roll, pose.rotation.pitch = 0, 0
+	pose.groupLeader = pose.guid
+	pose.file, pose.wmo, pose.group = nil, false, true
+	return pose
+end
+
 --- The selected object's pose, from the record the server pushed for it. The core never
 -- selects anything itself, since that would move the player's own selection.
 -- @return the pose; or nil and the reason, false standing for a group selection

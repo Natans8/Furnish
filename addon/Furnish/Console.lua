@@ -462,6 +462,18 @@ function Console.Target()
 	return selectedPose()
 end
 
+--- The selected group, which neither a source nor a target takes by itself, as a target may be
+-- filled from it once: its pose as Pose.OfGroup gives it. Nil when no group is selected, when
+-- the group is the one Furnish's last run made, which stands for the object that run was on,
+-- or when its leader's record has not arrived yet.
+function Console.Group()
+	if anchored and Client.SelectedGroup() == anchored.leader then
+		return nil
+	end
+	local leader = Client.SelectedGroupLeader()
+	return leader and Pose.OfGroup(leader) or nil
+end
+
 --- Why nothing new can start, or nil.
 function Console.Busy()
 	return busy()

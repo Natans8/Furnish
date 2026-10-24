@@ -60,7 +60,11 @@ catalogue names them once a walk of it, started when the window opens, has ended
 gob, or where you stand while nothing is selected, so every number always holds a value: X, Y
 and Z, then the roll, pitch and turn about each in ObjectMover's colours, then the scale. Here
 and Use selected gob fill it once; typing a number keeps what was typed; Tab moves through the
-boxes. Either block's Follow selection, unticked, keeps what it shows whatever you select. The
+boxes. Either block's Follow selection, unticked, keeps what it shows whatever you select. A
+selected group is used by neither block, as a model is no source: both say a group is selected, and
+Use selected group fills Target once with the group's position and facing, level, since a group
+has no roll or pitch of its own; Include the target then joins that group. The group a run selects
+when it ends still stands for the WMO the run was on. The
 doodad `.doodad select` picks is a selection of its own, held beside the gob's: it never changes
 Source or Target, and while there is one a panel stands against the window's right edge with
 its name and the sets of the WMO it is, those it draws already marked baked. Use as source keeps

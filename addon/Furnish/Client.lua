@@ -162,6 +162,20 @@ function Client.SelectedGroup()
 	return tostring(group.leaderGUID)
 end
 
+--- The record of the selected group's leader, which EpsilonLib fetches for itself when a group is
+-- selected; or nil when no group is selected or the record has not arrived yet.
+function Client.SelectedGroupLeader()
+	local lib = _G.EpsilonLib
+	if not (lib and lib.GameObject and lib.GameObject:IsGroupSelected()) then
+		return nil
+	end
+	local group = lib.GameObject:GetSelected()
+	if not (group and group.GetLeader) then
+		return nil
+	end
+	return group:GetLeader()
+end
+
 --- Call fn with an object's record once EpsilonLib holds it, which is once the server has
 -- pushed it for the selection. A record already selected is handed over at once.
 -- @param guid the object's GUID
