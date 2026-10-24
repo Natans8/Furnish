@@ -202,3 +202,21 @@ end
 function Reader.Roots()
 	return data().wmo
 end
+
+--- The lowest gameobject entry of each root, gathered the first time one is asked for.
+local lowest
+
+--- The lowest gameobject entry whose object is a root, or nil where no entry is. Several
+-- entries may draw one root, and any of them reads the same sets. Load first.
+-- @param file the root's file id
+function Reader.EntryOfFile(file)
+	if not lowest then
+		lowest = {}
+		for entry, root in pairs(data().entries) do
+			if not lowest[root] or entry < lowest[root] then
+				lowest[root] = entry
+			end
+		end
+	end
+	return lowest[file]
+end

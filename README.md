@@ -48,7 +48,9 @@ that imports that WMO by its unique id and furnishes it as `/furn import` does, 
 selection line, from `.gob select`, one that lists its sets.
 
 The window reads top to bottom as where the sets come from, which to spawn, and where they go.
-Source is the selected WMO or a WMO searched by name or entry; a name lists the WMOs with sets that the client's own catalogue names like it, the first
+Source is the WMO a gob entry is, held in its ID box as Target's numbers are: the selected gob's, one typed, which
+keeps it whatever gob is selected, or the lowest entry of a WMO searched by name, since every entry of one WMO reads
+the same sets. A search lists the WMOs with sets that the client's own catalogue names like it, the first
 lit so Enter takes it and Up and Down moving the light, and those that come unfurnished
 marked. A set the selected WMO draws already, as part of its model, is marked baked: its
 base set, unless it comes unfurnished. A click chooses one set and a
@@ -138,7 +140,7 @@ It loads on demand and holds nothing else, so it changes only when the data does
 `addon/Furnish/Reader.lua` is the reader and ships with the code, never with the data:
 `Furnish.Reader.Load()` loads the data addon and refuses another format, and `Sets(file)`,
 `Placements(set)`, `IsBlank(file)`, `FileOfEntry(entry)`, `MapSets(map, uid)`,
-`ModelFile(display)`, `ModelFiles()` and `Roots()` on it
+`ModelFile(display)`, `ModelFiles()`, `Roots()` and `EntryOfFile(file)` on it
 answer from the data. A set's string is
 LibDeflate's printable encoding of a raw deflate stream over varints, decoded the first time
 the set is asked for; the layout is documented in `src/furnish/codec.py`. Nothing is

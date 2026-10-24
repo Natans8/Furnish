@@ -1,6 +1,6 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
 	<!-- The window's layout, read top to bottom as where the sets come from, which of them, and
-	     where they go. Every offset is the design's, at the 400 by 600 the window opens at: what
+	     where they go. Every offset is the design's, at the 400 by 628 the window opens at: what
 	     hangs from the top stays there, what stands on the bottom stays there, and the set list
 	     takes whatever height the window gains. What it does is in Window.lua, which loads after
 	     this file and sets every word. -->
@@ -195,7 +195,7 @@
 	</Frame>
 
 	<Frame name="FurnishFrame" parent="UIParent" toplevel="true" movable="true" resizable="true" enableMouse="true" clampedToScreen="true" hidden="true">
-		<Size x="400" y="600"/>
+		<Size x="400" y="628"/>
 		<Anchors>
 			<Anchor point="CENTER"/>
 		</Anchors>
@@ -249,7 +249,7 @@
 				</Anchors>
 			</Button>
 
-			<!-- A name or an entry: the WMO to show the sets of instead of the selection's. The
+			<!-- A name: one way to fill the source's ID, with the lowest entry of the WMO picked. The
 			     box's border art reaches five units left of the box itself. -->
 			<EditBox parentKey="Search" inherits="SearchBoxTemplate" autoFocus="false" letters="60">
 				<Size y="20"/>
@@ -265,11 +265,19 @@
 				</Anchors>
 			</CheckButton>
 
+			<!-- The gob entry the sets come from, as the target's boxes hold its position: a third
+			     of the width, sized by Window.lua with them. -->
+			<EditBox parentKey="SourceID" inherits="FurnishNumberTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT" x="25" y="-114"/>
+				</Anchors>
+			</EditBox>
+
 			<!-- The sets, eleven rows at the size the window opens at, or a line saying why there
 			     are none. -->
 			<Frame parentKey="Sets" inherits="FurnishListTemplate">
 				<Anchors>
-					<Anchor point="TOPLEFT" x="14" y="-114"/>
+					<Anchor point="TOPLEFT" x="14" y="-142"/>
 					<Anchor point="BOTTOMRIGHT" x="-14" y="228"/>
 				</Anchors>
 			</Frame>

@@ -8,8 +8,9 @@
 -- every word.
 --
 -- Source and Target each follow the gob selection until their box is unticked. The source is
--- the selected WMO or a WMO searched; the target is the selected gob, or where the player stands
--- while no gob is selected, so every number always holds a value. The doodad `.doodad select`
+-- the WMO a gob entry is, shown in its ID box as the target's numbers are: the selected gob's,
+-- one typed, the lowest of a WMO searched, or the doodad's. The target is the selected gob, or
+-- where the player stands while no gob is selected, so every number always holds a value. The doodad `.doodad select`
 -- picks is another selection, held at the same time and shown in a panel of its own beside the
 -- window: picking it never changes the source or the target, and selecting a gob never clears
 -- it. It is a step before the gob pipeline, giving each side something in advance. Use as source
@@ -61,7 +62,7 @@ local ROW = 22
 
 --- The smallest the window may be drawn, which is the size its layout was made for; it may grow
 -- to twice that.
-local MIN_WIDTH, MIN_HEIGHT = 400, 600
+local MIN_WIDTH, MIN_HEIGHT = 400, 628
 
 --- How many letters a name search waits for, as Blizzard's own searches do; how many WMOs it
 -- lists at most, and how many rows of them show before the list scrolls.
@@ -107,8 +108,9 @@ local provider, found, drawn =
 --- Where the sets come from: the Source request pinned, or nil to follow the gob selection; the
 -- doodad `.doodad select` picked, in its own slot, imported or not, with the sets of the WMO it
 -- is; the doodad imported last while the source followed the selection, whose sets come chosen
--- when the gob it became is shown; the source shown, or nil; and the sets chosen, by index.
-local pinned, doodad, marks, shown
+-- when the gob it became is shown; the source shown, or nil, and the gob entry its ID box holds;
+-- and the sets chosen, by index.
+local pinned, doodad, marks, shown, shownEntry
 local chosen = {}
 
 --- Where the sets go: the pose shown, its own copy, with what to call it and say of it; whether
@@ -392,6 +394,7 @@ local function controls()
 	local all = {
 		frame.Search,
 		frame.SourceFollow,
+		frame.SourceID,
 		frame.TargetFollow,
 		frame.Here,
 		frame.UseSelected,
@@ -454,6 +457,12 @@ local function update()
 		control:SetEnabled(not run)
 	end
 	updateDoodad()
+	-- The ID box holds the source's entry, unless it is being typed in.
+	local id = frame.SourceID
+	if not id:HasFocus() then
+		id:SetText(shownEntry and tostring(shownEntry) or "")
+	end
+	id:SetTextColor(run and 0.5 or 1, run and 0.5 or 1, run and 0.5 or 1)
 	list.ScrollBox:ForEachFrame(mark)
 	updateMore()
 	updateTarget()
@@ -558,6 +567,18 @@ local function sourceDetail()
 	return count .. (shown.blank and ", unfurnished" or "")
 end
 
+--- The gob entry the source's ID box holds: the one kept, the lowest of a WMO searched, or the
+-- selected gob's; nil where there is none.
+local function sourceEntry()
+	if pinned then
+		return pinned.entry
+			or (pinned.file and Reader.Load() and Reader.EntryOfFile(pinned.file))
+			or nil
+	end
+	local selected = Console.Target()
+	return selected and selected.entry
+end
+
 --- Read the window afresh: the source and the target follow the selection unless unticked.
 local function refresh()
 	if run then
@@ -593,6 +614,7 @@ local function refresh()
 		edited = false
 	end
 	frame.SourceFollow:SetChecked(not pinned)
+	shownEntry = sourceEntry()
 	provider:Flush()
 	if shown then
 		frame.SourceName:SetText(shown.name)
@@ -818,7 +840,7 @@ local function initResult(button, wmo, new)
 end
 
 --- A search typed: from three letters, the WMOs a name finds list under the box, the first lit
--- so Enter takes it; a number waits for Enter.
+-- so Enter takes it.
 local function searchChanged(box, typed)
 	if not typed then
 		return
@@ -826,7 +848,7 @@ local function searchChanged(box, typed)
 	local text = box:GetText():match("^%s*(.-)%s*$")
 	found:Flush()
 	picked = 1
-	if tonumber(text) or #text < SEARCH_FROM then
+	if #text < SEARCH_FROM then
 		return frame.Results:Hide()
 	end
 	local wmos = Console.Find(text)
@@ -839,17 +861,8 @@ local function searchChanged(box, typed)
 	frame.Results:Show()
 end
 
---- A search entered: an entry, the number after a name on a lookup line, shows its WMO's sets;
--- a name shows the match that is lit.
-local function searched(box)
-	local text = box:GetText():match("^%s*(.-)%s*$")
-	local entry = tonumber(text)
-	if entry then
-		box:ClearFocus()
-		pinned = { entry = entry }
-		frame.Results:Hide()
-		return refresh()
-	end
+--- A search entered: the match that is lit becomes the source.
+local function searched()
 	local wmo = found:GetSize() > 0 and found:Find(picked)
 	if wmo then
 		pick(wmo)
@@ -862,10 +875,24 @@ local function followSource(box)
 		pinned = nil
 		frame.Search:SetText("")
 	else
-		-- Unticked with nothing shown, the source stays empty until a search fills it.
-		pinned = shown and { file = shown.file, name = shown.name } or { empty = true }
+		-- Unticked with nothing shown, the source stays empty until a search or an ID fills it.
+		pinned = shown and { file = shown.file, name = shown.name, entry = shownEntry }
+			or { empty = true }
 	end
 	refresh()
+end
+
+--- An ID typed, once its box is left: the WMO that gob entry is becomes the source, kept whatever
+-- gob is selected; anything but a new number puts back the one shown.
+local function idChanged(box)
+	local entry = tonumber(box:GetText())
+	if entry and entry ~= shownEntry then
+		pinned = { entry = entry }
+		frame.Search:SetText("")
+		frame.Results:Hide()
+		return refresh()
+	end
+	update()
 end
 
 --- Follow the selection with the target, or keep the position shown whatever is selected.
@@ -1032,6 +1059,10 @@ local function layoutNumbers()
 			box:SetTextInsets(box.Axis:GetStringWidth() + 6, 4, 0, 0)
 		end
 	end
+	-- The source's ID box is as wide as one of the three on the target's first row.
+	local id = frame.SourceID
+	id:SetWidth((width - 2 * NUMBER_GAP) / 3 - NUMBER_ART)
+	id:SetTextInsets(id.Axis:GetStringWidth() + 6, 4, 0, 0)
 end
 
 --- Size each button to its words and its caps.
@@ -1079,7 +1110,7 @@ end
 
 local function buildSearch()
 	local search = frame.Search
-	search.Instructions:SetText("Search a WMO by name or entry")
+	search.Instructions:SetText("Search a WMO by name")
 	search:HookScript("OnTextChanged", Client.Guarded(searchChanged))
 	search:HookScript("OnEnterPressed", Client.Guarded(searched))
 	search:HookScript("OnEscapePressed", function()
@@ -1112,6 +1143,21 @@ local function buildSource()
 	hint(frame.SourceFollow, "Follow selection", {
 		{ text = "Ticked, the sets are those of the selected WMO." },
 		{ text = "Unticked, they stay this WMO's whatever gob is selected." },
+	})
+	-- Typed in and left, by Enter or a click away, the ID takes; Escape puts back the one shown.
+	local id = frame.SourceID
+	id.Axis:SetText("ID")
+	id.Axis:SetTextColor(GREY[1], GREY[2], GREY[3])
+	id:SetScript("OnEnterPressed", id.ClearFocus)
+	id:SetScript("OnEscapePressed", function(box)
+		box:SetText(shownEntry and tostring(shownEntry) or "")
+		box:ClearFocus()
+	end)
+	id:HookScript("OnEditFocusGained", id.HighlightText)
+	id:HookScript("OnEditFocusLost", Client.Guarded(idChanged))
+	hint(id, "ID", {
+		{ text = "The gob entry whose WMO the sets come from." },
+		{ text = "Type one to keep that WMO whatever gob is selected." },
 	})
 	listOf(list, provider, "FurnishSetRowTemplate", initRow)
 	list:SetBackdropColor(0, 0, 0, 0.25)

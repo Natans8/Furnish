@@ -37,7 +37,7 @@ end
 
 --- An object's pose from EpsilonLib's record of it. The rotation is the record's own, roll
 -- on x, pitch on y, turn on z, with the server's orientation standing in for the turn where
--- the record carries none. Beside the pose: guid, file, name, wmo, groupLeader, canEdit.
+-- the record carries none. Beside the pose: guid, entry, file, name, wmo, groupLeader, canEdit.
 function Pose.OfRecord(object)
 	local rotation = object.transform and object.transform.rotation or {}
 	local position = object.transform and object.transform.position or {}
@@ -51,6 +51,7 @@ function Pose.OfRecord(object)
 		rotation = { roll = rotation.x or 0, pitch = rotation.y or 0, turn = turn },
 		scale = object.scale or 1,
 		guid = tonumber(object.guid),
+		entry = tonumber(object.entry),
 		file = object.fileID,
 		name = name,
 		wmo = object.IsWMO and object:IsWMO() or false,
