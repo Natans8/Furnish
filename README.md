@@ -63,8 +63,8 @@ doodad `.doodad select` picks is a selection of its own, held beside the gob's: 
 Source or Target, and while there is one a panel stands against the window's right edge with
 its name and the sets of the WMO it is, those it draws already marked baked. Use as source keeps
 that WMO as the source, with the sets the doodad drew beyond its base chosen. Import doodad turns
-it into a gob that is selected and followed by Target like any other; while Source follows the
-selection, the same sets come chosen on it, and a Source kept as it is stays so. The doodad is
+it into a gob that is selected like any other; while Source follows the selection, the same sets
+come chosen on it, and either block kept as it is stays so. The doodad is
 hidden, not gone, and stays selected; closing the panel lets it go. Group on spawn makes the objects one group,
 led by a pivot the button counts; Include the target makes the target lead it instead, and
 where the target is in a group already a mark warns and Spawn asks first. The status row

@@ -14,9 +14,9 @@
 -- window: picking it never changes the source or the target, and selecting a gob never clears
 -- it. It is a step before the gob pipeline, giving each side something in advance. Use as source
 -- keeps its WMO as the source with the sets it drew chosen; Import doodad turns it into a gob,
--- selected and followed like any other, with those sets chosen while the source follows the
--- selection. Importing hides the doodad, which stays selected, so the panel keeps it. While a run
--- goes nothing changes, since every spawn moves the selection.
+-- selected like any other, with those sets chosen while the source follows the selection; a
+-- block kept as it is stays so. Importing hides the doodad, which stays selected, so the panel
+-- keeps it. While a run goes nothing changes, since every spawn moves the selection.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -886,7 +886,7 @@ end
 local function importLines()
 	local lines = {
 		{
-			text = "Turn the doodad into a gob, selected, which the target follows. The gob draws only its base set, so while Source follows the selection, the doodad's other sets come chosen.",
+			text = "Turn the doodad into a gob, selected like any other. The gob draws only its base set, so while Source follows the selection, the doodad's other sets come chosen.",
 		},
 	}
 	if doodad and doodad.imported then
@@ -951,13 +951,12 @@ local function useDoodad()
 	refresh()
 end
 
---- Import the doodad picked: it becomes a gob, selected, which the target follows. While the
--- source follows the selection too, the sets the doodad drew come chosen when that gob is shown;
--- a source kept as it is stays so, its chosen sets and all. The doodad is hidden, not gone, and
--- stays selected, so it stays in its slot.
+--- Import the doodad picked: it becomes a gob, selected like any other, which Source and Target
+-- each follow while ticked; the sets the doodad drew come chosen when the source shows that gob.
+-- Either kept as it is stays so, the source's chosen sets and all. The doodad is hidden, not
+-- gone, and stays selected, so it stays in its slot.
 local function importDoodad()
 	doodad.imported = true
-	spotPinned = false
 	if not pinned then
 		marks, chosen, shown = doodad, {}, nil
 	end
