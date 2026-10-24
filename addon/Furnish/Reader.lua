@@ -146,7 +146,7 @@ function Reader.Sets(file)
 end
 
 --- Whether a root's own doodads are blanked, every one at scale 0, so it draws none of its
--- sets itself; its sets are the building's it was emptied from. Load first.
+-- sets itself; its sets are the WMO's it was emptied from. Load first.
 -- @param file the root's file id
 function Reader.IsBlank(file)
 	return data().blank[file] == true

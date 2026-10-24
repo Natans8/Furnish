@@ -3,7 +3,7 @@
 -- The data keys sets by the root's file id. A selected object's record carries that id, and
 -- a gameobject entry, the number a lookup line prints, reaches it through the data, which
 -- carries every WMO object the server lists. A root Epsilon emptied, an emptywmo twin or one
--- of its own copies, carries in the data the sets of the building it was emptied from. A map
+-- of its own copies, carries in the data the sets of the WMO it was emptied from. A map
 -- placement gives the sets the zone chose.
 
 _G.Furnish = _G.Furnish or {}
@@ -71,7 +71,7 @@ function Sets.OfEntry(entry)
 end
 
 --- Whether a root draws none of its sets itself, Epsilon having emptied it; its sets are
--- the building's it was emptied from, and the base set goes under any other.
+-- the WMO's it was emptied from, and the base set goes under any other.
 function Sets.IsBlank(file)
 	return Reader.Load() and Reader.IsBlank(file)
 end

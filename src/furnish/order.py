@@ -1,8 +1,8 @@
 """The order a set spawns in: a trail a player can follow with their eyes.
 
-The walk starts at the placement nearest the building's origin, which is where a set is
+The walk starts at the placement nearest the WMO's origin, which is where a set is
 anchored, and always moves to the nearest placement not yet placed. Each object appears beside
-the one before it, so the furnishing creeps across the building instead of popping up at
+the one before it, so the furnishing creeps across the WMO instead of popping up at
 random; the walk jumps only when it has finished an area and moves on to the nearest one left.
 Ties go to the placement that comes first in the order given, so the trail is the same on
 every export.

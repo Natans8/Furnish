@@ -16,11 +16,11 @@ local Chat = Furnish.Chat
 Command.USAGE = {
 	{ "", "open the window" },
 	{ "help", "this help" },
-	{ "list", "the selected building's sets" },
+	{ "list", "the selected WMO's sets" },
 	{ "list <entry>", "an object's sets, by the entry on its lookup line" },
-	{ "<set>", "spawn a set on the selected building" },
+	{ "<set>", "spawn a set on the selected WMO" },
 	{ "<set> from <entry>", "spawn an object's set on the selected object" },
-	{ "<set> here", "spawn the selected building's set at your feet" },
+	{ "<set> here", "spawn the selected WMO's set at your feet" },
 	{ "<set> here <entry>", "spawn an object's set at your feet" },
 	{ "import", "import the selected doodad and furnish it, grouped on it" },
 	{ "stop", "stop spawning" },
@@ -134,7 +134,7 @@ local function helpLines()
 			.. "Furnish"
 			.. Chat.END
 			.. Chat.GREY
-			.. " spawns a building's doodad sets as objects"
+			.. " spawns a WMO's doodad sets as objects"
 			.. Chat.END,
 	}
 	for i, row in ipairs(Command.USAGE) do
@@ -148,7 +148,7 @@ local function helpLines()
 		.. "A set in a list is a link: click it to spawn it, ctrl-click to spawn it at your feet."
 		.. Chat.END
 	lines[#lines + 1] = Chat.GREY
-		.. "A building's doodad line carries a [Furnish] button: it imports the building and furnishes it."
+		.. "A WMO's doodad line carries a [Furnish] button: it imports the WMO and furnishes it."
 		.. Chat.END
 	return lines
 end
@@ -192,7 +192,7 @@ local function fromLink(words)
 end
 
 --- A click on a list link spawns its set: plainly on the selected object, with ctrl at
--- the player's feet. A click on a doodad line's button imports that building and furnishes it.
+-- the player's feet. A click on a doodad line's button imports that WMO and furnishes it.
 function Command.Click(words, modifier)
 	-- TODO: a shift-click shares the set, once what a shared set carries is decided.
 	if modifier == "share" then
@@ -228,11 +228,11 @@ _G.SLASH_FURNISH2 = "/furnish"
 _G.SlashCmdList.FURNISH = Client.Guarded(Command.Run)
 Chat.OnLinks(Command.Click, Command.Hover)
 
---- The unique id of the map doodad a server line names by its link, where it is a building
+--- The unique id of the map doodad a server line names by its link, where it is a WMO
 -- Furnish has sets for. The number after the name in the link is the object's gameobject
--- entry, and the data answers for it; the name is never read, since many a building's
+-- entry, and the data answers for it; the name is never read, since many a WMO's
 -- name has no `.wmo` in it. The first such line loads the data.
-function Command.PlacedBuilding(line)
+function Command.PlacedWmo(line)
 	local uid, entry = line:match("|Hdoodad_uid:(%d+):[^|]*|h%[.- %- (%d+)%]|h")
 	if uid and Furnish.Sets.OfEntry(tonumber(entry)) then
 		return uid
@@ -240,9 +240,9 @@ function Command.PlacedBuilding(line)
 	return nil
 end
 
--- A building's doodad line, from a select or a near, gets a button that imports and
+-- A WMO's doodad line, from a select or a near, gets a button that imports and
 -- furnishes it, beside the server's own.
 Chat.OnServerLines(function(line)
-	local uid = Command.PlacedBuilding(line)
+	local uid = Command.PlacedWmo(line)
 	return uid and " - " .. Chat.Link("import:" .. uid, "Furnish") or nil
 end)

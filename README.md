@@ -1,7 +1,7 @@
 # Furnish
 
 The doodad sets of World of Warcraft's WMOs as a database, so that an Epsilon addon can
-spawn a building's furniture as gameobjects.
+spawn a WMO's furniture as gameobjects.
 
 A WMO root file names its doodad sets (`MODS`) and every placement each set holds
 (`MODD`, `MODI`). Epsilon spawns a WMO with its default set only, and spawns each model
@@ -16,12 +16,12 @@ reads the first.
 
 | command                    | does                                                              |
 |----------------------------|-------------------------------------------------------------------|
-| `/furn`                    | open the window: the selected building's sets, grouping, progress |
-| `/furn list`               | the selected building's sets                                      |
+| `/furn`                    | open the window, described below                                  |
+| `/furn list`               | the selected WMO's sets                                           |
 | `/furn list <entry>`       | an object's sets, by the entry on its lookup line                 |
-| `/furn <set>`              | spawn a set on the selected building                              |
+| `/furn <set>`              | spawn a set on the selected WMO                                   |
 | `/furn <set> from <entry>` | spawn an object's set on the selected object                      |
-| `/furn <set> here`         | spawn the selected building's set at your feet                    |
+| `/furn <set> here`         | spawn the selected WMO's set at your feet                         |
 | `/furn <set> here <entry>` | spawn an object's set at your feet                                |
 | `/furn import`             | import the selected doodad and furnish it, grouped on it          |
 | `/furn stop`               | stop spawning; a second stop gives up on a reply that never comes |
@@ -34,14 +34,21 @@ A set, list or import takes any of these words after it:
 | `first`   | its first object leads the group, instead of an invisible pivot |
 | `attach`  | join the selected object's group                                |
 | `nogroup` | spawn every object ungrouped                                    |
-| `base`    | lay the base set under it, as an emptied building always gets   |
+| `base`    | lay the base set under it, as an emptied WMO always gets        |
 
-Each set in a list is a link: a click spawns it on the selected object, building or not, a
+Each set in a list is a link: a click spawns it on the selected object, WMO or not, a
 ctrl-click at your feet, and resting on it says what it is. A run that leaves a group selects that group
 when it ends, in the chat as if typed, so `.gob group` commands act on it next. While it stays
 selected it stands for the object the run was on, so the next set or list needs no reselecting.
-A building's doodad line, from `.doodad select` or `.doodad near`, carries a `[Furnish]` button
-that imports that building by its unique id and furnishes it as `/furn import` does.
+A WMO's doodad line, from `.doodad select` or `.doodad near`, carries a `[Furnish]` button
+that imports that WMO by its unique id and furnishes it as `/furn import` does.
+
+The window shows the selected WMO's sets, and keeps showing them when the selection moves off
+it. A click chooses a set or lets it go, any number of them, and a double-click spawns one
+alone. Under the list are the grouping and where the sets go, on the target gob or on the
+player; the choices that act on the selected WMO grey out while none is selected. During a run
+a bar counts the objects and the clock, the spawn button stops it, and the bar says how it
+ended. Every choice's tooltip says how a command types it.
 
 ## Build
 
@@ -71,7 +78,7 @@ lacks, a private client's own names, plain or gzipped, and may be repeated. The 
 | `placements`  | a set's doodad in order: display, position, quaternion, scale |
 | `map_sets`    | a map id and ADT unique id, and a set it draws                |
 
-Epsilon empties a building by copying its root with every doodad at scale 0, an emptywmo
+Epsilon empties a WMO by copying its root with every doodad at scale 0, an emptywmo
 twin's also sunk below the ground. Such a root ships none of its own rows: its `wmo_sets`
 are those of the root that places every doodad at the same x, y and rotation, when every
 root that does holds the same sets, and it has none otherwise.
@@ -141,7 +148,7 @@ lead to the first doodad.
 
 | file            | role                                                                                 |
 |-----------------|--------------------------------------------------------------------------------------|
-| `Settings.lua`  | the defaults: marker, in-flight width; `FurnishSettings` keeps changes                |
+| `Settings.lua`  | the defaults: marker, in-flight width; `FurnishSettings` keeps changes               |
 | `Reader.lua`    | the data addon's reader                                                              |
 | `Names.lua`     | a set's name as a player reads it: `Set(name)`                                       |
 | `Transform.lua` | the placement maths: `Place(position, rotation, scale, row)`                         |

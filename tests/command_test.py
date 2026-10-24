@@ -157,10 +157,10 @@ def test_a_refused_command_is_said_once_with_the_prefix(tmp_path: Path) -> None:
 def test_the_help_names_every_command_and_word(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lines = run(lua, "help")
-    assert lines[0] == "|cffffd100Furnish|r|cff9d9d9d spawns a building's doodad sets as objects|r"
+    assert lines[0] == "|cffffd100Furnish|r|cff9d9d9d spawns a WMO's doodad sets as objects|r"
     assert lines[1] == "  |cffffd100/furn|r open the window"
     assert lines[2] == "  |cffffd100/furn help|r this help"
-    assert lines[3] == "  |cffffd100/furn list|r the selected building's sets"
+    assert lines[3] == "  |cffffd100/furn list|r the selected WMO's sets"
     assert "  |cffffd100attach|r join the selected object's group" in lines
     assert lines[-2].endswith("click it to spawn it, ctrl-click to spawn it at your feet.|r")
     assert len(lines) == 1 + 11 + 1 + 4 + 2
@@ -176,13 +176,13 @@ def test_the_command_alone_opens_the_window(tmp_path: Path) -> None:
 # -- What a window reads -----------------------------------------------------------------
 
 
-def test_a_window_sees_the_selected_building_and_its_sets(tmp_path: Path) -> None:
+def test_a_window_sees_the_selected_wmo_and_its_sets(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     assert lua.eval("select(2, Furnish.Console.Target())") == "no object is selected"
     lua.execute("SELECTED = 502")
     assert (
         lua.eval("select(2, Furnish.Console.Target())")
-        == "chair.m2 is not a building, so it has no sets"
+        == "chair.m2 is not a WMO, so it has no sets"
     )
     lua.execute("SELECTED = 500")
     target = lua.eval("Furnish.Console.Target()")
@@ -191,7 +191,7 @@ def test_a_window_sees_the_selected_building_and_its_sets(tmp_path: Path) -> Non
         (0, "Base", 1, ""),
         (1, "Full", 2, "Set_Full"),
     ]
-    # The group the run selects stands for the building it was on.
+    # The group the run selects stands for the WMO it was on.
     run(lua, "1")
     assert lua.eval("Furnish.Console.Target()").name == "house"
     lua.execute("GROUP_LEADER = 12345")
@@ -249,19 +249,18 @@ def test_a_list_prints_each_set_as_a_link_carrying_the_words(tmp_path: Path) -> 
     assert sent(lua) == []
 
 
-def test_a_list_refuses_without_a_building(tmp_path: Path) -> None:
+def test_a_list_refuses_without_a_wmo(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     assert run(lua, "list") == [
-        PREFIX + "no object is selected; select the building first, as with .gob select"
+        PREFIX + "no object is selected; select the WMO first, as with .gob select"
     ]
     lua.execute("SELECTED = 502")
     assert run(lua, "list") == [
-        PREFIX + "chair.m2 is not a building, so it has no sets; "
+        PREFIX + "chair.m2 is not a WMO, so it has no sets; "
         "/furn list <entry> lists another object's"
     ]
     assert run(lua, "list 5") == [
-        PREFIX
-        + "object 5 is not a building Furnish has sets for; check the entry on its lookup line"
+        PREFIX + "object 5 is not a WMO Furnish has sets for; check the entry on its lookup line"
     ]
 
 
@@ -287,7 +286,7 @@ def test_an_ungrouped_spawn_selects_nothing(tmp_path: Path) -> None:
     assert shown(lua) == []
 
 
-def test_attach_joins_the_buildings_own_group(tmp_path: Path) -> None:
+def test_attach_joins_the_wmos_own_group(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 501")
     assert run(lua, "1 attach")[0].endswith("joining emptywmo_house's group")
@@ -300,8 +299,17 @@ def test_an_emptywmo_is_given_the_base_set_it_does_not_draw(tmp_path: Path) -> N
     lua.execute("SELECTED = 501")
     line = run(lua, "1 nogroup")[0]
     assert line == (
-        PREFIX
-        + "spawning Full (set 1, 2 objects and the base set's 1) on emptywmo_house, ungrouped"
+        PREFIX + "spawning Base and Full (sets 0 and 1, 3 objects) on emptywmo_house, ungrouped"
+    )
+    assert [s.split()[2] for s in sent(lua)] == ["-21", "-20", "-21"]
+
+
+def test_several_sets_spawn_together_and_the_base_set_comes_once(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("SELECTED = 501")
+    lua.globals().Furnish.Console.Spawn(lua.eval("{ indexes = { 0, 1 }, group = 'nogroup' }"))
+    assert printed(lua)[-2] == (
+        PREFIX + "spawning Base and Full (sets 0 and 1, 3 objects) on emptywmo_house, ungrouped"
     )
     assert [s.split()[2] for s in sent(lua)] == ["-21", "-20", "-21"]
 
@@ -326,11 +334,11 @@ def test_a_set_at_the_players_feet_needs_no_selection(tmp_path: Path) -> None:
 def test_a_spawn_refuses_with_the_way_out(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     assert run(lua, "1")[0].endswith(
-        "no object is selected; select the building first, as with .gob select"
+        "no object is selected; select the WMO first, as with .gob select"
     )
     lua.execute("SELECTED = 'group'")
     assert run(lua, "1")[0].endswith(
-        "a group is selected, not one object; select the building first, as with .gob select"
+        "a group is selected, not one object; select the WMO first, as with .gob select"
     )
     lua.execute("SELECTED = 500")
     assert run(lua, "7") == [PREFIX + "house has no set 7; /furn list shows its 2"]
@@ -340,17 +348,15 @@ def test_a_spawn_refuses_with_the_way_out(tmp_path: Path) -> None:
     assert sent(lua) == []
 
 
-GROUP_REFUSED = (
-    "a group is selected, not one object; select the building first, as with .gob select"
-)
+GROUP_REFUSED = "a group is selected, not one object; select the WMO first, as with .gob select"
 
 
-def test_the_group_a_run_selected_stands_for_its_building_read_fresh(tmp_path: Path) -> None:
+def test_the_group_a_run_selected_stands_for_its_wmo_read_fresh(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 500")
     run(lua, "1")
     assert lua.eval("Furnish.Client.SelectedGroup()") == "7001"
-    # The group moved the building after the run; the next set goes where it stands now.
+    # The group moved the WMO after the run; the next set goes where it stands now.
     lua.execute("RECORDS[500].transform.position.x = 99")
     before = len(sent(lua))
     assert run(lua, "1")[0] == (
@@ -371,7 +377,7 @@ def test_a_group_no_run_selected_is_still_refused(tmp_path: Path) -> None:
     assert run(lua, "1")[0].endswith(GROUP_REFUSED)
 
 
-def test_a_building_that_cannot_be_selected_again_says_so_and_is_forgotten(
+def test_a_wmo_that_cannot_be_selected_again_says_so_and_is_forgotten(
     tmp_path: Path,
 ) -> None:
     lua = command_lua(tmp_path)
@@ -380,12 +386,12 @@ def test_a_building_that_cannot_be_selected_again_says_so_and_is_forgotten(
     lua.execute("SELECT_REFUSED = true")
     assert run(lua, "1") == [
         PREFIX + "the group stands for object 500, but selecting it was refused: "
-        '"Object not found"; select the building first'
+        '"Object not found"; select the WMO first'
     ]
     assert run(lua, "1")[0].endswith(GROUP_REFUSED)
 
 
-def test_a_wait_for_the_building_blocks_another_and_stops_with_nothing_spawned(
+def test_a_wait_for_the_wmo_blocks_another_and_stops_with_nothing_spawned(
     tmp_path: Path,
 ) -> None:
     lua = command_lua(tmp_path, deferred=True)
@@ -532,7 +538,7 @@ def test_a_second_stop_gives_up_on_the_reply_and_still_deletes(tmp_path: Path) -
 def test_a_set_at_the_feet_with_nothing_selected_offers_naming_it(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     assert run(lua, "1 here") == [
-        PREFIX + "no object is selected; select the building first, as with .gob select, "
+        PREFIX + "no object is selected; select the WMO first, as with .gob select, "
         "or name it, as /furn 3 here <entry>"
     ]
 
@@ -544,11 +550,11 @@ def test_an_import_with_base_lays_the_base_set_the_map_did_not_name(tmp_path: Pa
     )
 
 
-def test_an_imported_doodad_that_is_no_building_is_said_so(tmp_path: Path) -> None:
+def test_an_imported_doodad_that_is_no_wmo_is_said_so(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("IMPORT_GUID = 502")
     assert run(lua, "import") == [
-        PREFIX + "imported house.wmo as object 502; it is not a building, so it has no sets"
+        PREFIX + "imported house.wmo as object 502; it is not a WMO, so it has no sets"
     ]
 
 
@@ -567,7 +573,7 @@ def test_an_import_waiting_for_its_object_says_so_to_another_command(tmp_path: P
     lua = command_lua(tmp_path, deferred=True)
     run(lua, "import")
     assert run(lua, "list") == [
-        PREFIX + "no object is selected; select the building first, as with .gob select"
+        PREFIX + "no object is selected; select the WMO first, as with .gob select"
     ]
     assert run(lua, "1") == [
         PREFIX + "Furnish is waiting for the imported object; /furn stop ends it"
@@ -588,11 +594,11 @@ def test_a_named_set_spawns_on_any_selected_object(tmp_path: Path) -> None:
     )
 
 
-def test_a_set_read_off_the_selection_needs_a_building(tmp_path: Path) -> None:
+def test_a_set_read_off_the_selection_needs_a_wmo(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 502")
     assert run(lua, "1") == [
-        PREFIX + "chair.m2 is not a building, so it has no sets; name one, as /furn 3 from <entry>"
+        PREFIX + "chair.m2 is not a WMO, so it has no sets; name one, as /furn 3 from <entry>"
     ]
     lua.execute("SELECTED = nil")
     assert run(lua, "1 from 817579") == [
@@ -616,7 +622,7 @@ def test_the_command_answers_to_both_its_names(tmp_path: Path) -> None:
     assert list(lua.eval("SLASH_FURNISH1, SLASH_FURNISH2")) == ["/furn", "/furnish"]
 
 
-BUILDING_LINE = (
+WMO_LINE = (
     "Selected doodad |Hdoodad_uid:4242:0|h[6dr_draenei_house2 - 817579]|h (UID: 4242) "
     "at X: 1 Y: 2 Z: 3 on map 1116 with scale: 1.000000."
 )
@@ -633,12 +639,12 @@ def shown_line(lua: lua51.LuaRuntime, line: str) -> Any:
     return out
 
 
-def test_a_buildings_doodad_line_carries_a_button_that_imports_and_furnishes_it(
+def test_a_wmos_doodad_line_carries_a_button_that_imports_and_furnishes_it(
     tmp_path: Path,
 ) -> None:
     lua = command_lua(tmp_path)
-    line = shown_line(lua, BUILDING_LINE)
-    assert line == BUILDING_LINE + " - |cff71d5ff|Hgarrmission:furnish:import:4242|h[Furnish]|h|r"
+    line = shown_line(lua, WMO_LINE)
+    assert line == WMO_LINE + " - |cff71d5ff|Hgarrmission:furnish:import:4242|h[Furnish]|h|r"
     lua.globals().HOOKS.SetItemRef("garrmission:furnish:import:4242")
     assert sent(lua)[:2] == ["doodad import 4242", "gobject select 500"]
     assert printed(lua)[-2] == (
@@ -646,12 +652,10 @@ def test_a_buildings_doodad_line_carries_a_button_that_imports_and_furnishes_it(
     )
 
 
-def test_a_line_whose_entry_is_no_furnished_building_is_left_as_it_came(tmp_path: Path) -> None:
+def test_a_line_whose_entry_is_no_furnished_wmo_is_left_as_it_came(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
-    # Named like a building, but an entry the data has no sets for.
-    model_line = BUILDING_LINE.replace(
-        "6dr_draenei_house2 - 817579", "6dr_draenei_house2.wmo - 717747"
-    )
+    # Named like a WMO, but an entry the data has no sets for.
+    model_line = WMO_LINE.replace("6dr_draenei_house2 - 817579", "6dr_draenei_house2.wmo - 717747")
     assert shown_line(lua, model_line) == model_line
     assert shown_line(lua, "You have mounted 17697.") == "You have mounted 17697."
 

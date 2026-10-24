@@ -8,7 +8,7 @@ authors = [{ name = "Natan Shick" }]
 requires-python = ">=3.14"
 dependencies = [
     # The spawn order's walk: the nearest placement left, at every step of every
-    # set, which is millions of distances on the largest buildings.
+    # set, which is millions of distances on the largest WMOs.
     "numpy>=2.5.4",
     # Progress for the steps that take minutes: a walk over sixteen thousand
     # roots, a download of the display table.

@@ -191,7 +191,7 @@ def _donor(
     sets_by_root: dict[int, dict[int, int]],
     report: Report,
 ) -> dict[int, int] | None:
-    """The sets a blank root takes from the building it was emptied from, or None.
+    """The sets a blank root takes from the WMO it was emptied from, or None.
 
     The roots that match it exactly, but for the scale, are asked first, and the roots that
     place its doodads at the same spot across the ground after them; it takes the sets of the
@@ -213,10 +213,10 @@ def _donor(
 def _blanked(root: Root) -> bool:
     """Whether every doodad the root places is at scale 0, which draws nothing.
 
-    Epsilon empties a building this way: the file is the original's with every placement's
+    Epsilon empties a WMO this way: the file is the original's with every placement's
     scale set to 0, and in an emptywmo twin its height set below the ground and its models
     swapped too. The doodads keep their place across the ground and their rotation, so the
-    root's layout says which building it was emptied from, while its own rows spawn nothing.
+    root's layout says which WMO it was emptied from, while its own rows spawn nothing.
     """
     scales = [p.scale for s in root.sets for p in s.placements]
     return bool(scales) and all(scale == 0 for scale in scales)
@@ -230,7 +230,7 @@ def _layouts(root: Root, start: int = 0) -> tuple[bytes, bytes]:
     """Two fingerprints of where the root places its doodads, set by set from ``start``.
 
     The scale is left out of both. The first holds everything else: model, position and
-    rotation, to the bit, so a copy emptied by its scales alone matches the building it came
+    rotation, to the bit, so a copy emptied by its scales alone matches the WMO it came
     from and no recolour of it. The second holds only the place across the ground and the
     rotation, which an emptywmo twin keeps when it sinks its doodads and swaps their models.
     """

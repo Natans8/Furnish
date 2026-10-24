@@ -1,4 +1,4 @@
--- What the commands do: list a building's sets, spawn one, import a map doodad, and stop.
+-- What the commands do: list a WMO's sets, spawn one, import a map doodad, and stop.
 --
 -- This is the surface, not the API. It holds the one run, reads `attach` off the selection,
 -- and closes a grouped run by selecting the group in the player's sight, so the next group
@@ -8,12 +8,13 @@
 --
 -- A request is plain data, as the command line and a list link both give it:
 --   index   the set's index, as a list prints it
+--   indexes several sets' indexes instead, spawned together in the order given
 --   entry   an object's entry naming the root, as a lookup line prints it
 --   file    a root's file id, which a list link carries
 --   label   what to call that root in a line, which a list link carries
 --   here    true to spawn at the player rather than on the selected object
 --   group   "pivot", "first", "attach" or "nogroup"; nil is "pivot"
---   base    true to lay the root's base set under the set
+--   base    true to lay the root's base set under the sets, unless it is one of them
 --   quiet   true when a window shows the run's progress, so the chat leaves it out
 --
 -- A window reads Target for what to show, Busy for whether it may start, and Watch for the
@@ -90,7 +91,7 @@ local function busy()
 end
 
 --- The selected object's pose, or nil and the way out.
--- @param what what the selection is for, as the way out names it: "the building"
+-- @param what what the selection is for, as the way out names it: "the WMO"
 -- @param otherwise another way out, said after selecting, or nil
 local function selection(what, otherwise)
 	local pose, reason = Pose.Selected()
@@ -146,16 +147,16 @@ local function withSelection(what, otherwise, fn)
 	end)
 end
 
---- Why an object's own sets cannot be read, or nil when it is a building that has them.
-local function notBuilding(pose, instead)
+--- Why an object's own sets cannot be read, or nil when it is a WMO that has them.
+local function notWmo(pose, instead)
 	if pose.wmo then
 		return nil
 	end
-	return pose.name .. " is not a building, so it has no sets; " .. instead
+	return pose.name .. " is not a WMO, so it has no sets; " .. instead
 end
 
 --- The root a request names, what to call it, and the list command that shows its sets;
--- or nil and the way out. Without an entry or a file it is the selected building's own.
+-- or nil and the way out. Without an entry or a file it is the selected WMO's own.
 local function rootOf(request, pose)
 	if request.file then
 		return request.file, request.label, Chat.Typed("list")
@@ -164,7 +165,7 @@ local function rootOf(request, pose)
 		local file = Sets.OfEntry(request.entry)
 		if not file then
 			return nil,
-				("object %d is not a building Furnish has sets for; check the entry on its lookup line"):format(
+				("object %d is not a WMO Furnish has sets for; check the entry on its lookup line"):format(
 					request.entry
 				)
 		end
@@ -253,7 +254,7 @@ end
 
 --- Send a run, having said what it is.
 -- @param target the pose the rows are placed at
--- @param about { what, the set as a line names it; where, "on <building>" or "at your feet";
+-- @param about { what, the set as a line names it; where, "on <WMO>" or "at your feet";
 --   lead, how the group is led as groupOf says it; anchor, the selected object the run is
 --   anchored on, or nil; quiet, true when a window shows the progress instead }
 local function start(rows, target, group, about)
@@ -280,11 +281,11 @@ local function start(rows, target, group, about)
 	running, stopping = handle, false
 end
 
---- What a window shows: the selected building and its sets, or nil and why there are none.
--- While the group the last run selected stays selected, it is the building that run was on.
+--- What a window shows: the selected WMO and its sets, or nil and why there are none.
+-- While the group the last run selected stays selected, it is the WMO that run was on.
 -- @return { name, file, blank, sets }, each set { index, name, count, canonical }, the name as
 --   a line shows it and canonical as the file spells it, empty for the base set; blank is true
---   for a building Epsilon emptied, which always gets its base set
+--   for a WMO Epsilon emptied, which always gets its base set
 function Console.Target()
 	local pose, reason = Pose.Selected()
 	if not pose and anchored and Client.SelectedGroup() == anchored.leader then
@@ -294,7 +295,7 @@ function Console.Target()
 		return nil, reason
 	end
 	if not pose.wmo then
-		return nil, pose.name .. " is not a building, so it has no sets"
+		return nil, pose.name .. " is not a WMO, so it has no sets"
 	end
 	local loaded, why = Reader.Load()
 	if not loaded then
@@ -333,7 +334,7 @@ function Console.Watch(watcher)
 	end
 end
 
---- Print a root's sets, each a link that spawns it; pose is the selected building's, or nil
+--- Print a root's sets, each a link that spawns it; pose is the selected WMO's, or nil
 -- where the request names an entry.
 local function list(request, pose)
 	local file, label = rootOf(request, pose)
@@ -365,7 +366,7 @@ local function list(request, pose)
 end
 
 --- Print a root's sets, each a link that spawns it.
--- @param request { entry } for an object's sets, or {} for the selected building's; group
+-- @param request { entry } for an object's sets, or {} for the selected WMO's; group
 --   and base ride along on every link
 function Console.List(request)
 	local loaded, reason = Reader.Load()
@@ -375,8 +376,8 @@ function Console.List(request)
 	if request.entry then
 		return list(request, nil)
 	end
-	withSelection("the building", nil, function(pose)
-		local wrong = notBuilding(pose, Chat.Typed("list <entry>") .. " lists another object's")
+	withSelection("the WMO", nil, function(pose)
+		local wrong = notWmo(pose, Chat.Typed("list <entry>") .. " lists another object's")
 		if wrong then
 			return say(wrong)
 		end
@@ -412,12 +413,12 @@ function Console.Describe(request, tooltip)
 	tooltip:AddLine("Ctrl-click: spawn it at your feet", 1, 1, 1)
 end
 
---- Fill a tooltip for the button on a building's doodad line.
+--- Fill a tooltip for the button on a WMO's doodad line.
 -- @param tooltip a tooltip owned and empty
 function Console.DescribeImport(tooltip)
 	tooltip:SetText("Furnish", 1, 1, 1)
 	tooltip:AddLine(
-		"Import this building and spawn the sets the map placed it with, grouped on it",
+		"Import this WMO and spawn the sets the map placed it with, grouped on it",
 		0.62,
 		0.62,
 		0.62,
@@ -425,8 +426,29 @@ function Console.DescribeImport(tooltip)
 	)
 end
 
---- Spawn a set; pose is the selected object's, or nil where the set goes at the player from a
--- named root and joins no object's group.
+--- The rows of several sets in the order given, and how a line names them, as "Base and Full
+-- (sets 0 and 1, 3 objects)"; or nil and the reason.
+local function gather(chosen)
+	local rows, names, indexes = {}, {}, {}
+	for i, set in ipairs(chosen) do
+		local own, missing = Rows.OfSet(set.id)
+		if not own then
+			return nil, missing
+		end
+		rows = Rows.Union(rows, own)
+		names[i], indexes[i] = setName(set), set.index
+	end
+	return rows,
+		("%s (%s %s, %s)"):format(
+			table.concat(names, " and "),
+			#chosen == 1 and "set" or "sets",
+			table.concat(indexes, " and "),
+			objects(#rows)
+		)
+end
+
+--- Spawn sets; pose is the selected object's, or nil where they go at the player from a named
+-- root and join no object's group.
 local function spawnOn(request, pose)
 	local target, reason = pose, nil
 	if request.here then
@@ -444,27 +466,26 @@ local function spawnOn(request, pose)
 	if not sets then
 		return say(reason)
 	end
-	local set = Sets.Pick(file, request.index)
-	if not set then
-		return say(
-			("%s has no set %d; %s shows its %d"):format(label, request.index, listing, #sets)
-		)
+	local chosen, hasBase = {}, false
+	for _, index in ipairs(request.indexes or { request.index }) do
+		local set = Sets.Pick(file, index)
+		if not set then
+			return say(("%s has no set %d; %s shows its %d"):format(label, index, listing, #sets))
+		end
+		chosen[#chosen + 1] = set
+		hasBase = hasBase or set.index == 0
 	end
-	local rows, missing = Rows.OfSet(set.id)
-	if not rows then
-		return say(missing)
-	end
-	local what = ("%s (set %d, %s"):format(setName(set), set.index, objects(#rows))
-	-- A building Epsilon emptied draws no base set of its own, so one standing as the target
-	-- gets it.
+	-- A WMO Epsilon emptied draws no base set of its own, so one standing as the target gets
+	-- it, under the rest and once.
 	local base = request.base or (not request.here and Sets.IsBlank(pose.file))
-	if base and set.index ~= 0 and sets[1].index == 0 then
-		local under = Rows.OfSet(sets[1].id)
-		rows = Rows.Union(under, rows)
-		what = what .. " and the base set's " .. #under
+	if base and not hasBase and sets[1].index == 0 then
+		table.insert(chosen, 1, sets[1])
 	end
-	what = what .. ")"
-	-- The set is named by its building wherever it is not going onto that building.
+	local rows, what = gather(chosen)
+	if not rows then
+		return say(what)
+	end
+	-- The set is named by its WMO wherever it is not going onto that WMO.
 	if request.here or label ~= pose.name then
 		what = label .. "'s " .. what
 	end
@@ -493,13 +514,13 @@ function Console.Spawn(request)
 		return say(reason)
 	end
 	-- The selected object is the target unless the set goes at the player, and any object
-	-- will do. It must be a building only where the set is its own, read off it because
+	-- will do. It must be a WMO only where the set is its own, read off it because
 	-- neither a link nor an entry names one; and it leads the group a set attaches to.
 	local named = request.entry or request.file
 	if request.here and named and request.group ~= "attach" then
 		return spawnOn(request, nil)
 	end
-	local what = not named and "the building"
+	local what = not named and "the WMO"
 		or request.here and "the object whose group to join"
 		or "the object to spawn on"
 	local otherwise = request.here and not named and request.group ~= "attach"
@@ -508,7 +529,7 @@ function Console.Spawn(request)
 		otherwise and (", or name it, as " .. Chat.Typed("3 here <entry>")) or nil,
 		function(pose)
 			local wrong = not named
-				and notBuilding(pose, "name one, as " .. Chat.Typed("3 from <entry>"))
+				and notWmo(pose, "name one, as " .. Chat.Typed("3 from <entry>"))
 			if wrong then
 				return say(wrong)
 			end
@@ -517,7 +538,7 @@ function Console.Spawn(request)
 	)
 end
 
---- The sets of an imported building the map placed it with, beyond the base set it shows
+--- The sets of an imported WMO the map placed it with, beyond the base set it shows
 -- itself; with base, the base set as well, whether the map named it or not.
 local function placed(pose, ids, base)
 	local chosen = {}
@@ -534,7 +555,7 @@ local function placed(pose, ids, base)
 end
 
 --- Import a map doodad, then spawn on it the sets the map placed it with, grouped on the
--- building it now is unless a word says otherwise.
+-- WMO it now is unless a word says otherwise.
 -- @param request uid, the doodad's unique id, or nil for the selected doodad; group and
 --   base, as for a spawn
 function Console.Import(request)
@@ -576,10 +597,7 @@ function Console.Import(request)
 		local pose = Pose.OfRecord(record)
 		if not pose.wmo then
 			return say(
-				("imported %s as object %s; it is not a building, so it has no sets"):format(
-					model,
-					guid
-				)
+				("imported %s as object %s; it is not a WMO, so it has no sets"):format(model, guid)
 			)
 		end
 		local chosen = ids and placed(pose, ids, request.base) or {}
@@ -588,7 +606,7 @@ function Console.Import(request)
 				("imported %s as object %s; %s"):format(
 					model,
 					guid,
-					ids and "the map draws only its base set, which the building shows itself"
+					ids and "the map draws only its base set, which the WMO shows itself"
 						or (
 							"the map placed it with no set Furnish knows; "
 							.. Chat.Typed("list")
@@ -597,17 +615,10 @@ function Console.Import(request)
 				)
 			)
 		end
-		local rows, names, indexes = {}, {}, {}
-		for i, set in ipairs(chosen) do
-			rows = Rows.Union(rows, Rows.OfSet(set.id))
-			names[i], indexes[i] = setName(set), set.index
+		local rows, what = gather(chosen)
+		if not rows then
+			return say(what)
 		end
-		local what = ("%s (%s %s, %s)"):format(
-			table.concat(names, " and "),
-			#chosen == 1 and "set" or "sets",
-			table.concat(indexes, " and "),
-			objects(#rows)
-		)
 		local group, lead = groupOf({ group = request.group or "attach" }, pose)
 		start(
 			rows,

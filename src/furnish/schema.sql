@@ -29,7 +29,7 @@ CREATE TABLE root_displays (
 
 CREATE TABLE blank_roots (
     file INTEGER PRIMARY KEY        -- a root whose every doodad is at scale 0, so it draws none;
-) WITHOUT ROWID;                    -- its wmo_sets are the building's it was emptied from
+) WITHOUT ROWID;                    -- its wmo_sets are the WMO's it was emptied from
 
 CREATE TABLE entries (
     entry INTEGER PRIMARY KEY,      -- a gameobject entry whose object is a furnished root

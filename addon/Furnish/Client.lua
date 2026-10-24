@@ -77,7 +77,7 @@ function Client.Send()
 end
 
 --- Whether the player may spawn objects in this phase, its members, officers and owner. A
--- refusal is said in chat in Epsilon's own words, as its other building tools say it. Where
+-- refusal is said in chat in Epsilon's own words, as its other tools say it. Where
 -- EpsilonLib cannot answer, the server is left to decide.
 function Client.CanSpawn()
 	local lib = _G.EpsilonLib

@@ -136,7 +136,7 @@ def sunk(p: Placement) -> Placement:
     return replace(p, position=(p.position[0], p.position[1], -1000.0), scale=0.0)
 
 
-def test_a_blanked_root_takes_the_sets_of_the_building_it_was_emptied_from(
+def test_a_blanked_root_takes_the_sets_of_the_wmo_it_was_emptied_from(
     tmp_path: Path,
 ) -> None:
     inputs = write_inputs(tmp_path)
@@ -155,7 +155,7 @@ def test_a_blanked_root_takes_the_sets_of_the_building_it_was_emptied_from(
             models=[1001],
         )
     )
-    # Two buildings place their doodads alike but hold different models.
+    # Two WMOs place their doodads alike but hold different models.
     (roots / "world/wmo/tower.wmo").write_bytes(
         wmo_root(
             [("Set_$DefaultGlobal", [replace(CHAIR, position=(5.0, 0.0, 0.0))])], models=[1001]
