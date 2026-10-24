@@ -83,9 +83,9 @@ local provider, found = _G.CreateDataProvider(), _G.CreateDataProvider()
 
 --- Where the sets come from: the Source request pinned, or nil to follow the selection; the
 -- doodad imported last, whose sets come chosen while its WMO is shown; the source shown, or nil
--- and why there is none; the sets chosen, by index, and the one a shift-click runs from.
+-- and why there is none; and the sets chosen, by index.
 local pinned, marks, shown
-local chosen, anchor = {}, nil
+local chosen = {}
 
 --- Where the sets go: the pose shown, its own copy; what to call it where it is no object's;
 -- whether it stays when the selection moves; and the doodad picked and not yet imported.
@@ -371,18 +371,18 @@ end
 -- else its first set past the base, and the base too where Epsilon emptied the WMO, since it
 -- draws none of its own.
 local function chooseFirst(sets, blank)
-	chosen, anchor = {}, nil
+	chosen = {}
 	for _, set in ipairs(sets) do
 		if set.placed then
-			chosen[set.index], anchor = true, anchor or set.index
+			chosen[set.index] = true
 		end
 	end
-	if anchor then
+	if next(chosen) then
 		return
 	end
 	for _, set in ipairs(sets) do
 		if set.index ~= 0 then
-			chosen[set.index], anchor = true, set.index
+			chosen[set.index] = true
 			break
 		end
 	end
@@ -487,32 +487,14 @@ local function finished(result, seconds)
 	refresh()
 end
 
---- Where a set stands in the list, or nil.
-local function positionOf(index)
-	for position, set in ipairs(shown.sets) do
-		if set.index == index then
-			return position
-		end
-	end
-	return nil
-end
-
---- Select as a file list does: a click selects the one set, a ctrl-click adds or removes one,
--- and a shift-click selects the run from the last set clicked.
+--- A click chooses the one set, and a ctrl-click adds or removes one.
 local function rowClick(button)
 	_G.PlaySound(_G.SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
 	local index = button:GetElementData().index
-	local from = anchor and positionOf(anchor)
-	if _G.IsShiftKeyDown() and from then
-		local to = positionOf(index)
-		chosen = {}
-		for position = math.min(from, to), math.max(from, to) do
-			chosen[shown.sets[position].index] = true
-		end
-	elseif _G.IsControlKeyDown() then
-		chosen[index], anchor = not chosen[index] or nil, index
+	if _G.IsControlKeyDown() then
+		chosen[index] = not chosen[index] or nil
 	else
-		chosen, anchor = { [index] = true }, index
+		chosen = { [index] = true }
 	end
 	update()
 end
@@ -531,8 +513,7 @@ local function rowEnter(button)
 	elseif set.placed then
 		lines[#lines + 1] = { text = "The doodad showed it", colour = GREEN }
 	end
-	lines[#lines + 1] =
-		{ text = "Click: choose it. Ctrl: add it. Shift: choose the run", colour = GREEN }
+	lines[#lines + 1] = { text = "Click: choose it. Ctrl-click: add or remove it", colour = GREEN }
 	tip(button, set.name, lines)
 end
 

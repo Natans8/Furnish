@@ -45,19 +45,20 @@ that imports that WMO by its unique id and furnishes it as `/furn import` does, 
 selection line, from `.gob select`, one that lists its sets.
 
 The window works on gobs and shows where the sets come from, which to spawn, and where they
-go. The sets are the selected WMO's until a WMO is searched, by name or by entry, or the pin
-beside the name is clicked; a name lists the WMOs with sets that the client's own catalogue
-names like it, emptied copies marked, and a selection with no sets says so. The list selects as
-a file list does: a click selects one set, a ctrl-click adds or removes one, a shift-click
-selects a run of them, and a marker at either end counts the chosen sets scrolled out of view.
-Under the list, a line says what the chosen sets hold, the models named by the client's
-catalogue, and resting on it lists them all. Onto shows the spot and its position, filled from
-the selection as it moves, from you with Me, or from the selection with Selected; changing a
-number pins it, as its pin does. A doodad `.doodad select` picks adds an Import button there:
-it turns the doodad into a gob, which is selected and followed like any other, and the sets the
-doodad showed come chosen. Group says whether the sets join the target's group, form their own,
-led by an invisible marker or by their first object, or stand loose, and an icon warns where the
-target is in a group already. The button says how many objects it spawns, or why it cannot;
+go. The sets are the selected WMO's until a WMO is searched, by name or by entry, or Follow
+selection is unticked; a name lists the WMOs with sets that the client's own catalogue names
+like it, emptied copies marked, and a selection with no sets says so. A click chooses one set
+and a ctrl-click adds or removes one, and a marker at either end of the list counts the chosen
+sets scrolled out of view. Under the list, a line says what the chosen sets hold, once the
+client's catalogue has named every model, and resting on it lists them all. Onto shows the spot
+and its position, a grid of X, Y and Z, the roll, pitch and turn about each, and the scale,
+filled from the selection as it moves, from you with Me, or from the selection with Selected;
+changing a number unticks its Follow selection. A doodad `.doodad select` picks adds an Import
+button there: it turns the doodad into a gob, which is selected and followed like any other, and
+the sets the doodad showed come chosen. Group them makes the objects one group, led by an
+invisible pivot where the WMO stands; Join its group puts them in the target's group instead, or
+one it leads, and an icon warns where the target is in a group already. Unticked, they stand
+loose. The button says how many objects it spawns, or why it cannot;
 during a run it stops and Stop and delete beside it also deletes what was spawned, and after a
 run Delete them deletes what it left. The window resizes from its corner, and the game keeps its
 size and place.
