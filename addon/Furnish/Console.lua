@@ -427,7 +427,8 @@ end
 
 --- The WMOs Furnish has sets for whose names hold some words, as the client's own catalogue of
 -- gameobject displays names them; each WMO once, however many displays draw it.
--- @return a list of { file, name, sets, blank }, sets being how many it has, ordered by name
+-- @return a list of { file, name, sets, blank }, sets being how many it has, those with the most
+--   sets first and then by name, since a WMO with one set has only the base set it draws already
 function Console.Find(words)
 	if not Reader.Load() then
 		return {}
@@ -446,6 +447,9 @@ function Console.Find(words)
 		end
 	end
 	table.sort(found, function(a, b)
+		if a.sets ~= b.sets then
+			return a.sets > b.sets
+		end
 		return a.name < b.name
 	end)
 	return found

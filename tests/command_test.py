@@ -824,6 +824,17 @@ def test_a_name_search_lists_each_wmo_with_sets_once(tmp_path: Path) -> None:
     ]
 
 
+def test_a_name_search_lists_the_wmos_with_the_most_sets_first(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path, layered=True)
+    lua.execute(
+        "ROWS = { { displayid = 30262, fileid = 900, name = 'world/wmo/house.wmo' },"
+        " { displayid = 5, fileid = 777, name = 'emptywmo_house.wmo' } }"
+    )
+    lua.execute(CATALOGUE)
+    found = lua.eval("Furnish.Console.Find('house')")
+    assert [(w.name, w.sets) for w in found.values()] == [("house", 3), ("emptywmo_house", 2)]
+
+
 def test_an_import_alone_spawns_nothing(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("Furnish.Console.Import({ only = true })")
