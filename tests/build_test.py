@@ -66,13 +66,13 @@ def write_inputs(tmp_path: Path) -> Inputs:
     )
 
 
-def test_build_writes_the_five_tables(tmp_path: Path) -> None:
+def test_build_writes_every_table(tmp_path: Path) -> None:
     out = tmp_path / "furnish.sqlite"
     inputs = write_inputs(tmp_path)
     report = build(inputs, out)
     db = sqlite3.connect(out)
     assert dict(db.execute("SELECT key, value FROM meta")) == {
-        "format": "5",
+        "format": "6",
         "build": "9.2.7.45745",
     }
     assert db.execute("SELECT name FROM sets ORDER BY id").fetchall() == [(None,), ("Set_Full",)]
@@ -119,6 +119,10 @@ def test_build_writes_the_five_tables(tmp_path: Path) -> None:
         report.models_without_display,
     ) == (2, 1, 1, 2, 2, 1)
     assert (report.tiles_read, report.map_rows, report.map_rows_unresolved) == (1, 3, 1)
+    # Each display a placement spawns names its model by the file's name alone; the lamp's
+    # file is in no listfile, so it is counted rather than named.
+    assert db.execute("SELECT display, name FROM models ORDER BY 1").fetchall() == [(20, "chair")]
+    assert report.models_unnamed == 1
 
 
 def test_spawners_merge_the_overlay_and_preferred_picks_epsilon_then_lowest(tmp_path: Path) -> None:

@@ -11,7 +11,7 @@ import re
 import struct
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from tqdm import tqdm
 
@@ -87,6 +87,7 @@ class Report:
     blank_ambiguous: int = 0
     blank_slots: int = 0
     models_without_display: int = 0
+    models_unnamed: int = 0
     entries: int = 0
     entries_unresolved: int = 0
     entries_ambiguous: int = 0
@@ -104,16 +105,21 @@ def build(inputs: Inputs, out: Path) -> Report:
         out: The database path; an existing file is replaced.
     """
     report = Report()
-    path_to_id = {
-        path_key(path): file_id
-        for listfile in (inputs.listfile, *inputs.extra_listfiles)
-        for file_id, path in read_listfile(listfile)
-    }
+    path_to_id: dict[str, int] = {}
+    paths: dict[int, str] = {}
+    for listfile in (inputs.listfile, *inputs.extra_listfiles):
+        for file_id, path in read_listfile(listfile):
+            path_to_id[path_key(path)] = file_id
+            paths.setdefault(file_id, path)
     spawnable = spawners(inputs.display_table, inputs.overlay)
     displays = {file_id: preferred(ids) for file_id, ids in spawnable.items()}
     with Database(out) as database:
         database.meta({"build": inputs.build})
-        sets_by_root = _write_roots(inputs.roots, path_to_id, displays, spawnable, database, report)
+        models: dict[int, int] = {}
+        sets_by_root = _write_roots(
+            inputs.roots, path_to_id, displays, spawnable, models, database, report
+        )
+        database.add_models(_model_names(models, paths, report))
         if inputs.objects is not None:
             _write_entries(inputs.objects, path_to_id, sets_by_root, database, report)
         if inputs.maps is not None:
@@ -130,6 +136,7 @@ def _write_roots(
     path_to_id: dict[str, int],
     displays: dict[int, int],
     spawners: dict[int, tuple[int, ...]],
+    models: dict[int, int],
     database: Database,
     report: Report,
 ) -> dict[int, dict[int, int]]:
@@ -163,6 +170,8 @@ def _write_roots(
             report.roots_without_doodads += 1
             continue
         report.roots_read += 1
+        for _, rows in kept.values():
+            models.update((display, placement.model) for display, placement in rows)
         set_ids = {index: database.add_set(name, rows) for index, (name, rows) in kept.items()}
         sets_by_root[file_id] = set_ids
         for start in (0, 1):
@@ -183,6 +192,22 @@ def _write_roots(
         database.add_wmo_sets((file_id, index, set_id) for index, set_id in borrowed.items())
         database.add_root_displays((display, file_id) for display in spawners[file_id])
     return sets_by_root
+
+
+def _model_names(
+    models: dict[int, int], paths: dict[int, str], report: Report
+) -> Iterator[tuple[int, str]]:
+    """Each spawned display and the name of the model it draws, as a player reads it.
+
+    The name is the file's, with no folder or extension. A model no listfile names is counted
+    and left out, so a window says how many it cannot name rather than printing a number.
+    """
+    for display, file_id in sorted(models.items()):
+        path = paths.get(file_id)
+        if path is None:
+            report.models_unnamed += 1
+            continue
+        yield display, PurePosixPath(path.replace("\\", "/")).stem
 
 
 def _donor(

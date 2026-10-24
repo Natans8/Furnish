@@ -1,13 +1,14 @@
 """Layer 2: the database as the Lua data file an addon loads.
 
-``Data.lua`` declares one global, ``FurnishData``, holding three tables and the two meta
+``Data.lua`` declares one global, ``FurnishData``, holding its tables and the two meta
 values. ``wmo`` lists each root file's sets with their index, set id, name and placement
 count, which is everything a window needs before a set is chosen. ``blobs`` holds each
 set's placements as one printable string, in the order they spawn, decoded by the reader
 only when that set is asked for. ``maps`` says which sets each map placement draws, by map
 id and unique id. ``wmo`` is keyed by the root's file id, which is what a selected object's
 record reports, and ``entries`` turns a gameobject entry, the number a lookup line prints,
-into that file.
+into that file. ``models`` names the model each spawned display draws, so a set can say
+what it holds without the client's help.
 """
 
 import sqlite3
@@ -37,6 +38,7 @@ class Sizes:
     entries: int = 0
     blobs: int = 0
     maps: int = 0
+    models: int = 0
     total: int = 0
 
 
@@ -61,9 +63,10 @@ def export(database: Path, out: Path) -> Sizes:
     entries = "".join(_entries(connection))
     blobs = "".join(_blobs(connection))
     maps = "".join(_maps(connection))
+    models = "".join(_models(connection))
     sizes.wmo, sizes.blank, sizes.entries = len(wmo), len(blank), len(entries)
-    sizes.blobs, sizes.maps = len(blobs), len(maps)
-    parts += [wmo, blank, entries, blobs, maps]
+    sizes.blobs, sizes.maps, sizes.models = len(blobs), len(maps), len(models)
+    parts += [wmo, blank, entries, blobs, maps, models]
     text = "".join(parts)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(text.encode("utf-8"))
@@ -129,6 +132,13 @@ def _maps(connection: sqlite3.Connection) -> Iterable[str]:
             sets = "".join(f" {set_id}," for _, _, set_id in by_uid)
             yield f"    [{uid}] = {{{sets} }},\n"
         yield "  },\n"
+    yield "}\n"
+
+
+def _models(connection: sqlite3.Connection) -> Iterable[str]:
+    yield "FurnishData.models = {\n"
+    for display, name in connection.execute("SELECT display, name FROM models ORDER BY display"):
+        yield f"  [{display}] = {_string(name)},\n"
     yield "}\n"
 
 

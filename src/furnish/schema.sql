@@ -1,7 +1,7 @@
--- The furnishing database. One row of meta, then five tables: a set is a named list of
+-- The furnishing database. One row of meta, then the tables: a set is a named list of
 -- doodad placements, shared by every root that holds the same one; a display id and a
 -- gameobject entry each reach the sets of the file they spawn; a map placement names the
--- sets its zone chose.
+-- sets its zone chose; and every display a placement spawns names its model.
 
 PRAGMA foreign_keys = ON;
 
@@ -50,6 +50,11 @@ CREATE TABLE placements (
     scale   REAL NOT NULL,
     PRIMARY KEY ("set", seq)
 ) WITHOUT ROWID;                    -- clustered by set, which is the one way it is read
+
+CREATE TABLE models (
+    display INTEGER PRIMARY KEY,    -- a display some placement spawns
+    name    TEXT NOT NULL           -- its model file's name, with no folder or extension
+) WITHOUT ROWID;
 
 CREATE TABLE map_sets (
     map   INTEGER NOT NULL,         -- the map id the client reports

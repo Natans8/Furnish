@@ -134,6 +134,14 @@ class Database:
         """
         self._connected().executemany("INSERT INTO root_displays VALUES (?, ?)", rows)
 
+    def add_models(self, rows: Iterable[tuple[int, str]]) -> None:
+        """Insert ``(display, name)`` rows, the model each spawned display draws.
+
+        Args:
+            rows: One per display, its model file's name without folder or extension.
+        """
+        self._connected().executemany("INSERT INTO models VALUES (?, ?)", rows)
+
     def add_blank_root(self, file_id: int) -> None:
         """Record a root whose own doodads are blanked, so it draws none of its sets itself.
 
