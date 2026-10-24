@@ -187,8 +187,7 @@ def test_a_window_takes_its_sets_from_the_selected_wmo(tmp_path: Path) -> None:
     assert lua.eval("select(2, Furnish.Console.Source())") == "no object is selected"
     lua.execute("SELECTED = 502")
     assert (
-        lua.eval("select(2, Furnish.Console.Source())")
-        == "chair.m2 is not a WMO, so it has no sets"
+        lua.eval("select(2, Furnish.Console.Source())") == "chair is not a WMO, so it has no sets"
     )
     lua.execute("SELECTED = 500")
     source = lua.eval("Furnish.Console.Source()")
@@ -245,7 +244,7 @@ def test_the_target_is_any_selected_object_with_its_pose(tmp_path: Path) -> None
     lua = command_lua(tmp_path)
     assert lua.eval("select(2, Furnish.Console.Target())") == "no object is selected"
     lua.execute("SELECTED = 502")
-    assert lua.eval("(Furnish.Console.Target())").name == "chair.m2"
+    assert lua.eval("(Furnish.Console.Target())").name == "chair"
     lua.execute("SELECTED = 500")
     target = lua.eval("(Furnish.Console.Target())")
     assert (target.name, target.guid, target.scale) == ("house", 500, 2)
@@ -290,7 +289,7 @@ def test_a_named_source_spawns_on_any_selected_object(tmp_path: Path) -> None:
         lua.eval("{ indexes = { 1 }, file = 900, label = 'house', group = 'nogroup' }")
     )
     assert printed(lua)[-2] == (
-        PREFIX + "spawning house's Full (set 1, 2 objects) on chair.m2, ungrouped"
+        PREFIX + "spawning house's Full (set 1, 2 objects) on chair, ungrouped"
     )
 
 
@@ -352,8 +351,7 @@ def test_a_list_refuses_without_a_wmo(tmp_path: Path) -> None:
     ]
     lua.execute("SELECTED = 502")
     assert run(lua, "list") == [
-        PREFIX + "chair.m2 is not a WMO, so it has no sets; "
-        "/furn list <entry> lists another object's"
+        PREFIX + "chair is not a WMO, so it has no sets; /furn list <entry> lists another object's"
     ]
     assert run(lua, "list 5") == [
         PREFIX + "object 5 is not a WMO Furnish has sets for; check the entry on its lookup line"
@@ -708,10 +706,10 @@ def test_a_named_set_spawns_on_any_selected_object(tmp_path: Path) -> None:
     lua.globals().HOOKS.SetItemRef("garrmission:furnish:" + words)
     assert printed(lua)[-2] == (
         PREFIX
-        + "spawning object 817579's Full (set 1, 2 objects) on chair.m2, led by an invisible pivot"
+        + "spawning object 817579's Full (set 1, 2 objects) on chair, led by an invisible pivot"
     )
     assert run(lua, "1 from 817579 nogroup")[0] == (
-        PREFIX + "spawning object 817579's Full (set 1, 2 objects) on chair.m2, ungrouped"
+        PREFIX + "spawning object 817579's Full (set 1, 2 objects) on chair, ungrouped"
     )
 
 
@@ -719,7 +717,7 @@ def test_a_set_read_off_the_selection_needs_a_wmo(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 502")
     assert run(lua, "1") == [
-        PREFIX + "chair.m2 is not a WMO, so it has no sets; name one, as /furn 3 from <entry>"
+        PREFIX + "chair is not a WMO, so it has no sets; name one, as /furn 3 from <entry>"
     ]
     lua.execute("SELECTED = nil")
     assert run(lua, "1 from 817579") == [

@@ -55,12 +55,51 @@
 		</Layers>
 	</Button>
 
-	<!-- A pin: lit, the line it stands on stays as it is; dark, it follows the selection. -->
-	<Button name="FurnishPinTemplate" virtual="true">
-		<Size x="20" y="20"/>
-		<NormalTexture parentKey="Icon" atlas="Waypoint-MapPin-Untracked"/>
-		<HighlightTexture atlas="Waypoint-MapPin-Untracked" alphaMode="ADD"/>
+	<!-- One WMO a search found: its name, marked where Epsilon emptied it, and its set count. -->
+	<Button name="FurnishResultRowTemplate" virtual="true">
+		<Size y="22"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="Count" inherits="GameFontDisableSmall" justifyH="RIGHT">
+					<Anchors>
+						<Anchor point="RIGHT" x="-8" y="0"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Tag" inherits="GameFontGreenSmall" justifyH="RIGHT">
+					<Anchors>
+						<Anchor point="RIGHT" relativeKey="$parent.Count" relativePoint="LEFT" x="-8" y="0"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Label" inherits="GameFontHighlight" justifyH="LEFT" wordwrap="false">
+					<Anchors>
+						<Anchor point="LEFT" x="8" y="0"/>
+						<Anchor point="RIGHT" relativeKey="$parent.Tag" relativePoint="LEFT" x="-6" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture setAllPoints="true">
+					<Color r="1" g="1" b="1" a="0.08"/>
+				</Texture>
+			</Layer>
+		</Layers>
 	</Button>
+
+	<!-- Follow selection: ticked, the line it stands on follows what is selected, as
+	     ObjectMover's Auto Update does; unticked, it stays as it is. Its words stand to its left,
+	     so it sits at the right edge of the line. -->
+	<CheckButton name="FurnishFollowTemplate" inherits="UICheckButtonTemplate" virtual="true">
+		<Size x="22" y="22"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="Label" inherits="GameFontNormalSmall" justifyH="RIGHT">
+					<Anchors>
+						<Anchor point="RIGHT" relativePoint="LEFT" x="-1" y="1"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+	</CheckButton>
 
 	<!-- One number of the position, its name to its left. -->
 	<EditBox name="FurnishNumberTemplate" inherits="InputBoxTemplate" autoFocus="false" letters="14" virtual="true">
@@ -142,7 +181,7 @@
 	</Frame>
 
 	<Frame name="FurnishFrame" parent="UIParent" toplevel="true" movable="true" resizable="true" enableMouse="true" clampedToScreen="true" hidden="true">
-		<Size x="400" y="580"/>
+		<Size x="400" y="600"/>
 		<Anchors>
 			<Anchor point="CENTER"/>
 		</Anchors>
@@ -173,26 +212,27 @@
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
-						<FontString parentKey="Name" inherits="GameFontHighlightLarge" justifyH="LEFT" justifyV="TOP" maxLines="2">
+						<!-- The whole width: a WMO's name has no spaces to wrap at. -->
+						<FontString parentKey="Name" inherits="GameFontHighlightMedium" justifyH="LEFT" wordwrap="false">
 							<Anchors>
 								<Anchor point="TOPLEFT" x="0" y="0"/>
-								<Anchor point="TOPRIGHT" x="-26" y="0"/>
+								<Anchor point="TOPRIGHT" x="0" y="0"/>
 							</Anchors>
 						</FontString>
 						<FontString parentKey="Detail" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false">
 							<Anchors>
-								<Anchor point="TOPLEFT" relativeKey="$parent.Name" relativePoint="BOTTOMLEFT" x="0" y="-4"/>
-								<Anchor point="TOPRIGHT" relativeKey="$parent.Name" relativePoint="BOTTOMRIGHT" x="0" y="-4"/>
+								<Anchor point="TOPLEFT" x="0" y="-24"/>
+								<Anchor point="TOPRIGHT" x="-130" y="-24"/>
 							</Anchors>
 						</FontString>
 					</Layer>
 				</Layers>
 				<Frames>
-					<Button parentKey="Pin" inherits="FurnishPinTemplate">
+					<CheckButton parentKey="Follow" inherits="FurnishFollowTemplate">
 						<Anchors>
-							<Anchor point="TOPRIGHT" x="0" y="2"/>
+							<Anchor point="TOPRIGHT" x="0" y="-18"/>
 						</Anchors>
-					</Button>
+					</CheckButton>
 				</Frames>
 			</Frame>
 
@@ -200,7 +240,7 @@
 			<Frame parentKey="Sets" inherits="FurnishListTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" x="14" y="-114"/>
-					<Anchor point="BOTTOMRIGHT" x="-14" y="216"/>
+					<Anchor point="BOTTOMRIGHT" x="-14" y="240"/>
 				</Anchors>
 			</Frame>
 
@@ -208,8 +248,8 @@
 			<Button parentKey="Contents">
 				<Size y="16"/>
 				<Anchors>
-					<Anchor point="BOTTOMLEFT" x="20" y="196"/>
-					<Anchor point="BOTTOMRIGHT" x="-20" y="196"/>
+					<Anchor point="BOTTOMLEFT" x="20" y="220"/>
+					<Anchor point="BOTTOMRIGHT" x="-20" y="220"/>
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
@@ -221,7 +261,7 @@
 			<!-- Where the sets go: the object or spot, its position, where to fill it from, and how
 			     the sets are grouped. -->
 			<Frame parentKey="Onto">
-				<Size y="124"/>
+				<Size y="148"/>
 				<Anchors>
 					<Anchor point="BOTTOMLEFT" x="20" y="64"/>
 					<Anchor point="BOTTOMRIGHT" x="-20" y="64"/>
@@ -236,73 +276,39 @@
 						<FontString parentKey="Name" inherits="GameFontHighlight" justifyH="LEFT" wordwrap="false">
 							<Anchors>
 								<Anchor point="TOPLEFT" x="48" y="-3"/>
-								<Anchor point="TOPRIGHT" x="-26" y="-3"/>
+								<Anchor point="TOPRIGHT" x="-130" y="-3"/>
 							</Anchors>
 						</FontString>
 						<FontString parentKey="FillLabel" inherits="GameFontDisableSmall" justifyH="LEFT">
 							<Anchors>
-								<Anchor point="TOPLEFT" x="0" y="-81"/>
+								<Anchor point="TOPLEFT" x="0" y="-105"/>
 							</Anchors>
 						</FontString>
 						<FontString parentKey="GroupLabel" inherits="GameFontNormal" justifyH="LEFT">
 							<Anchors>
-								<Anchor point="TOPLEFT" x="0" y="-107"/>
+								<Anchor point="TOPLEFT" x="0" y="-131"/>
 							</Anchors>
 						</FontString>
 					</Layer>
 				</Layers>
 				<Frames>
-					<Button parentKey="Pin" inherits="FurnishPinTemplate">
+					<CheckButton parentKey="Follow" inherits="FurnishFollowTemplate">
 						<Anchors>
-							<Anchor point="TOPRIGHT" x="0" y="2"/>
+							<Anchor point="TOPRIGHT" x="0" y="3"/>
 						</Anchors>
-					</Button>
-					<EditBox parentKey="X" inherits="FurnishNumberTemplate">
-						<Size x="78" y="20"/>
-						<Anchors>
-							<Anchor point="TOPLEFT" x="20" y="-26"/>
-						</Anchors>
-					</EditBox>
-					<EditBox parentKey="Y" inherits="FurnishNumberTemplate">
-						<Size x="78" y="20"/>
-						<Anchors>
-							<Anchor point="LEFT" relativeKey="$parent.X" relativePoint="RIGHT" x="26" y="0"/>
-						</Anchors>
-					</EditBox>
-					<EditBox parentKey="Z" inherits="FurnishNumberTemplate">
-						<Size x="78" y="20"/>
-						<Anchors>
-							<Anchor point="LEFT" relativeKey="$parent.Y" relativePoint="RIGHT" x="26" y="0"/>
-						</Anchors>
-					</EditBox>
-					<EditBox parentKey="Turn" inherits="FurnishNumberTemplate">
-						<Size x="44" y="20"/>
-						<Anchors>
-							<Anchor point="TOPLEFT" x="38" y="-50"/>
-						</Anchors>
-					</EditBox>
-					<EditBox parentKey="Pitch" inherits="FurnishNumberTemplate">
-						<Size x="44" y="20"/>
-						<Anchors>
-							<Anchor point="LEFT" relativeKey="$parent.Turn" relativePoint="RIGHT" x="42" y="0"/>
-						</Anchors>
-					</EditBox>
-					<EditBox parentKey="Roll" inherits="FurnishNumberTemplate">
-						<Size x="44" y="20"/>
-						<Anchors>
-							<Anchor point="LEFT" relativeKey="$parent.Pitch" relativePoint="RIGHT" x="34" y="0"/>
-						</Anchors>
-					</EditBox>
-					<EditBox parentKey="Scale" inherits="FurnishNumberTemplate">
-						<Size x="44" y="20"/>
-						<Anchors>
-							<Anchor point="LEFT" relativeKey="$parent.Roll" relativePoint="RIGHT" x="42" y="0"/>
-						</Anchors>
-					</EditBox>
+					</CheckButton>
+					<!-- The position's boxes, laid out across the frame's width by Window.lua. -->
+					<EditBox parentKey="X" inherits="FurnishNumberTemplate"/>
+					<EditBox parentKey="Y" inherits="FurnishNumberTemplate"/>
+					<EditBox parentKey="Z" inherits="FurnishNumberTemplate"/>
+					<EditBox parentKey="Turn" inherits="FurnishNumberTemplate"/>
+					<EditBox parentKey="Pitch" inherits="FurnishNumberTemplate"/>
+					<EditBox parentKey="Roll" inherits="FurnishNumberTemplate"/>
+					<EditBox parentKey="Scale" inherits="FurnishNumberTemplate"/>
 					<Button parentKey="FromPlayer" inherits="UIPanelButtonTemplate">
 						<Size x="44" y="20"/>
 						<Anchors>
-							<Anchor point="TOPLEFT" x="48" y="-76"/>
+							<Anchor point="TOPLEFT" x="48" y="-100"/>
 						</Anchors>
 					</Button>
 					<Button parentKey="FromSelection" inherits="UIPanelButtonTemplate">
@@ -319,17 +325,23 @@
 							<Anchor point="RIGHT" x="0" y="0"/>
 						</Anchors>
 					</Button>
-					<Frame parentKey="Group" inherits="UIDropDownMenuTemplate">
+					<!-- Whether the objects form a group, and whether it is the target's own. -->
+					<CheckButton parentKey="Grouped" inherits="UICheckButtonTemplate">
+						<Size x="22" y="22"/>
 						<Anchors>
-							<Anchor point="TOPLEFT" x="32" y="-100"/>
+							<Anchor point="TOPLEFT" x="44" y="-126"/>
 						</Anchors>
-					</Frame>
-					<!-- Shown where joining the target's group joins a group it is in already. -->
+					</CheckButton>
+					<CheckButton parentKey="Join" inherits="UICheckButtonTemplate">
+						<Size x="22" y="22"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" x="170" y="-126"/>
+						</Anchors>
+					</CheckButton>
+					<!-- Shown where joining the target's group joins a group it is in already;
+					     Window.lua stands it after the join's words. -->
 					<Button parentKey="Warning" hidden="true">
-						<Size x="20" y="20"/>
-						<Anchors>
-							<Anchor point="LEFT" relativeKey="$parent.Group" relativePoint="RIGHT" x="-12" y="2"/>
-						</Anchors>
+						<Size x="18" y="18"/>
 						<NormalTexture file="Interface\DialogFrame\UI-Dialog-Icon-AlertNew"/>
 					</Button>
 				</Frames>
@@ -380,12 +392,13 @@
 				</Anchors>
 			</Button>
 
-			<!-- The WMOs a name finds, under the search box and over everything else. -->
+			<!-- The WMOs a name finds, under the search box, the window's width, over everything
+			     else. -->
 			<Frame parentKey="Results" inherits="FurnishListTemplate" frameStrata="DIALOG" hidden="true">
 				<Size y="200"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeKey="$parent.Search" relativePoint="BOTTOMLEFT" x="-8" y="-2"/>
-					<Anchor point="TOPRIGHT" relativeKey="$parent.Search" relativePoint="BOTTOMRIGHT" x="4" y="-2"/>
+					<Anchor point="TOPLEFT" x="14" y="-56"/>
+					<Anchor point="TOPRIGHT" x="-14" y="-56"/>
 				</Anchors>
 			</Frame>
 

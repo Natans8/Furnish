@@ -282,13 +282,13 @@ function Client.Facing()
 end
 
 --- The model name a record carries, as the data spells it: the file's base name, lower
--- case, without the folder, a leading tag in brackets, a WMO's extension or the carriage
--- return the client appends.
+-- case, without the folder, a leading tag in brackets, the extension or the carriage return
+-- the client appends.
 function Client.ModelName(name)
 	name = tostring(name or ""):gsub("[\r\n]", ""):lower()
 	name = name:match("([^/\\]+)$") or name
 	name = name:gsub("^%[.-%]%s*", "")
-	return (name:gsub("%.wmo$", ""))
+	return (name:gsub("%.wmo$", ""):gsub("%.m2$", ""))
 end
 
 --- How many rows of the client's display catalogue a walk reads in one frame.
