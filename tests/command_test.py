@@ -176,26 +176,53 @@ def test_the_command_alone_opens_the_window(tmp_path: Path) -> None:
 # -- What a window reads -----------------------------------------------------------------
 
 
-def test_a_window_sees_the_selected_wmo_and_its_sets(tmp_path: Path) -> None:
+def test_a_window_takes_its_sets_from_the_selected_wmo(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
-    assert lua.eval("select(2, Furnish.Console.Target())") == "no object is selected"
+    assert lua.eval("select(2, Furnish.Console.Source())") == "no object is selected"
     lua.execute("SELECTED = 502")
     assert (
-        lua.eval("select(2, Furnish.Console.Target())")
+        lua.eval("select(2, Furnish.Console.Source())")
         == "chair.m2 is not a WMO, so it has no sets"
     )
     lua.execute("SELECTED = 500")
-    target = lua.eval("Furnish.Console.Target()")
-    assert (target.name, target.file, target.blank) == ("house", 900, False)
-    assert [(s.index, s.name, s.count, s.canonical) for s in target.sets.values()] == [
+    source = lua.eval("Furnish.Console.Source()")
+    assert (source.name, source.file, source.blank) == ("house", 900, False)
+    assert [(s.index, s.name, s.count, s.canonical) for s in source.sets.values()] == [
         (0, "Base", 1, ""),
         (1, "Full", 2, "Set_Full"),
     ]
     # The group the run selects stands for the WMO it was on.
     run(lua, "1")
-    assert lua.eval("Furnish.Console.Target()").name == "house"
+    assert lua.eval("Furnish.Console.Source()").name == "house"
     lua.execute("GROUP_LEADER = 12345")
-    assert lua.eval("select(2, Furnish.Console.Target())") == "a group is selected, not one object"
+    assert lua.eval("select(2, Furnish.Console.Source())") == "a group is selected, not one object"
+
+
+def test_a_window_takes_its_sets_from_an_entry_whatever_is_selected(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    source = lua.eval("Furnish.Console.Source(817579)")
+    assert (source.name, source.file) == ("object 817579", 900)
+    assert lua.eval("select(2, Furnish.Console.Source(1))").startswith("entry 1 is no WMO object")
+
+
+def test_the_target_is_any_selected_object(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    assert lua.eval("select(2, Furnish.Console.Target())") == "no object is selected"
+    lua.execute("SELECTED = 502")
+    assert lua.eval("Furnish.Console.Target()") == "chair.m2"
+    lua.execute("SELECTED = 500")
+    assert lua.eval("Furnish.Console.Target()") == "house"
+
+
+def test_a_named_source_spawns_on_any_selected_object(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("SELECTED = 502")
+    lua.globals().Furnish.Console.Spawn(
+        lua.eval("{ indexes = { 1 }, file = 900, label = 'house', group = 'nogroup' }")
+    )
+    assert printed(lua)[-2] == (
+        PREFIX + "spawning house's Full (set 1, 2 objects) on chair.m2, ungrouped"
+    )
 
 
 def test_a_window_hears_the_run_it_started_until_it_stops_hearing(tmp_path: Path) -> None:

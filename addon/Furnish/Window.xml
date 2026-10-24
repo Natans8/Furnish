@@ -84,7 +84,7 @@
 						<FontString parentKey="Name" inherits="GameFontHighlightLarge" justifyH="LEFT" wordwrap="false">
 							<Anchors>
 								<Anchor point="TOPLEFT" x="12" y="-12"/>
-								<Anchor point="TOPRIGHT" x="-12" y="-12"/>
+								<Anchor point="TOPRIGHT" x="-112" y="-12"/>
 							</Anchors>
 						</FontString>
 						<FontString parentKey="Detail" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false">
@@ -95,6 +95,15 @@
 						</FontString>
 					</Layer>
 				</Layers>
+				<Frames>
+					<!-- A gameobject's entry: typed, the sets are its WMO's instead of the selected one's. -->
+					<EditBox parentKey="Entry" inherits="InputBoxInstructionsTemplate" autoFocus="false" numeric="true" letters="10">
+						<Size x="88" y="20"/>
+						<Anchors>
+							<Anchor point="TOPRIGHT" x="-14" y="-9"/>
+						</Anchors>
+					</EditBox>
+				</Frames>
 			</Frame>
 
 			<Frame parentKey="SetsPanel" inherits="BackdropTemplate">

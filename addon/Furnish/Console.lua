@@ -17,8 +17,9 @@
 --   base    true to lay the root's base set under the sets, unless it is one of them
 --   quiet   true when a window shows the run's progress, so the chat leaves it out
 --
--- A window reads Target for what to show, Busy for whether it may start, and Watch for the
--- run it started; it spawns and stops through the same doors as the commands.
+-- A window reads Source for the sets to show, Target for the object they may spawn on, Busy
+-- for whether it may start, and Watch for the run it started; it spawns and stops through the
+-- same doors as the commands.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -281,36 +282,65 @@ local function start(rows, target, group, about)
 	running, stopping = handle, false
 end
 
---- What a window shows: the selected WMO and its sets, or nil and why there are none.
--- While the group the last run selected stays selected, it is the WMO that run was on.
--- @return { name, file, blank, sets }, each set { index, name, count, canonical }, the name as
---   a line shows it and canonical as the file spells it, empty for the base set; blank is true
---   for a WMO Epsilon emptied, which always gets its base set
-function Console.Target()
+--- The selected object's pose, any object, or nil and why there is none. While the group the
+-- last run selected stays selected, it is the object that run was on.
+local function selectedPose()
 	local pose, reason = Pose.Selected()
 	if not pose and anchored and Client.SelectedGroup() == anchored.leader then
-		pose = anchored.pose
+		return anchored.pose
 	end
-	if not pose then
-		return nil, reason
-	end
-	if not pose.wmo then
-		return nil, pose.name .. " is not a WMO, so it has no sets"
-	end
+	return pose, reason
+end
+
+--- A WMO's sets as a window lists them, under the name it goes by; or nil and the reason.
+local function described(file, name)
 	local loaded, why = Reader.Load()
 	if not loaded then
 		return nil, why
 	end
-	local sets = Sets.OfFile(pose.file)
+	local sets = Sets.OfFile(file)
 	if not sets then
-		return nil, pose.name .. " has no doodad sets in Furnish's data"
+		return nil, name .. " has no doodad sets in Furnish's data"
 	end
 	local shown = {}
 	for i, set in ipairs(sets) do
 		shown[i] =
 			{ index = set.index, name = setName(set), count = set.count, canonical = set.name }
 	end
-	return { name = pose.name, file = pose.file, blank = Sets.IsBlank(pose.file), sets = shown }
+	return { name = name, file = file, blank = Sets.IsBlank(file), sets = shown }
+end
+
+--- Where a window takes its sets from: the WMO an entry names, or the selected one.
+-- @param entry a gameobject's entry, the number a lookup line prints, or nil for the selection
+-- @return { name, file, blank, sets }, each set { index, name, count, canonical }, the name as
+--   a line shows it and canonical as the file spells it, empty for the base set; blank is true
+--   for a WMO Epsilon emptied, which always gets its base set; or nil and why there are none
+function Console.Source(entry)
+	if entry then
+		local file, reason = Sets.OfEntry(entry)
+		if not file then
+			return nil, reason
+		end
+		return described(file, ("object %d"):format(entry))
+	end
+	local pose, reason = selectedPose()
+	if not pose then
+		return nil, reason
+	end
+	if not pose.wmo then
+		return nil, pose.name .. " is not a WMO, so it has no sets"
+	end
+	return described(pose.file, pose.name)
+end
+
+--- What a window's sets may spawn on and whose group they may join: the selected object's
+-- name, whatever it is, or nil and why nothing is selected.
+function Console.Target()
+	local pose, reason = selectedPose()
+	if not pose then
+		return nil, reason
+	end
+	return pose.name
 end
 
 --- Why nothing new can start, or nil.

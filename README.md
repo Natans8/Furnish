@@ -43,12 +43,13 @@ selected it stands for the object the run was on, so the next set or list needs 
 A WMO's doodad line, from `.doodad select` or `.doodad near`, carries a `[Furnish]` button
 that imports that WMO by its unique id and furnishes it as `/furn import` does.
 
-The window shows the selected WMO's sets, and keeps showing them when the selection moves off
-it. A click chooses a set or lets it go, any number of them, and a double-click spawns one
-alone. Under the list are the grouping and where the sets go, on the target gob or on the
-player; the choices that act on the selected WMO grey out while none is selected. During a run
-a bar counts the objects and the clock, the spawn button stops it, and the bar says how it
-ended. Every choice's tooltip says how a command types it.
+The window shows a WMO's sets: the one an object ID typed into it names, or else the selected
+WMO, kept when the selection moves off it. A click chooses a set or lets it go, any number of
+them, and a double-click spawns one alone. Under the list are the grouping and where the sets
+go, on the target gob, which is whatever object is selected, or on the player; the choices that
+act on the target gob grey out while nothing is selected. During a run a bar counts the objects
+and the clock, the spawn button stops it, and the bar says how it ended. Every choice's tooltip
+says how a command types it.
 
 ## Build
 
