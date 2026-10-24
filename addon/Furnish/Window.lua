@@ -522,21 +522,17 @@ local function spawn()
 	Console.Spawn(request())
 end
 
---- What is chosen when a WMO is first shown: where a doodad says which sets it drew, those beyond
--- the base set, which the WMO draws itself unless it comes unfurnished, and so perhaps none;
--- else its first set it does not draw already, and the base too where it comes unfurnished.
+--- What is chosen when a WMO is first shown: the sets a doodad drew beyond the base set, which the
+-- WMO draws itself unless it comes unfurnished; where no doodad adds one, its first set it does not
+-- draw already, and the base too where it comes unfurnished.
 local function chooseFirst(sets, blank)
 	chosen = {}
-	local told = false
 	for _, set in ipairs(sets) do
-		if set.placed then
-			told = true
-			if set.index ~= 0 or blank then
-				chosen[set.index] = true
-			end
+		if set.placed and (set.index ~= 0 or blank) then
+			chosen[set.index] = true
 		end
 	end
-	if told then
+	if next(chosen) then
 		return
 	end
 	for _, set in ipairs(sets) do
