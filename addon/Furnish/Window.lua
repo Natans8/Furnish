@@ -52,8 +52,8 @@ local CHOICES = {
 			},
 			{
 				value = "attach",
-				label = "Target gob's group",
-				hint = "The objects join the target gob's own group.",
+				label = "Target gob",
+				hint = "The objects join the target gob's group.",
 				needsTarget = true,
 			},
 			{ value = "nogroup", label = "No group", hint = "The objects stand loose." },
