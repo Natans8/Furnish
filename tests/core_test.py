@@ -417,6 +417,17 @@ def test_pivot_spawns_the_marker_first_and_joins_every_doodad_to_it(tmp_path: Pa
     assert list(lua.eval("PROGRESS").values()) == ["1/2", "2/2"]
 
 
+def test_the_pivot_turns_and_scales_with_the_set_it_leads(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    sent = fake_server(lua)
+    lua.execute(
+        f"Furnish.Spawn({rows(lua, 2)}, {ANCHOR}, {{ roll = 0, pitch = 10, turn = 90 }}, 2,"
+        " Furnish.Group.Pivot, SEND, {})"
+    )
+    marker = "gobject spawn -424242 scale 2 posx 10 posy 20 posz 30 pitch 10 face north turn 90"
+    assert sent()[0] == marker
+
+
 def test_first_lets_the_first_doodad_lead_and_sends_it_no_join(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     sent = fake_server(lua)

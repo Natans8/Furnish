@@ -156,7 +156,8 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 	end
 
 	if marker then
-		local long = spawn(marker, Transform.Place(position, rotation, 1, ORIGIN))
+		-- Turned and scaled with the set, so the pivot stays in proportion to what it leads.
+		local long = spawn(marker, Transform.Place(position, rotation, scale, ORIGIN))
 		if long then
 			return nil, long
 		end
