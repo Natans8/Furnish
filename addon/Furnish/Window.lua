@@ -10,11 +10,13 @@
 -- Source and Target each follow the gob selection until their box is unticked. The source is
 -- the selected WMO or a WMO searched; the target is the selected gob, or where the player stands
 -- while no gob is selected, so every number always holds a value. The doodad `.doodad select`
--- picks is another selection, held at the same time and in a slot of its own: it never changes
--- the source or the target, and selecting a gob never clears it. It offers Import doodad, a step
--- before the gob pipeline: the gob it becomes is selected and followed like any other, with the
--- sets the doodad drew chosen. Importing hides the doodad, which stays selected, so the slot
--- keeps it. While a run goes nothing changes, since every spawn moves the selection.
+-- picks is another selection, held at the same time and shown in a panel of its own beside the
+-- window: picking it never changes the source or the target, and selecting a gob never clears
+-- it. It is a step before the gob pipeline, giving each side something in advance. Use as source
+-- keeps its WMO as the source with the sets it drew chosen; Import doodad turns it into a gob,
+-- selected and followed like any other, with those sets chosen while the source follows the
+-- selection. Importing hides the doodad, which stays selected, so the panel keeps it. While a run
+-- goes nothing changes, since every spawn moves the selection.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -93,14 +95,19 @@ local NUMBER_ROWS, NUMBER_GAP, NUMBER_ART = { 170, 144 }, 8, 5
 --- A button's caps either side of its words.
 local CAPS = 24
 
+--- How many of a doodad's sets its panel shows before its list scrolls.
+local DOODAD_ROWS = 10
+
 local frame = _G.FurnishFrame
 local list = frame.Sets
-local provider, found = _G.CreateDataProvider(), _G.CreateDataProvider()
+local panel = frame.Doodad
+local provider, found, drawn =
+	_G.CreateDataProvider(), _G.CreateDataProvider(), _G.CreateDataProvider()
 
 --- Where the sets come from: the Source request pinned, or nil to follow the gob selection; the
--- doodad `.doodad select` picked, in its own slot, imported or not; the doodad imported last,
--- whose sets come chosen when the gob it became is shown; the source shown, or nil; and the sets
--- chosen, by index.
+-- doodad `.doodad select` picked, in its own slot, imported or not, with the sets of the WMO it
+-- is; the doodad imported last while the source followed the selection, whose sets come chosen
+-- when the gob it became is shown; the source shown, or nil; and the sets chosen, by index.
 local pinned, doodad, marks, shown
 local chosen = {}
 
@@ -388,7 +395,6 @@ local function controls()
 		frame.TargetFollow,
 		frame.Here,
 		frame.UseSelected,
-		frame.Import,
 		frame.Grouped,
 	}
 	for _, number in ipairs(NUMBERS) do
@@ -423,7 +429,6 @@ local function updateTarget()
 		box.Axis:SetTextColor(colour[1], colour[2], colour[3])
 		box:SetTextColor(run and 0.5 or 1, run and 0.5 or 1, run and 0.5 or 1)
 	end
-	frame.Import:SetShown(doodad ~= nil)
 	frame.UseSelected:SetEnabled(not run and Console.Target() ~= nil)
 	local canInclude = not run and frame.Grouped:GetChecked() and not cannotInclude()
 	frame.Include:SetEnabled(canInclude)
@@ -432,10 +437,23 @@ local function updateTarget()
 	frame.Warning:SetShown(grouped() == "attach" and (spot.groupLeader or 0) ~= 0)
 end
 
+--- The doodad panel, there while a doodad is selected; a doodad imported once is not again.
+local function updateDoodad()
+	panel:SetShown(doodad ~= nil)
+	if not doodad then
+		return
+	end
+	local count = #doodad.sets .. (#doodad.sets == 1 and " set" or " sets")
+	panel.Detail:SetText(count .. (doodad.imported and ", imported" or ""))
+	panel.UseSource:SetEnabled(not run)
+	panel.Import:SetEnabled(not run and not doodad.imported)
+end
+
 local function update()
 	for _, control in ipairs(controls()) do
 		control:SetEnabled(not run)
 	end
+	updateDoodad()
 	list.ScrollBox:ForEachFrame(mark)
 	updateMore()
 	updateTarget()
@@ -495,16 +513,21 @@ local function spawn()
 	Console.Spawn(request())
 end
 
---- What is chosen when a WMO is first shown: the sets a doodad imported from it drew; else its
--- first set it does not draw already, and the base too where it comes unfurnished.
+--- What is chosen when a WMO is first shown: where a doodad says which sets it drew, those beyond
+-- the base set, which the WMO draws itself unless it comes unfurnished, and so perhaps none;
+-- else its first set it does not draw already, and the base too where it comes unfurnished.
 local function chooseFirst(sets, blank)
 	chosen = {}
+	local told = false
 	for _, set in ipairs(sets) do
 		if set.placed then
-			chosen[set.index] = true
+			told = true
+			if set.index ~= 0 or blank then
+				chosen[set.index] = true
+			end
 		end
 	end
-	if next(chosen) then
+	if told then
 		return
 	end
 	for _, set in ipairs(sets) do
@@ -518,8 +541,8 @@ local function chooseFirst(sets, blank)
 	end
 end
 
---- The source's request: what is pinned, or the selected gob, marked with the sets the doodad it
--- was imported from drew.
+--- The source's request: what is pinned, the doodad's WMO among them, or the selected gob, marked
+-- with the sets the doodad it was imported from drew.
 local function sourceRequest()
 	if pinned then
 		return pinned
@@ -692,8 +715,7 @@ local function rowEnter(button)
 		lines[#lines + 1] =
 			{ text = "The WMO draws this set already, as part of its model.", colour = GREEN }
 	elseif set.placed then
-		lines[#lines + 1] =
-			{ text = "The doodad this gob was imported from drew this set.", colour = GREEN }
+		lines[#lines + 1] = { text = "The doodad drew this set.", colour = GREEN }
 	end
 	if Console.ModelsNamed() then
 		local held, unnamed = holds(set)
@@ -860,30 +882,14 @@ local function fillTarget(pose)
 	update()
 end
 
---- What the Import doodad tooltip says: which doodad, the sets it draws already as part of its
--- model, and what importing does with them.
-local function doodadLines()
-	if not doodad then
-		return {}
-	end
-	local lines = { { label = "Doodad", value = doodad.name } }
-	local of = Console.Source({ entry = doodad.entry, placement = doodad })
-	local drawn = {}
-	for _, set in ipairs(of and of.sets or {}) do
-		if (set.index == 0 and not of.blank) or set.placed then
-			drawn[#drawn + 1] = set.name
-		end
-	end
-	if #drawn > 0 then
-		local text = ("It draws %s already, as part of its model."):format(
-			table.concat(drawn, ", ")
-		)
-		lines[#lines + 1] = { text = text, colour = GREEN }
-	end
-	lines[#lines + 1] = {
-		text = "Importing turns it into a gob, selected and followed like any other; the gob draws only its base set, so the doodad's other sets come chosen.",
+--- What the Import doodad tooltip says: what importing does, and whether it has been.
+local function importLines()
+	local lines = {
+		{
+			text = "Turn the doodad into a gob, selected, which the target follows. The gob draws only its base set, so while Source follows the selection, the doodad's other sets come chosen.",
+		},
 	}
-	if doodad.imported then
+	if doodad and doodad.imported then
 		lines[#lines + 1] = {
 			text = "Imported already: the doodad is hidden on the map and stays selected.",
 			colour = GREY,
@@ -892,15 +898,70 @@ local function doodadLines()
 	return lines
 end
 
---- Import the doodad picked: it becomes a gob, selected, which the target follows, and the sets
--- the doodad drew come chosen when that gob is shown. The doodad is hidden, not gone, and stays
--- selected, so it stays in its slot.
-local function importDoodad()
-	marks, spotPinned = doodad, false
-	doodad.imported = true
-	chosen = {}
+--- A doodad's set's tooltip: what it is, and whether the doodad draws it.
+local function drawnEnter(button)
+	local set = button:GetElementData()
+	local lines = {
+		{ label = "Set", value = set.index },
+		{ label = "Objects", value = thousands(set.count) },
+	}
+	if set.canonical ~= "" then
+		lines[#lines + 1] = { label = "In the file", value = set.canonical }
+	end
+	if set.draws then
+		local text = set.placed and "The doodad draws this set on the map."
+			or "The doodad draws this set as part of its model."
+		lines[#lines + 1] = { text = text, colour = GREEN }
+	end
+	tip(button, set.name, lines)
+end
+
+local function initDrawn(button, set, new)
+	if new then
+		button:SetScript("OnEnter", Client.Guarded(drawnEnter))
+		button:SetScript("OnLeave", _G.GameTooltip_Hide)
+	end
+	button.Index:SetText(set.index)
+	button.Label:SetText(set.name)
+	button.Count:SetText(thousands(set.count))
+	button.Tag:SetText(set.draws and "baked" or "")
+	button.Label:SetPoint("RIGHT", set.draws and -100 or -44, 0)
+end
+
+--- Fill the doodad panel with the doodad's name and the sets of the WMO it is, its list as tall
+-- as its sets up to a point, past which it scrolls.
+local function fillDoodad()
+	drawn:Flush()
+	if not doodad then
+		return
+	end
+	panel.Name:SetText(doodad.name)
+	drawn:InsertTable(doodad.sets)
+	local rows = math.min(#doodad.sets, DOODAD_ROWS)
+	panel:SetHeight(72 + rows * ROW + 16 + 82)
+end
+
+--- Keep the doodad's WMO as the source whatever is selected, with the sets the doodad drew
+-- chosen; the target stays as it is.
+local function useDoodad()
+	pinned = { entry = doodad.entry, placement = doodad, name = doodad.name }
+	frame.Search:SetText("")
+	frame.Results:Hide()
 	shown = nil
-	Console.Import({ uid = marks.uid, only = true })
+	refresh()
+end
+
+--- Import the doodad picked: it becomes a gob, selected, which the target follows. While the
+-- source follows the selection too, the sets the doodad drew come chosen when that gob is shown;
+-- a source kept as it is stays so, its chosen sets and all. The doodad is hidden, not gone, and
+-- stays selected, so it stays in its slot.
+local function importDoodad()
+	doodad.imported = true
+	spotPinned = false
+	if not pinned then
+		marks, chosen, shown = doodad, {}, nil
+	end
+	Console.Import({ uid = doodad.uid, only = true })
 	update()
 end
 
@@ -923,15 +984,21 @@ local function numberChanged(box, typed)
 	update()
 end
 
---- A doodad `.doodad select` picked: a WMO Furnish has sets for fills the doodad slot, which offers
--- its import; the source and the target stay the gob selection's.
+--- A doodad `.doodad select` picked: a WMO Furnish has sets for fills the doodad slot and its
+-- panel, each set marked where the doodad draws it, as part of its model or as the map chose;
+-- the source and the target stay the gob selection's.
 local function doodadSelected(line)
 	local named = Furnish.Commands.SelectedDoodad(line)
-	if run or not named or not Console.Source({ entry = named.entry }) then
+	local of = named and Console.Source({ entry = named.entry, placement = named })
+	if run or not of then
 		return
 	end
-	named.name = Client.ModelName(named.name)
+	for _, set in ipairs(of.sets) do
+		set.draws = set.placed or (set.index == 0 and not of.blank)
+	end
+	named.name, named.sets = Client.ModelName(named.name), of.sets
 	doodad = named
+	fillDoodad()
 	update()
 end
 
@@ -969,7 +1036,7 @@ end
 
 --- Size each button to its words and its caps.
 local function fitButtons()
-	for _, button in ipairs({ frame.Here, frame.UseSelected, frame.Import, frame.Highlight }) do
+	for _, button in ipairs({ frame.Here, frame.UseSelected, frame.Highlight }) do
 		button:SetWidth(math.ceil(button:GetFontString():GetStringWidth()) + CAPS)
 	end
 end
@@ -1101,7 +1168,6 @@ local function buildTarget()
 	end
 	frame.Here:SetText("Here")
 	frame.UseSelected:SetText("Use selected gob")
-	frame.Import:SetText("Import doodad")
 	frame.Here:SetScript(
 		"OnClick",
 		Client.Guarded(function()
@@ -1116,7 +1182,6 @@ local function buildTarget()
 			fillTarget(selected and copy(selected, nil, gobDetail(selected)))
 		end)
 	)
-	frame.Import:SetScript("OnClick", Client.Guarded(importDoodad))
 	hint(
 		frame.Here,
 		"Here",
@@ -1128,9 +1193,6 @@ local function buildTarget()
 		"Use selected gob",
 		{ { text = "Fill the target with the selected gob's position, once." } }
 	)
-	hint(frame.Import, "Import doodad", function()
-		return doodadLines()
-	end, "import")
 
 	frame.Grouped.text:SetText("Group on spawn")
 	frame.Grouped:SetChecked(true)
@@ -1171,6 +1233,32 @@ local function buildTarget()
 	frame.Warning:SetScript("OnLeave", _G.GameTooltip_Hide)
 	frame:HookScript("OnSizeChanged", Client.Guarded(layoutNumbers))
 	layoutNumbers()
+end
+
+local function buildDoodad()
+	panel.Label:SetText("Doodad")
+	panel.UseSource:SetText("Use as source")
+	panel.Import:SetText("Import doodad")
+	listOf(panel.Sets, drawn, "FurnishSetRowTemplate", initDrawn)
+	panel.Sets:SetBackdropColor(0, 0, 0, 0.25)
+	-- Closed, the panel lets the doodad go; selecting one again brings it back.
+	panel.CloseButton:SetScript(
+		"OnClick",
+		Client.Guarded(function()
+			doodad = nil
+			fillDoodad()
+			update()
+		end)
+	)
+	panel.UseSource:SetScript("OnClick", Client.Guarded(useDoodad))
+	panel.Import:SetScript("OnClick", Client.Guarded(importDoodad))
+	hint(panel.UseSource, "Use as source", {
+		{
+			text = "Show the sets of the doodad's WMO as the source, kept whatever you select, with the sets the doodad drew beyond its base chosen.",
+		},
+		{ text = "The target stays as it is." },
+	})
+	hint(panel.Import, "Import doodad", importLines, "import")
 end
 
 local function buildFooter()
@@ -1239,6 +1327,7 @@ local function build()
 	buildSearch()
 	buildSource()
 	buildTarget()
+	buildDoodad()
 	buildFooter()
 
 	frame:SetScript(

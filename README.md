@@ -60,9 +60,12 @@ and Z, then the roll, pitch and turn about each in ObjectMover's colours, then t
 and Use selected gob fill it once; typing a number keeps what was typed; Tab moves through the
 boxes. Either block's Follow selection, unticked, keeps what it shows whatever you select. The
 doodad `.doodad select` picks is a selection of its own, held beside the gob's: it never changes
-Source or Target, and it adds Import doodad, whose tooltip names the sets the doodad draws
-already. Importing turns it into a gob that is selected and followed like any other, with the
-doodad's sets chosen; the doodad is hidden, not gone, and stays selected. Group on spawn makes the objects one group,
+Source or Target, and while there is one a panel stands against the window's right edge with
+its name and the sets of the WMO it is, those it draws already marked baked. Use as source keeps
+that WMO as the source, with the sets the doodad drew beyond its base chosen. Import doodad turns
+it into a gob that is selected and followed by Target like any other; while Source follows the
+selection, the same sets come chosen on it, and a Source kept as it is stays so. The doodad is
+hidden, not gone, and stays selected; closing the panel lets it go. Group on spawn makes the objects one group,
 led by a pivot the button counts; Include the target makes the target lead it instead, and
 where the target is in a group already a mark warns and Spawn asks first. The status row
 holds Highlighting, which toggles the client's outline on selected objects, beside a run's
