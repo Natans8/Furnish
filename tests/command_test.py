@@ -13,11 +13,12 @@ from tests.core_test import fake_client, lua_core, printed
 PREFIX = "|cff66ccffFurnish:|r "
 
 
-def command_lua(tmp_path: Path, deferred: bool = False) -> lua51.LuaRuntime:
+def command_lua(tmp_path: Path, deferred: bool = False, layered: bool = False) -> lua51.LuaRuntime:
     """The core with the client stood in, every send logged with whether its reply is shown,
     the import answered, and a selection's record announced the way EpsilonLib announces it.
-    Deferred, a reply waits until FLUSH() so a run can be caught in flight."""
-    lua = lua_core(tmp_path)
+    Deferred, a reply waits until FLUSH() so a run can be caught in flight; layered, the data
+    is the fixture's layered house."""
+    lua = lua_core(tmp_path, layered)
     fake_client(lua)
     lua.globals().DEFERRED = deferred
     lua.execute(
@@ -582,6 +583,21 @@ def test_a_set_at_the_feet_with_nothing_selected_offers_naming_it(tmp_path: Path
         PREFIX + "no object is selected; select the WMO first, as with .gob select, "
         "or name it, as /furn 3 here <entry>"
     ]
+
+
+def test_an_import_of_a_placement_drawing_several_sets_spawns_every_one(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path, layered=True)
+    lua.execute("IMPORT_UID = 4343")
+    assert run(lua, "import") == [
+        PREFIX
+        + "spawning Full and Lights (sets 1 and 2, 3 objects) on house, joining house's group",
+        PREFIX + "done: 3 of 3 spawned in 0.0 s",
+    ]
+    # The base is laid once beside them, not once a set.
+    assert run(lua, "import base")[0] == (
+        PREFIX + "spawning Base and Full and Lights (sets 0 and 1 and 2, 4 objects) on house,"
+        " joining house's group"
+    )
 
 
 def test_an_import_with_base_lays_the_base_set_the_map_did_not_name(tmp_path: Path) -> None:

@@ -45,7 +45,9 @@ SPAWN_LAMP = "gobject spawn -21 scale 0.5 posx 10 posy 20 posz 33 face north"
 SPAWN_MARKER = "gobject spawn -424242 posx 10 posy 20 posz 30 face north"
 
 
-def write_database(path: Path) -> None:
+def write_database(path: Path, layered: bool = False) -> None:
+    """The house, its emptywmo twin and the map placement that draws Full. Layered, the house
+    has a second set, Lights, and placement 4343 draws both, as a tile naming a run of sets does."""
     with Database(path) as db:
         db.meta({"build": "9.2.7.45745"})
         default = db.add_set(None, [(21, GLOW)])
@@ -57,10 +59,14 @@ def write_database(path: Path) -> None:
         db.add_root_displays([(30262, HOUSE)])
         db.add_entries([(817579, HOUSE)])
         db.add_map_sets([(1116, 4242, full)])
+        if layered:
+            lights = db.add_set("Set_Lights", [(22, GLOW)])
+            db.add_wmo_sets([(HOUSE, 2, lights)])
+            db.add_map_sets([(1116, 4343, full), (1116, 4343, lights)])
 
 
-def lua_core(tmp_path: Path) -> lua51.LuaRuntime:
-    write_database(tmp_path / "f.sqlite")
+def lua_core(tmp_path: Path, layered: bool = False) -> lua51.LuaRuntime:
+    write_database(tmp_path / "f.sqlite", layered)
     export(tmp_path / "f.sqlite", tmp_path / "Data.lua")
     lua = lua51.LuaRuntime(unpack_returned_tuples=True)
     lua.execute(
