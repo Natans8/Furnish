@@ -292,6 +292,13 @@ function updateContents()
 		return frame.Contents.Text:SetText("")
 	end
 	local held, unknown = contents()
+	-- A display number tells a player nothing, so nothing is shown until every model is named.
+	-- TODO: a list of its own in place of this line, once the names are seen to resolve in game.
+	if #unknown > 0 then
+		frame.Contents.held = nil
+		frame.Contents.Text:SetText("")
+		return Client.WalkDisplays(unknown, updateContents)
+	end
 	frame.Contents.held = held
 	local named = {}
 	for i = 1, math.min(NAMED, #held) do
@@ -299,9 +306,6 @@ function updateContents()
 	end
 	local more = #held > NAMED and (", and %d more"):format(#held - NAMED) or ""
 	frame.Contents.Text:SetText("Holds " .. table.concat(named, ", ") .. more)
-	if #unknown > 0 then
-		Client.WalkDisplays(unknown, updateContents)
-	end
 end
 
 local function updateOnto()
