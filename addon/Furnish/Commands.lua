@@ -77,7 +77,7 @@ function Commands.SelectGroup(leader)
 	return "gobject group select " .. leader
 end
 
---- Turn a map doodad into a gameobject: the one a unique id names, or the selected one.
+--- Turn a doodad into a gameobject: the one a unique id names, or the selected one.
 function Commands.Import(uid)
 	if uid then
 		return "doodad import " .. uid

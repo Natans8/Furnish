@@ -1,4 +1,4 @@
--- What the commands do: list a WMO's sets, spawn one, import a map doodad, and stop.
+-- What the commands do: list a WMO's sets, spawn one, import a doodad, and stop.
 --
 -- This is the surface, not the API. It holds the one run, reads `attach` off the selection,
 -- and closes a grouped run by selecting the group in the player's sight, so the next group
@@ -42,8 +42,9 @@ local say = Chat.Say
 
 --- The run going on, if any, and whether it was asked to stop. A wait for an object's record:
 -- { what it waits for, what a stop leaves standing or nil, stop }. The group the last run
--- selected and the object that run was anchored on: { leader, guid, pose }.
-local running, stopping, waiting, anchored
+-- selected and the object that run was anchored on: { leader, guid, pose }. The GUIDs the last
+-- run left standing, until they are deleted or another run starts.
+local running, stopping, waiting, anchored, last
 
 --- Who hears a run besides the chat, as a window registers: { started(total, what),
 -- progress(done, total), finished(result, seconds) }, each optional.
@@ -233,6 +234,7 @@ local function finish(result, started, anchor)
 			)
 		)
 	end
+	last = not result.deleted and #result.spawned > 0 and result.spawned or nil
 	if result.joined > 0 and not result.deleted then
 		Client.Send()(Commands.SelectGroup(result.leader), nil, true)
 		anchored = anchor
@@ -242,12 +244,12 @@ local function finish(result, started, anchor)
 end
 
 local function hooks(about)
-	local last, started = 0, Client.Now()
+	local told, started = 0, Client.Now()
 	return {
 		progress = function(done, total)
 			tell("progress", done, total)
-			if not about.quiet and done < total and done - last >= 10 then
-				last = done
+			if not about.quiet and done < total and done - told >= 10 then
+				told = done
 				say(("%d of %d"):format(done, total))
 			end
 		end,
@@ -269,6 +271,7 @@ local function start(rows, target, group, about)
 		return say(reason)
 	end
 	say(("spawning %s %s, %s"):format(about.what, about.where, about.lead))
+	last = nil
 	-- Told before the run, which may answer whole before Spawn returns.
 	tell("started", #rows, about.what)
 	local handle, refused = Furnish.Spawn(
@@ -314,6 +317,7 @@ local function described(file, name, drawn)
 	local shown = {}
 	for i, set in ipairs(sets) do
 		shown[i] = {
+			id = set.id,
 			index = set.index,
 			name = setName(set),
 			count = set.count,
@@ -326,24 +330,25 @@ end
 
 --- Where a window takes its sets from: a root it names, or the selected WMO.
 -- @param of nil for the selection; { file, name } for a root by its file id and what to call it;
---   or { entry, placement } for the WMO a gameobject's entry names, the number a lookup line
---   prints, with the map doodad it was read off, as Commands.SelectedDoodad gives it, or nil;
---   a doodad's name names the source, and the sets its map draws are marked
--- @return { name, file, blank, sets }, each set { index, name, count, canonical, placed }, the
+--   or { entry } for the WMO a gameobject's entry names, the number a lookup line prints. Any
+--   of them may carry a placement, a doodad as Commands.SelectedDoodad reads it, whose sets are
+--   marked placed; with an entry, the doodad's name also names the source
+-- @return { name, file, blank, sets }, each set { id, index, name, count, canonical, placed }, the
 --   name as a line shows it, canonical as the file spells it, empty for the base set, and placed
---   true for a set the map draws; blank is true for a WMO Epsilon emptied, which always gets its
+--   true for a set the doodad shows now; blank is true for a WMO Epsilon emptied, which always gets its
 --   base set; or nil and why there are none
 function Console.Source(of)
-	if of and of.file then
-		return described(of.file, of.name)
+	of = of or {}
+	local placement = of.placement
+	local drawn = placement and Sets.OfPlacement(placement.map, placement.uid) or nil
+	if of.file then
+		return described(of.file, of.name, drawn)
 	end
-	if of then
+	if of.entry then
 		local file, reason = Sets.OfEntry(of.entry)
 		if not file then
 			return nil, reason
 		end
-		local placement = of.placement
-		local drawn = placement and Sets.OfPlacement(placement.map, placement.uid) or nil
 		return described(
 			file,
 			placement and Client.ModelName(placement.name) or ("object %d"):format(of.entry),
@@ -357,7 +362,82 @@ function Console.Source(of)
 	if not pose.wmo then
 		return nil, pose.name .. " is not a WMO, so it has no sets"
 	end
-	return described(pose.file, pose.name)
+	return described(pose.file, pose.name, drawn)
+end
+
+--- The WMOs Furnish has sets for whose names hold some words, as the client's own catalogue of
+-- gameobject displays names them; each WMO once, however many displays draw it.
+-- @return a list of { file, name, sets, blank }, sets being how many it has, ordered by name
+function Console.Find(words)
+	if not Reader.Load() then
+		return {}
+	end
+	local found, seen = {}, {}
+	for _, row in ipairs(Client.SearchDisplays(words)) do
+		local sets = not seen[row.file] and Sets.OfFile(row.file)
+		seen[row.file] = true
+		if sets then
+			found[#found + 1] = {
+				file = row.file,
+				name = Client.ModelName(row.name),
+				sets = #sets,
+				blank = Sets.IsBlank(row.file),
+			}
+		end
+	end
+	table.sort(found, function(a, b)
+		return a.name < b.name
+	end)
+	return found
+end
+
+--- How many objects the last run left standing, or nil when it left none, was deleted, or
+-- another run has started since.
+function Console.Last()
+	return last and #last or nil
+end
+
+--- Delete what the last run left standing.
+function Console.DeleteLast()
+	local blocked = busy()
+	if blocked then
+		return say(blocked)
+	end
+	if not last then
+		return say("nothing to delete; the last run left nothing standing")
+	end
+	local send, reason = Client.Send()
+	if not send then
+		return say(reason)
+	end
+	local guids, commands, started = last, {}, Client.Now()
+	last = nil
+	for i, guid in ipairs(guids) do
+		commands[i] = { text = Commands.Delete(guid) }
+	end
+	say(("deleting the %s the last run spawned"):format(objects(#guids)))
+	tell("started", #guids, "deleting")
+	local handle, refused = Furnish.Run.Start(commands, send, {
+		progress = function(done, total)
+			tell("progress", done, total)
+		end,
+		finished = function(outcome)
+			local deleted = 0
+			for _, result in pairs(outcome.results) do
+				deleted = deleted + (result.success and 1 or 0)
+			end
+			say(("deleted %d of %d"):format(deleted, #guids))
+			local result = { total = #guids, spawned = {}, refused = {}, unjoined = {} }
+			result.deleted, result.undone = deleted, true
+			tell("finished", result, Client.Now() - started)
+		end,
+	}, Furnish.Settings.inFlight)
+	if not handle then
+		last = guids
+		tell("finished", nil, 0)
+		return say("nothing was sent: " .. refused)
+	end
+	running, stopping = handle, false
 end
 
 --- What a window's sets may spawn on and whose group they may join: the selected object's
@@ -472,7 +552,7 @@ end
 function Console.DescribeImport(tooltip)
 	tooltip:SetText("Furnish", 1, 1, 1)
 	tooltip:AddLine(
-		"Import this WMO and spawn the sets the map placed it with, grouped on it",
+		"Import this WMO and spawn the sets it shows now, grouped on it",
 		0.62,
 		0.62,
 		0.62,
@@ -606,8 +686,8 @@ function Console.Spawn(request)
 	)
 end
 
---- The sets of an imported WMO the map placed it with, beyond the base set it shows
--- itself; with base, the base set as well, whether the map named it or not.
+--- The sets an imported WMO showed as a doodad, beyond the base set it shows
+-- itself; with base, the base set as well, whether the doodad showed it or not.
 local function placed(pose, ids, base)
 	local chosen = {}
 	for _, set in ipairs(Sets.OfFile(pose.file) or {}) do
@@ -622,10 +702,12 @@ local function placed(pose, ids, base)
 	return chosen
 end
 
---- Import a map doodad, then spawn on it the sets the map placed it with, grouped on the
--- WMO it now is unless a word says otherwise.
--- @param request uid, the doodad's unique id, or nil for the selected doodad; group and
---   base, as for a spawn
+--- Import a doodad, then spawn on it the sets it showed, or the ones named,
+-- grouped on the WMO it now is unless a word says otherwise.
+-- @param request uid, the doodad's unique id, or nil for the selected doodad; only, true to
+--   import it and spawn nothing, leaving it selected as the WMO it now is; indexes, the sets to
+--   spawn in place of the ones it showed, the base among them only with base; group and base,
+--   as for a spawn
 function Console.Import(request)
 	local blocked = busy()
 	if blocked then
@@ -662,11 +744,23 @@ function Console.Import(request)
 	}
 
 	local function furnish(record, ids, guid, model)
+		if request.only then
+			return say(("imported %s as object %s"):format(model, guid))
+		end
 		local pose = Pose.OfRecord(record)
 		if not pose.wmo then
 			return say(
 				("imported %s as object %s; it is not a WMO, so it has no sets"):format(model, guid)
 			)
+		end
+		if request.indexes then
+			ids = {}
+			for _, index in ipairs(request.indexes) do
+				local set = Sets.Pick(pose.file, index)
+				if set then
+					ids[#ids + 1] = set.id
+				end
+			end
 		end
 		local chosen = ids and placed(pose, ids, request.base) or {}
 		if #chosen == 0 then
@@ -674,9 +768,9 @@ function Console.Import(request)
 				("imported %s as object %s; %s"):format(
 					model,
 					guid,
-					ids and "the map draws only its base set, which the WMO shows itself"
+					ids and "the doodad shows only its base set, which the WMO shows itself"
 						or (
-							"the map placed it with no set Furnish knows; "
+							"the doodad shows no set Furnish knows; "
 							.. Chat.Typed("list")
 							.. " shows its own"
 						)
@@ -688,12 +782,13 @@ function Console.Import(request)
 			return say(what)
 		end
 		local group, lead = groupOf({ group = request.group or "attach" }, pose)
-		start(
-			rows,
-			pose,
-			group,
-			{ what = what, where = "on " .. pose.name, lead = lead, anchor = pose }
-		)
+		start(rows, pose, group, {
+			what = what,
+			where = "on " .. pose.name,
+			lead = lead,
+			anchor = pose,
+			quiet = request.quiet,
+		})
 	end
 
 	-- The import selects the object but pushes no record of it, and the record carries the

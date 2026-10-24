@@ -192,7 +192,8 @@ local function fromLink(words)
 end
 
 --- A click on a list link spawns its set: plainly on the selected object, with ctrl at
--- the player's feet. A click on a doodad line's button imports that WMO and furnishes it.
+-- the player's feet. A click on a doodad line's button imports that WMO and furnishes it,
+-- and one on a gob line's lists the gob's sets.
 function Command.Click(words, modifier)
 	-- TODO: a shift-click shares the set, once what a shared set carries is decided.
 	if modifier == "share" then
@@ -202,6 +203,10 @@ function Command.Click(words, modifier)
 	if uid then
 		return Console.Import({ uid = uid })
 	end
+	local entry = words:match("^list:(%d+)$")
+	if entry then
+		return Console.List({ entry = tonumber(entry) })
+	end
 	local request = fromLink(words)
 	if request then
 		request.here = modifier == "ctrl"
@@ -209,11 +214,15 @@ function Command.Click(words, modifier)
 	end
 end
 
---- What resting on one of Furnish's links shows: a set and its clicks, or what the
--- doodad line's button does.
+--- What resting on one of Furnish's links shows: a set and its clicks, or what a doodad or
+-- gob line's button does.
 function Command.Hover(words, tooltip)
 	if words:match("^import:%d+$") then
 		return Console.DescribeImport(tooltip)
+	end
+	if words:match("^list:%d+$") then
+		tooltip:SetText("Furnish", 1, 1, 1)
+		return tooltip:AddLine("List this WMO's doodad sets", 0.62, 0.62, 0.62, true)
 	end
 	local request = fromLink(words)
 	if request then
@@ -228,7 +237,7 @@ _G.SLASH_FURNISH2 = "/furnish"
 _G.SlashCmdList.FURNISH = Client.Guarded(Command.Run)
 Chat.OnLinks(Command.Click, Command.Hover)
 
---- The unique id of the map doodad a server line names by its link, where it is a WMO
+--- The unique id of the doodad a server line names by its link, where it is a WMO
 -- Furnish has sets for. The number after the name in the link is the object's gameobject
 -- entry, and the data answers for it; the name is never read, since many a WMO's
 -- name has no `.wmo` in it. The first such line loads the data.
@@ -240,9 +249,24 @@ function Command.PlacedWmo(line)
 	return nil
 end
 
--- A WMO's doodad line, from a select or a near, gets a button that imports and
--- furnishes it, beside the server's own.
+--- The entry of the gob a selection line names, where it is a WMO Furnish has sets for; the
+-- number in the link is the entry, and the name is never read.
+function Command.SelectedWmo(line)
+	local entry = line:find("Selected gameobject", 1, true)
+		and line:match("|Hgameobject_entry:(%d+)|h")
+	if entry and Furnish.Sets.OfEntry(tonumber(entry)) then
+		return entry
+	end
+	return nil
+end
+
+-- A WMO's doodad line, from a select or a near, gets a button that imports and furnishes
+-- it, and a WMO gob's selection line one that lists its sets, beside the server's own.
 Chat.OnServerLines(function(line)
 	local uid = Command.PlacedWmo(line)
-	return uid and " - " .. Chat.Link("import:" .. uid, "Furnish") or nil
+	if uid then
+		return " - " .. Chat.Link("import:" .. uid, "Furnish")
+	end
+	local entry = Command.SelectedWmo(line)
+	return entry and " - " .. Chat.Link("list:" .. entry, "Furnish") or nil
 end)

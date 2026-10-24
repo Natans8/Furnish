@@ -282,9 +282,112 @@ function Client.Facing()
 end
 
 --- The model name a record carries, as the data spells it: the file's base name, lower
--- case, without the folder, the extension or the carriage return the client appends.
+-- case, without the folder, a leading tag in brackets, a WMO's extension or the carriage
+-- return the client appends.
 function Client.ModelName(name)
 	name = tostring(name or ""):gsub("[\r\n]", ""):lower()
 	name = name:match("([^/\\]+)$") or name
+	name = name:gsub("^%[.-%]%s*", "")
 	return (name:gsub("%.wmo$", ""))
+end
+
+--- How many rows of the client's display catalogue a walk reads in one frame.
+local WALK = 4000
+
+--- The client's catalogue of gameobject displays, or nil where this client has none.
+local function catalogue()
+	local epsilon = _G.C_Epsilon
+	if epsilon and epsilon.GODI_Get and epsilon.GODI_Count and epsilon.GODI_Search then
+		return epsilon
+	end
+	return nil
+end
+
+--- The rows of the client's display catalogue whose names hold some words.
+-- @return a list of { display, file, name }, the name as the client holds it
+function Client.SearchDisplays(words)
+	local epsilon = catalogue()
+	if not epsilon then
+		return {}
+	end
+	local found = {}
+	for i = 0, (epsilon.GODI_Search(words) or 0) - 1 do
+		local row = epsilon.GODI_RetrieveSearch(i)
+		if row then
+			found[#found + 1] = { display = row.displayid, file = row.fileid, name = row.name }
+		end
+	end
+	return found
+end
+
+--- What each display draws, as far as it is known: a model's name, or false once a walk of the
+-- whole catalogue has missed the display.
+local drawn = {}
+
+--- The model a gameobject display draws, by the client's own catalogue, or nil while unknown.
+-- The catalogue is searched by halves first, which finds it at once where the catalogue is in
+-- display order; a display that search misses is left to Client.WalkDisplays.
+function Client.DisplayModel(display)
+	if drawn[display] ~= nil then
+		return drawn[display] or nil
+	end
+	local epsilon = catalogue()
+	if not epsilon then
+		return nil
+	end
+	local low, high = 0, epsilon.GODI_Count() - 1
+	while low <= high do
+		local middle = math.floor((low + high) / 2)
+		local row = epsilon.GODI_Get(middle)
+		local id = row and row.displayid
+		if not id then
+			return nil
+		elseif id == display then
+			drawn[display] = row.name
+			return row.name
+		elseif id < display then
+			low = middle + 1
+		else
+			high = middle - 1
+		end
+	end
+	return nil
+end
+
+--- The displays a walk is out looking for, so a second ask does not start a second walk.
+local sought = {}
+
+--- Read the whole catalogue a few thousand rows a frame, learning what every display asked for
+-- draws, then call done. A display the walk does not meet draws nothing the catalogue knows.
+function Client.WalkDisplays(displays, done)
+	local epsilon = catalogue()
+	local missing, any = {}, false
+	for _, display in ipairs(displays) do
+		if drawn[display] == nil and not sought[display] then
+			missing[display], sought[display], any = true, true, true
+		end
+	end
+	if not (epsilon and any) then
+		return
+	end
+	local at, count = 0, epsilon.GODI_Count()
+	local function step()
+		local stop = math.min(at + WALK, count) - 1
+		for i = at, stop do
+			local row = epsilon.GODI_Get(i)
+			if row and missing[row.displayid] then
+				drawn[row.displayid], missing[row.displayid] = row.name, nil
+				sought[row.displayid] = nil
+			end
+		end
+		at = stop + 1
+		if at < count and next(missing) then
+			return _G.C_Timer.After(0, Client.Guarded(step))
+		end
+		for display in pairs(missing) do
+			drawn[display], sought[display] = false, nil
+		end
+		done()
+	end
+	step()
 end

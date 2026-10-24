@@ -804,3 +804,57 @@ def test_a_fault_is_said_in_chat_once(tmp_path: Path) -> None:
     lua.execute("BROKEN(); BROKEN()")
     faults = [line for line in printed(lua) if "stopped by an error" in line]
     assert faults == ["|cff66ccffFurnish:|r |cffff2020stopped by an error: the reader broke|r"]
+
+
+#: A stand-in for the client's catalogue of gameobject displays: ROWS in the order given, and a
+#: search over their names.
+CATALOGUE = """
+CATALOGUE_READS = 0
+C_Epsilon.GODI_Count = function() return #ROWS end
+C_Epsilon.GODI_Get = function(i)
+  CATALOGUE_READS = CATALOGUE_READS + 1
+  return ROWS[i + 1]
+end
+C_Epsilon.GODI_Search = function(words)
+  FOUND = {}
+  for _, row in ipairs(ROWS) do
+    if row.name:lower():find(words, 1, true) then FOUND[#FOUND + 1] = row end
+  end
+  return #FOUND
+end
+C_Epsilon.GODI_RetrieveSearch = function(i) return FOUND[i + 1] end
+"""
+
+
+def test_a_display_in_an_ordered_catalogue_is_found_by_halves(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    fake_client(lua)
+    lua.execute(
+        "ROWS = {}; for i = 1, 1000 do"
+        " ROWS[i] = { displayid = i * 2, fileid = i, name = 'model' .. i .. '.m2' } end"
+    )
+    lua.execute(CATALOGUE)
+    assert lua.eval("Furnish.Client.DisplayModel(1000)") == "model500.m2"
+    assert lua.eval("CATALOGUE_READS") <= 11
+    assert lua.eval("Furnish.Client.DisplayModel(1001)") is None
+
+
+def test_a_walk_names_what_an_unordered_catalogue_hides_and_rules_out_the_rest(
+    tmp_path: Path,
+) -> None:
+    lua = lua_core(tmp_path)
+    fake_client(lua)
+    lua.execute(
+        "ROWS = { { displayid = 20, fileid = 2, name = 'b.m2' },"
+        " { displayid = 30, fileid = 3, name = 'c.m2' },"
+        " { displayid = 10, fileid = 1, name = 'a.m2' } }"
+    )
+    lua.execute(CATALOGUE)
+    assert lua.eval("Furnish.Client.DisplayModel(10)") is None
+    lua.execute("DONE = 0; Furnish.Client.WalkDisplays({ 10, 99 }, function() DONE = DONE + 1 end)")
+    assert lua.eval("DONE") == 1
+    assert lua.eval("Furnish.Client.DisplayModel(10)") == "a.m2"
+    assert lua.eval("Furnish.Client.DisplayModel(99)") is None
+    # Nothing is left to look for, so a second ask walks nothing.
+    lua.execute("CATALOGUE_READS = 0; Furnish.Client.WalkDisplays({ 10, 99 }, function() end)")
+    assert lua.eval("CATALOGUE_READS") == 0

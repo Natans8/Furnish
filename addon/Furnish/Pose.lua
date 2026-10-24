@@ -4,7 +4,7 @@
 -- turn }, scale }, plus whatever else the source knew, so a surface may take the pose from
 -- one source and anything else from another. Nothing here sends a command: an object's
 -- record is read off the selection the player made, never one the addon makes for them. A
--- map doodad is reached the same way, since `.doodad import` selects what it imports.
+-- doodad is reached the same way, since `.doodad import` selects what it imports.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish

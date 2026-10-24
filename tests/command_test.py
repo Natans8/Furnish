@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from lupa import lua51
 
-from tests.core_test import fake_client, lua_core, printed
+from tests.core_test import CATALOGUE, fake_client, lua_core, printed
 
 PREFIX = "|cff66ccffFurnish:|r "
 
@@ -604,7 +604,7 @@ def test_an_import_the_map_did_not_furnish_spawns_nothing(tmp_path: Path) -> Non
     lua.execute("IMPORT_UID = 1")
     assert run(lua, "import") == [
         PREFIX + "imported house.wmo as object 500; "
-        "the map placed it with no set Furnish knows; /furn list shows its own"
+        "the doodad shows no set Furnish knows; /furn list shows its own"
     ]
     assert sent(lua) == ["doodad import", "gobject select 500"]
 
@@ -652,6 +652,16 @@ def test_an_import_of_a_placement_drawing_several_sets_spawns_every_one(tmp_path
         PREFIX + "spawning Base and Full and Lights (sets 0 and 1 and 2, 4 objects) on house,"
         " joining house's group"
     )
+
+
+def test_an_import_spawns_the_sets_named_in_place_of_the_maps(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path, layered=True)
+    lua.execute("IMPORT_UID = 4343")
+    lua.execute("Furnish.Console.Import({ indexes = { 2 }, group = 'nogroup', quiet = true })")
+    assert printed(lua)[-2:] == [
+        PREFIX + "spawning Lights (set 2, 1 object) on house, ungrouped",
+        PREFIX + "done: 1 of 1 spawned in 0.0 s",
+    ]
 
 
 def test_an_import_with_base_lays_the_base_set_the_map_did_not_name(tmp_path: Path) -> None:
@@ -793,3 +803,62 @@ def test_a_run_says_how_long_it_took(tmp_path: Path) -> None:
     run(lua, "1")
     lua.execute("CLOCK = 14.5; FLUSH()")
     assert printed(lua)[-1] == PREFIX + "done: 2 of 2 spawned in 12.5 s"
+
+
+def test_a_name_search_lists_each_wmo_with_sets_once(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute(
+        "ROWS = { { displayid = 30262, fileid = 900, name = 'world/wmo/house.wmo\\r' },"
+        " { displayid = 30263, fileid = 900, name = 'world/wmo/house.wmo' },"
+        " { displayid = 5, fileid = 777, name = '[bfa 810-820] emptywmo_house.wmo' },"
+        " { displayid = 6, fileid = 1, name = 'world/prop/housechair.m2' } }"
+    )
+    lua.execute(CATALOGUE)
+    found = lua.eval("Furnish.Console.Find('house')")
+    assert [(w.name, w.file, w.sets, w.blank) for w in found.values()] == [
+        ("emptywmo_house", 777, 2, True),
+        ("house", 900, 2, False),
+    ]
+
+
+def test_what_the_last_run_left_can_be_deleted(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("SELECTED = 500")
+    run(lua, "1 nogroup")
+    assert lua.eval("Furnish.Console.Last()") == 2
+    before = len(sent(lua))
+    lua.execute("Furnish.Console.DeleteLast()")
+    assert sent(lua)[before:] == ["gobject delete 7001", "gobject delete 7002"]
+    assert printed(lua)[-1] == PREFIX + "deleted 2 of 2"
+    assert lua.eval("Furnish.Console.Last()") is None
+    lua.execute("Furnish.Console.DeleteLast()")
+    assert printed(lua)[-1] == PREFIX + "nothing to delete; the last run left nothing standing"
+
+
+def test_an_import_alone_spawns_nothing(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("Furnish.Console.Import({ only = true })")
+    assert sent(lua) == ["doodad import", "gobject select 500"]
+    assert printed(lua)[-1] == PREFIX + "imported house.wmo as object 500"
+
+
+def test_a_doodads_sets_are_marked_on_the_selected_wmo(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("SELECTED = 500")
+    source = lua.eval("Furnish.Console.Source({ placement = { map = 1116, uid = 4242 } })")
+    assert [(s.name, s.placed) for s in source.sets.values()] == [("Base", False), ("Full", True)]
+
+
+def test_a_wmo_gobs_selection_line_carries_a_button_that_lists_its_sets(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    selected = (
+        "Selected gameobject |Hgameobject_entry:817579|h[6dr_draenei_house2 - 817579]|h "
+        "(GUID: |Hgameobject_GUID:500|h500|h)"
+    )
+    line = shown_line(lua, selected)
+    assert line == selected + " - |cff71d5ff|Hgarrmission:furnish:list:817579|h[Furnish]|h|r"
+    lua.globals().HOOKS.SetItemRef("garrmission:furnish:list:817579")
+    assert any("Full" in each for each in printed(lua))
+    # A gob whose entry is no furnished WMO is left as it came.
+    chair = selected.replace("817579", "717747")
+    assert shown_line(lua, chair) == chair
