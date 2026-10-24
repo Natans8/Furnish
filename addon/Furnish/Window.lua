@@ -304,8 +304,9 @@ local function refresh()
 	if run then
 		return
 	end
-	target = Console.Target()
-	local found, reason = Console.Source(entry, placement)
+	local selected = Console.Target()
+	target = selected and selected.name
+	local found, reason = Console.Source(entry and { entry = entry, placement = placement })
 	if found and not (source and source.file == found.file) then
 		chooseFirst(found)
 	end
@@ -485,7 +486,7 @@ end
 -- leaves the window as it is.
 local function doodadSelected(line)
 	local doodad = Furnish.Commands.SelectedDoodad(line)
-	if run or not doodad or not Console.Source(doodad.entry) then
+	if run or not doodad or not Console.Source({ entry = doodad.entry }) then
 		return
 	end
 	placement, entry, source = doodad, doodad.entry, nil

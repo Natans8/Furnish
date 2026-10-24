@@ -98,6 +98,11 @@ def shown(lua: lua51.LuaRuntime) -> list[str]:
     return list(lua.eval("SHOWN").values())
 
 
+def spawn(lua: lua51.LuaRuntime, request: str) -> None:
+    """Spawn through the console as a window does, the request written as a Lua table."""
+    lua.execute(f"Furnish.Console.Spawn({request})")
+
+
 # -- Reading what is typed ---------------------------------------------------------------
 
 
@@ -201,9 +206,21 @@ def test_a_window_takes_its_sets_from_the_selected_wmo(tmp_path: Path) -> None:
 
 def test_a_window_takes_its_sets_from_an_entry_whatever_is_selected(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
-    source = lua.eval("Furnish.Console.Source(817579)")
+    source = lua.eval("Furnish.Console.Source({ entry = 817579 })")
     assert (source.name, source.file) == ("object 817579", 900)
-    assert lua.eval("select(2, Furnish.Console.Source(1))").startswith("entry 1 is no WMO object")
+    assert lua.eval("select(2, Furnish.Console.Source({ entry = 1 }))").startswith(
+        "entry 1 is no WMO object"
+    )
+
+
+def test_a_window_takes_its_sets_from_a_root_by_its_file(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    source = lua.eval("Furnish.Console.Source({ file = 900, name = 'house' })")
+    assert (source.name, source.file, len(source.sets)) == ("house", 900, 2)
+    assert (
+        lua.eval("select(2, Furnish.Console.Source({ file = 1, name = 'chair' }))")
+        == "chair has no doodad sets in Furnish's data"
+    )
 
 
 def test_a_selected_map_wmo_names_its_source_and_marks_the_sets_its_map_draws(
@@ -211,22 +228,59 @@ def test_a_selected_map_wmo_names_its_source_and_marks_the_sets_its_map_draws(
 ) -> None:
     lua = command_lua(tmp_path)
     source = lua.eval(
-        "Furnish.Console.Source(817579, { map = 1116, uid = 4242, name = 'House.wmo' })"
+        "Furnish.Console.Source({ entry = 817579,"
+        " placement = { map = 1116, uid = 4242, name = 'House.wmo' } })"
     )
     assert source.name == "house"
     assert [(s.name, s.placed) for s in source.sets.values()] == [("Base", False), ("Full", True)]
     # A doodad the map does not place leaves every set unmarked.
-    stray = lua.eval("Furnish.Console.Source(817579, { map = 1116, uid = 1, name = 'house' })")
+    stray = lua.eval(
+        "Furnish.Console.Source({ entry = 817579,"
+        " placement = { map = 1116, uid = 1, name = 'house' } })"
+    )
     assert [s.placed for s in stray.sets.values()] == [False, False]
 
 
-def test_the_target_is_any_selected_object(tmp_path: Path) -> None:
+def test_the_target_is_any_selected_object_with_its_pose(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     assert lua.eval("select(2, Furnish.Console.Target())") == "no object is selected"
     lua.execute("SELECTED = 502")
-    assert lua.eval("Furnish.Console.Target()") == "chair.m2"
+    assert lua.eval("(Furnish.Console.Target())").name == "chair.m2"
     lua.execute("SELECTED = 500")
-    assert lua.eval("Furnish.Console.Target()") == "house"
+    target = lua.eval("(Furnish.Console.Target())")
+    assert (target.name, target.guid, target.scale) == ("house", 500, 2)
+    assert (target.position.x, target.rotation.turn, target.groupLeader) == (10, 90, 0)
+
+
+def test_a_set_spawns_at_a_pose_given_with_no_object_behind_it(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("SELECTED = 502")
+    spawn(lua, "{ index = 1, file = 900, label = 'house', at = Furnish.Pose.At(1, 2, 3, 0) }")
+    assert printed(lua)[-2] == (
+        PREFIX
+        + "spawning house's Full (set 1, 2 objects) at 1.0, 2.0, 3.0, led by an invisible pivot"
+    )
+    assert sent(lua)[0] == "gobject spawn -424242 posx 1 posy 2 posz 3 face north"
+    # With no object behind the pose there is no group to join, and a pose names no WMO.
+    spawn(lua, "{ index = 1, file = 900, at = Furnish.Pose.At(1, 2, 3), group = 'attach' }")
+    assert printed(lua)[-1] == (
+        PREFIX + "the position is no object's, so there is no group to join"
+    )
+    spawn(lua, "{ index = 1, at = Furnish.Pose.At(1, 2, 3) }")
+    assert printed(lua)[-1] == (
+        PREFIX + "a position names no WMO; name the one whose sets to spawn"
+    )
+
+
+def test_a_pose_read_off_an_object_joins_that_objects_group(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("SELECTED = 500")
+    lua.execute("AT = Furnish.Console.Target(); SELECTED = 502")
+    spawn(lua, "{ index = 1, file = 900, label = 'house', at = AT, group = 'attach' }")
+    assert printed(lua)[-2] == (
+        PREFIX + "spawning Full (set 1, 2 objects) on house, joining house's group"
+    )
+    assert "gobject group add 500" in sent(lua)
 
 
 def test_a_named_source_spawns_on_any_selected_object(tmp_path: Path) -> None:

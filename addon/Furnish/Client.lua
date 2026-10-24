@@ -77,16 +77,30 @@ function Client.Send()
 end
 
 --- Whether the player may spawn objects in this phase, its members, officers and owner. A
--- refusal is said in chat in Epsilon's own words, as its other tools say it. Where
--- EpsilonLib cannot answer, the server is left to decide.
-function Client.CanSpawn()
+-- refusal is said in chat in Epsilon's own words, as its other tools say it, unless quiet.
+-- Where EpsilonLib cannot answer, the server is left to decide.
+function Client.CanSpawn(quiet)
 	local lib = _G.EpsilonLib
 	local check = lib and lib.GameObject and lib.GameObject.CanSpawn
 	if not check then
 		return true
 	end
 	-- Any true answer is permission, as EpsilonLib reads it: Epsilon's calls may answer 1.
-	return check(true) and true or false
+	return check(not quiet) and true or false
+end
+
+--- Whether the player may change an object, and so group with it: a phase's officers and
+-- owner may change anything, a member what the object's record says they may.
+-- @param pose an object's pose, as Pose.OfRecord gives it
+function Client.CanEdit(pose)
+	local epsilon = _G.C_Epsilon
+	if not (epsilon and epsilon.IsOfficer) then
+		return true
+	end
+	return epsilon.IsOfficer()
+		or epsilon.IsOwner()
+		or (epsilon.IsMember() and pose.canEdit)
+		or false
 end
 
 --- The selected object's record, or nil; false for a group selection.
@@ -101,26 +115,38 @@ function Client.Selected()
 	return lib.GameObject:GetSelected()
 end
 
---- Call fn whenever EpsilonLib says the selection changed, until the function returned is
--- called; or nil and the reason.
-function Client.OnSelection(fn)
+--- Call fn whenever EpsilonLib fires an event, until the function returned is called; or nil
+-- and the reason.
+local function listen(event, fn)
 	local lib = _G.EpsilonLib
 	local events = lib and lib.EventManager
 	if not events then
 		return nil, "EpsilonLib is not loaded, and Furnish reads every object through it"
 	end
 	local _, reference = events:Register(
-		"EPSILON_OBJ_UPDATE",
+		event,
 		Client.Guarded(function()
 			fn()
 		end)
 	)
 	return function()
 		if reference then
-			events:Remove(reference, "EPSILON_OBJ_UPDATE")
+			events:Remove(reference, event)
 			reference = nil
 		end
 	end
+end
+
+--- Call fn whenever EpsilonLib says the selection changed, until the function returned is
+-- called; or nil and the reason.
+function Client.OnSelection(fn)
+	return listen("EPSILON_OBJ_UPDATE", fn)
+end
+
+--- Call fn whenever the player enters another phase, until the function returned is called;
+-- or nil and the reason.
+function Client.OnPhaseChange(fn)
+	return listen("EPSILON_PHASE_CHANGE", fn)
 end
 
 --- The GUID of the selected group's leader, or nil when no group is selected.

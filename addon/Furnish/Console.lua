@@ -13,6 +13,8 @@
 --   file    a root's file id, which a list link carries
 --   label   what to call that root in a line, which a list link carries
 --   here    true to spawn at the player rather than on the selected object
+--   at      a pose to spawn at instead, as Pose gives one; with the guid of the object it was
+--           read off, that object is the one an attach joins
 --   group   "pivot", "first", "attach" or "nogroup"; nil is "pivot"
 --   base    true to lay the root's base set under the sets, unless it is one of them
 --   quiet   true when a window shows the run's progress, so the chat leaves it out
@@ -194,6 +196,9 @@ local function groupOf(request, pose)
 	elseif word == "nogroup" then
 		return Group.None, "ungrouped"
 	end
+	if not pose.guid then
+		return nil, "the position is no object's, so there is no group to join"
+	end
 	local leader = pose.groupLeader ~= 0 and pose.groupLeader or pose.guid
 	return leader, "joining " .. pose.name .. "'s group"
 end
@@ -319,24 +324,29 @@ local function described(file, name, drawn)
 	return { name = name, file = file, blank = Sets.IsBlank(file), sets = shown }
 end
 
---- Where a window takes its sets from: the WMO an entry names, or the selected one.
--- @param entry a gameobject's entry, the number a lookup line prints, or nil for the selection
--- @param placement a map doodad the entry was read off, as Commands.SelectedDoodad gives it, or
---   nil; its name names the source, and the sets its map draws are marked
+--- Where a window takes its sets from: a root it names, or the selected WMO.
+-- @param of nil for the selection; { file, name } for a root by its file id and what to call it;
+--   or { entry, placement } for the WMO a gameobject's entry names, the number a lookup line
+--   prints, with the map doodad it was read off, as Commands.SelectedDoodad gives it, or nil;
+--   a doodad's name names the source, and the sets its map draws are marked
 -- @return { name, file, blank, sets }, each set { index, name, count, canonical, placed }, the
 --   name as a line shows it, canonical as the file spells it, empty for the base set, and placed
 --   true for a set the map draws; blank is true for a WMO Epsilon emptied, which always gets its
 --   base set; or nil and why there are none
-function Console.Source(entry, placement)
-	if entry then
-		local file, reason = Sets.OfEntry(entry)
+function Console.Source(of)
+	if of and of.file then
+		return described(of.file, of.name)
+	end
+	if of then
+		local file, reason = Sets.OfEntry(of.entry)
 		if not file then
 			return nil, reason
 		end
+		local placement = of.placement
 		local drawn = placement and Sets.OfPlacement(placement.map, placement.uid) or nil
 		return described(
 			file,
-			placement and Client.ModelName(placement.name) or ("object %d"):format(entry),
+			placement and Client.ModelName(placement.name) or ("object %d"):format(of.entry),
 			drawn
 		)
 	end
@@ -351,13 +361,10 @@ function Console.Source(entry, placement)
 end
 
 --- What a window's sets may spawn on and whose group they may join: the selected object's
--- name, whatever it is, or nil and why nothing is selected.
+-- pose, whatever it is, with its name, guid, groupLeader and canEdit beside it; or nil and
+-- why nothing is selected.
 function Console.Target()
-	local pose, reason = selectedPose()
-	if not pose then
-		return nil, reason
-	end
-	return pose.name
+	return selectedPose()
 end
 
 --- Why nothing new can start, or nil.
@@ -537,11 +544,17 @@ local function spawnOn(request, pose)
 		what = label .. "'s " .. what
 	end
 	local group, lead = groupOf(request, pose)
+	if not group then
+		return say(lead)
+	end
+	local spot = target.position
 	start(rows, target, group, {
 		what = what,
-		where = request.here and "at your feet" or ("on " .. pose.name),
+		where = request.here and "at your feet"
+			or pose.name and ("on " .. pose.name)
+			or ("at %.1f, %.1f, %.1f"):format(spot.x, spot.y, spot.z),
 		lead = lead,
-		anchor = pose,
+		anchor = pose and pose.guid and pose or nil,
 		quiet = request.quiet,
 	})
 end
@@ -560,10 +573,18 @@ function Console.Spawn(request)
 	if not loaded then
 		return say(reason)
 	end
+	-- A pose given is the target, and the object it was read off, if any, is the one an attach
+	-- joins; its root must be named, since a pose names none.
+	local named = request.entry or request.file
+	if request.at then
+		if not named then
+			return say("a position names no WMO; name the one whose sets to spawn")
+		end
+		return spawnOn(request, request.at)
+	end
 	-- The selected object is the target unless the set goes at the player, and any object
 	-- will do. It must be a WMO only where the set is its own, read off it because
 	-- neither a link nor an entry names one; and it leads the group a set attaches to.
-	local named = request.entry or request.file
 	if request.here and named and request.group ~= "attach" then
 		return spawnOn(request, nil)
 	end
