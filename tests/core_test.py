@@ -241,6 +241,26 @@ def test_replies_are_read_and_stripped_plain(tmp_path: Path) -> None:
     assert commands.Plain(guid) == "Spawned 7001"
 
 
+def test_a_doodad_selection_line_is_read_and_nothing_else(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    read = lua.eval("Furnish.Commands.SelectedDoodad")
+    # As the server printed it, captured whole.
+    line = (
+        "Selected doodad |cff00CCFF|Hdoodad_uid:10059564:0|h[draenei jug - 326022]|h|r"
+        " (UID: |cff00CCFF10059564|r) at X: |cff00CCFF2984.496745|r Y: |cff00CCFF3273.661784|r"
+        " Z: |cff00CCFF45.630093|r on map |cff00CCFF1116|r with scale: |cff00CCFF1.000000|r."
+    )
+    doodad = read(line)
+    assert (doodad.uid, doodad.entry, doodad.name, doodad.map) == (
+        10059564,
+        326022,
+        "draenei jug",
+        1116,
+    )
+    assert read("Imported [house.wmo - 817579] (UniqueId: 4242) as GUID 500.") is None
+    assert read("|Hdoodad_uid:4242:0|h[house.wmo - 817579]|h (UID: 4242)") is None
+
+
 # -- Run --------------------------------------------------------------------------------
 
 

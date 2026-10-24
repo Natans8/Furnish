@@ -205,6 +205,20 @@ def test_a_window_takes_its_sets_from_an_entry_whatever_is_selected(tmp_path: Pa
     assert lua.eval("select(2, Furnish.Console.Source(1))").startswith("entry 1 is no WMO object")
 
 
+def test_a_selected_map_wmo_names_its_source_and_marks_the_sets_its_map_draws(
+    tmp_path: Path,
+) -> None:
+    lua = command_lua(tmp_path)
+    source = lua.eval(
+        "Furnish.Console.Source(817579, { map = 1116, uid = 4242, name = 'House.wmo' })"
+    )
+    assert source.name == "house"
+    assert [(s.name, s.placed) for s in source.sets.values()] == [("Base", False), ("Full", True)]
+    # A doodad the map does not place leaves every set unmarked.
+    stray = lua.eval("Furnish.Console.Source(817579, { map = 1116, uid = 1, name = 'house' })")
+    assert [s.placed for s in stray.sets.values()] == [False, False]
+
+
 def test_the_target_is_any_selected_object(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     assert lua.eval("select(2, Furnish.Console.Target())") == "no object is selected"

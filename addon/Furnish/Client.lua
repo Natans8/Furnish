@@ -172,10 +172,12 @@ function Client.AwaitRecord(guid, fn)
 	return stop
 end
 
-local systemFrame, systemListener
+local systemFrame
+local systemListeners = {}
 
 --- Hear every system line the server prints: fn(line) for each, until the function returned
--- is called. One listener at a time, since one import waits at a time.
+-- is called. An import waiting for its line and a window watching for a selected doodad may
+-- both be listening.
 function Client.OnSystemLine(fn)
 	if not systemFrame then
 		systemFrame = _G.CreateFrame("Frame")
@@ -183,16 +185,21 @@ function Client.OnSystemLine(fn)
 		systemFrame:SetScript(
 			"OnEvent",
 			Client.Guarded(function(_, _, line)
-				if systemListener then
-					systemListener(line)
+				-- A copy, since a listener may stop hearing from inside its own call.
+				local listening = { unpack(systemListeners) }
+				for _, listener in ipairs(listening) do
+					listener(line)
 				end
 			end)
 		)
 	end
-	systemListener = fn
+	systemListeners[#systemListeners + 1] = fn
 	return function()
-		if systemListener == fn then
-			systemListener = nil
+		for i, listener in ipairs(systemListeners) do
+			if listener == fn then
+				table.remove(systemListeners, i)
+				return
+			end
 		end
 	end
 end

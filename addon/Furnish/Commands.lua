@@ -98,6 +98,19 @@ function Commands.Imported(messages)
 	return nil
 end
 
+--- What a doodad selection's line names, the line `.doodad select` prints and no addon message
+-- carries: { uid, entry, name, map }, the doodad's unique id, the entry after its name, its name
+-- as the line spells it and the map it stands on; or nil for any other line.
+function Commands.SelectedDoodad(line)
+	local plain = Commands.Plain(line)
+	local name, entry, uid = plain:match("Selected doodad %[(.-) %- (%d+)%] %(UID: (%d+)%)")
+	local map = plain:match(" on map (%d+)")
+	if not (name and map) then
+		return nil
+	end
+	return { uid = tonumber(uid), entry = tonumber(entry), name = name, map = tonumber(map) }
+end
+
 --- A reply with its colour codes and link wrappers removed, for quoting in a message.
 function Commands.Plain(text)
 	return (

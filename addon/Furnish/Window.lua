@@ -90,9 +90,10 @@ local wmo, sets = frame.WmoPanel, frame.SetsPanel
 local provider = _G.CreateDataProvider()
 
 --- The WMO the sets come from, kept when the selection moves off it; the entry it was typed
--- as, if it was; the target gob's name, nil while nothing is selected; the sets chosen, by
--- index, and the one a shift-click runs from; and the option taken in each choice, by field.
-local source, entry, target, chosen, anchor = nil, nil, nil, {}, nil
+-- as, if it was, and the map doodad it was read off, if it was; the target gob's name, nil while
+-- nothing is selected; the sets chosen, by index, and the one a shift-click runs from; and the
+-- option taken in each choice, by field.
+local source, entry, placement, target, chosen, anchor = nil, nil, nil, nil, {}, nil
 local taken = { group = "pivot", place = "target" }
 
 --- Every radio button, each knowing its choice and its option.
@@ -101,7 +102,7 @@ local radios = {}
 --- The run going on, as the window draws it: { total, done, started, what }.
 local run
 
-local stopSelection
+local stopSelection, stopDoodads
 
 --- A count with its thousands set apart.
 local function thousands(count)
@@ -261,10 +262,19 @@ local function progressText()
 	)
 end
 
---- What is chosen when a WMO is first shown: its first set past the base, and the base too
--- where Epsilon emptied the WMO, since it draws none of its own.
+--- What is chosen when a WMO is first shown: the sets its map draws, where it was read off a
+-- map doodad; else its first set past the base, and the base too where Epsilon emptied the WMO,
+-- since it draws none of its own.
 local function chooseFirst(found)
 	chosen, anchor = {}, nil
+	for _, set in ipairs(found.sets) do
+		if set.placed then
+			chosen[set.index], anchor = true, anchor or set.index
+		end
+	end
+	if anchor then
+		return
+	end
 	for _, set in ipairs(found.sets) do
 		if set.index ~= 0 then
 			chosen[set.index], anchor = true, set.index
@@ -276,6 +286,17 @@ local function chooseFirst(found)
 	end
 end
 
+--- What a selected map WMO's map draws, as a line says it: ", the map draws B and C".
+local function drawn(found)
+	local names = {}
+	for _, set in ipairs(found.sets) do
+		if set.placed then
+			names[#names + 1] = set.name
+		end
+	end
+	return #names > 0 and ", the map draws " .. table.concat(names, " and ") or ""
+end
+
 --- Show where the sets come from and what is selected. A typed entry names the WMO whatever is
 -- selected; without one, a WMO selected is shown and one shown before stays when the selection
 -- moves off it. Nothing changes while a run goes.
@@ -284,7 +305,7 @@ local function refresh()
 		return
 	end
 	target = Console.Target()
-	local found, reason = Console.Source(entry)
+	local found, reason = Console.Source(entry, placement)
 	if found and not (source and source.file == found.file) then
 		chooseFirst(found)
 	end
@@ -298,6 +319,7 @@ local function refresh()
 			#source.sets
 				.. (#source.sets == 1 and " set" or " sets")
 				.. (source.blank and ", emptied by Epsilon" or "")
+				.. drawn(source)
 		)
 		provider:InsertTable(source.sets)
 		frame.Empty:Hide()
@@ -400,6 +422,9 @@ local function rowEnter(button)
 	if set.canonical ~= "" then
 		tooltip:AddLine(("Named %s in the WMO's file"):format(set.canonical), 0.62, 0.62, 0.62)
 	end
+	if set.placed then
+		tooltip:AddLine("The map draws it on the selected map WMO", 0.1, 1, 0.1)
+	end
 	tooltip:AddLine("Click to select it, ctrl-click to add or remove it", 0.62, 0.62, 0.62)
 	tooltip:AddLine("Shift-click selects every set from the last one clicked", 0.62, 0.62, 0.62)
 	tooltip:Show()
@@ -414,6 +439,7 @@ local function initRow(button, set, new)
 	button.Index:SetText(set.index)
 	button.Label:SetText(set.name)
 	button.Count:SetText(objects(set.count))
+	button.Tag:SetText(set.placed and "on the map" or "")
 	mark(button, set)
 end
 
@@ -443,7 +469,27 @@ local function radioEnter(radio)
 end
 
 local function entryChanged(box)
-	entry = tonumber(box:GetText())
+	local given = tonumber(box:GetText())
+	if given == entry then
+		return
+	end
+	entry = given
+	if placement and placement.entry ~= entry then
+		placement = nil
+	end
+	refresh()
+end
+
+--- Follow a map doodad as `.doodad select` names it: a map WMO Furnish has sets for becomes the
+-- source, its entry in the box, with the sets its map draws marked and chosen. Anything else
+-- leaves the window as it is.
+local function doodadSelected(line)
+	local doodad = Furnish.Commands.SelectedDoodad(line)
+	if run or not doodad or not Console.Source(doodad.entry) then
+		return
+	end
+	placement, entry, source = doodad, doodad.entry, nil
+	wmo.Entry:SetText(tostring(doodad.entry))
 	refresh()
 end
 
@@ -563,6 +609,7 @@ local function build()
 		Client.Guarded(function()
 			_G.PlaySound(_G.SOUNDKIT.IG_CHARACTER_INFO_OPEN)
 			stopSelection = Client.OnSelection(refresh)
+			stopDoodads = Client.OnSystemLine(doodadSelected)
 			refresh()
 		end)
 	)
@@ -573,6 +620,10 @@ local function build()
 			if stopSelection then
 				stopSelection()
 				stopSelection = nil
+			end
+			if stopDoodads then
+				stopDoodads()
+				stopDoodads = nil
 			end
 		end)
 	)

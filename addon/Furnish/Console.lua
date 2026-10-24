@@ -293,7 +293,7 @@ local function selectedPose()
 end
 
 --- A WMO's sets as a window lists them, under the name it goes by; or nil and the reason.
-local function described(file, name)
+local function described(file, name, drawn)
 	local loaded, why = Reader.Load()
 	if not loaded then
 		return nil, why
@@ -302,26 +302,43 @@ local function described(file, name)
 	if not sets then
 		return nil, name .. " has no doodad sets in Furnish's data"
 	end
+	local placed = {}
+	for _, id in ipairs(drawn or {}) do
+		placed[id] = true
+	end
 	local shown = {}
 	for i, set in ipairs(sets) do
-		shown[i] =
-			{ index = set.index, name = setName(set), count = set.count, canonical = set.name }
+		shown[i] = {
+			index = set.index,
+			name = setName(set),
+			count = set.count,
+			canonical = set.name,
+			placed = placed[set.id] == true,
+		}
 	end
 	return { name = name, file = file, blank = Sets.IsBlank(file), sets = shown }
 end
 
 --- Where a window takes its sets from: the WMO an entry names, or the selected one.
 -- @param entry a gameobject's entry, the number a lookup line prints, or nil for the selection
--- @return { name, file, blank, sets }, each set { index, name, count, canonical }, the name as
---   a line shows it and canonical as the file spells it, empty for the base set; blank is true
---   for a WMO Epsilon emptied, which always gets its base set; or nil and why there are none
-function Console.Source(entry)
+-- @param placement a map doodad the entry was read off, as Commands.SelectedDoodad gives it, or
+--   nil; its name names the source, and the sets its map draws are marked
+-- @return { name, file, blank, sets }, each set { index, name, count, canonical, placed }, the
+--   name as a line shows it, canonical as the file spells it, empty for the base set, and placed
+--   true for a set the map draws; blank is true for a WMO Epsilon emptied, which always gets its
+--   base set; or nil and why there are none
+function Console.Source(entry, placement)
 	if entry then
 		local file, reason = Sets.OfEntry(entry)
 		if not file then
 			return nil, reason
 		end
-		return described(file, ("object %d"):format(entry))
+		local drawn = placement and Sets.OfPlacement(placement.map, placement.uid) or nil
+		return described(
+			file,
+			placement and Client.ModelName(placement.name) or ("object %d"):format(entry),
+			drawn
+		)
 	end
 	local pose, reason = selectedPose()
 	if not pose then

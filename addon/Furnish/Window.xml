@@ -34,10 +34,16 @@
 						<Anchor point="RIGHT" x="-8"/>
 					</Anchors>
 				</FontString>
+				<!-- "on the map" where a selected map WMO draws this set, else empty. -->
+				<FontString parentKey="Tag" inherits="GameFontGreenSmall" justifyH="RIGHT">
+					<Anchors>
+						<Anchor point="RIGHT" relativeKey="$parent.Count" relativePoint="LEFT" x="-8"/>
+					</Anchors>
+				</FontString>
 				<FontString parentKey="Label" inherits="GameFontHighlight" justifyH="LEFT" wordwrap="false">
 					<Anchors>
 						<Anchor point="LEFT" relativeKey="$parent.Index" relativePoint="RIGHT" x="10"/>
-						<Anchor point="RIGHT" relativeKey="$parent.Count" relativePoint="LEFT" x="-8"/>
+						<Anchor point="RIGHT" relativeKey="$parent.Tag" relativePoint="LEFT" x="-6"/>
 					</Anchors>
 				</FontString>
 			</Layer>
