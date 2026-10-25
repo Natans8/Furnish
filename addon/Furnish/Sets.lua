@@ -76,9 +76,9 @@ function Sets.IsBlank(file)
 	return Reader.Load() and Reader.IsBlank(file)
 end
 
---- The set ids a WMO placed on the map draws, by map and ADT unique id, the number a
--- `.doodad import` line prints; or nil and the reason. Several on a tile where the zone
--- chose a run of sets.
+--- The set ids beyond its base a WMO placed on the map draws, by map and ADT unique id, the
+-- number a `.doodad import` line prints; or nil and the reason. Several on a tile where the
+-- zone chose a run of sets. The data keeps no placement that draws only its base set.
 function Sets.OfPlacement(map, uid)
 	local loaded, reason = Reader.Load()
 	if not loaded then
@@ -87,7 +87,7 @@ function Sets.OfPlacement(map, uid)
 	local ids = Reader.MapSets(map, uid)
 	if not ids then
 		return nil,
-			("the data has no map placement %s on map %s; only WMOs placed by the map are known"):format(
+			("the data has no map placement %s on map %s that draws a set beyond its base"):format(
 				tostring(uid),
 				tostring(map)
 			)

@@ -4,11 +4,12 @@
 values. ``wmo`` lists each root file's sets with their index, set id, name and placement
 count, which is everything a window needs before a set is chosen. ``blobs`` holds each
 set's placements as one printable string, in the order they spawn, decoded by the reader
-only when that set is asked for. ``maps`` says which sets each map placement draws, by map
-id and unique id. ``wmo`` is keyed by the root's file id, which is what a selected object's
-record reports, and ``entries`` turns a gameobject entry, the number a lookup line prints,
-into that file. ``models`` gives the model file each spawned display draws, which a model
-frame renders and the client's own catalogue names.
+only when that set is asked for. ``maps`` says which sets beyond its base each map placement
+draws, by map id and unique id, and leaves out a placement that draws nothing more, since the
+gob a doodad is imported as draws its base set itself. ``wmo`` is keyed by the root's file
+id, which is what a selected object's record reports, and ``entries`` turns a gameobject
+entry, the number a lookup line prints, into that file. ``models`` gives the model file each
+spawned display draws, which a model frame renders and the client's own catalogue names.
 """
 
 import sqlite3
@@ -125,7 +126,14 @@ def _blobs(connection: sqlite3.Connection) -> Iterable[str]:
 
 def _maps(connection: sqlite3.Connection) -> Iterable[str]:
     yield "FurnishData.maps = {\n"
-    rows = connection.execute('SELECT map, uid, "set" FROM map_sets ORDER BY map, uid, "set"')
+    # A base set tells the addon nothing, since the gob a doodad is imported as draws that set
+    # itself, so a placement drawing nothing more is left out. A set some root holds past its
+    # base stays, the database not saying which root a placement is.
+    rows = connection.execute(
+        'SELECT map, uid, "set" FROM map_sets WHERE "set" NOT IN '
+        '(SELECT "set" FROM wmo_sets GROUP BY "set" HAVING max("index") = 0) '
+        'ORDER BY map, uid, "set"'
+    )
     for map_id, by_map in groupby(rows, key=itemgetter(0)):
         yield f"  [{map_id}] = {{\n"
         for uid, by_uid in groupby(by_map, key=itemgetter(1)):

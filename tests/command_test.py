@@ -611,7 +611,8 @@ def test_an_import_the_map_did_not_furnish_spawns_nothing(tmp_path: Path) -> Non
     lua.execute("IMPORT_UID = 1")
     assert run(lua, "import") == [
         PREFIX + "imported house.wmo as object 500; "
-        "the doodad drew no set Furnish knows; /furn list lists the WMO's own"
+        "the doodad drew no set beyond its base that Furnish knows of; "
+        "/furn list lists the WMO's own"
     ]
     assert sent(lua) == ["doodad import", "gobject select 500"]
 

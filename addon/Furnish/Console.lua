@@ -792,16 +792,13 @@ function Console.Import(request)
 		end
 		local chosen = ids and placed(pose, ids, request.base) or {}
 		if #chosen == 0 then
+			-- The data keeps no placement that draws only its base set, which the gob draws
+			-- itself, so this is said alike of one that drew only that and one the data lacks.
 			return say(
-				("imported %s as object %s; %s"):format(
+				("imported %s as object %s; the doodad drew no set beyond its base that Furnish knows of; %s lists the WMO's own"):format(
 					model,
 					guid,
-					ids and "the doodad drew only its base set, which the gob draws itself"
-						or (
-							"the doodad drew no set Furnish knows; "
-							.. Chat.Typed("list")
-							.. " lists the WMO's own"
-						)
+					Chat.Typed("list")
 				)
 			)
 		end

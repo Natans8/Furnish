@@ -65,7 +65,8 @@ def test_reader_loads_and_answers(tmp_path: Path) -> None:
     assert (chair.qx, chair.qy, chair.qz, chair.qw, chair.scale) == (0, 0, 0.5, 0.75, 1)
     assert (lamp.display, lamp.z, lamp.qw, lamp.scale) == (21, 3.0, 1, 0.5)
     assert lua.eval("Furnish.Reader.Placements(2) == Furnish.Reader.Placements(2)") is True
-    assert list(lua.eval("Furnish.Reader.MapSets(0, 4243)").values()) == [1, 2]
+    # The base set is left out, the gob a doodad becomes drawing it itself.
+    assert list(lua.eval("Furnish.Reader.MapSets(0, 4243)").values()) == [2]
     assert lua.eval("Furnish.Reader.MapSets(1, 4243)") is None
     assert lua.eval("Furnish.Reader.FileOfEntry(817579)") == 900
     assert lua.eval("Furnish.Reader.FileOfEntry(1)") is None

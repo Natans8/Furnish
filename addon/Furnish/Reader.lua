@@ -176,7 +176,8 @@ function Reader.FileOfEntry(entry)
 	return data().entries[entry]
 end
 
---- The sets a WMO placed on a map draws, or nil when the data has none for it. Load first.
+--- The sets beyond its base a WMO placed on a map draws, or nil when the data has none for
+-- it, which it has not for one that draws only its base. Load first.
 -- @param map the map id the client reports
 -- @param uid the placement's unique id, as .doodad near prints it
 -- @return a list of set ids

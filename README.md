@@ -136,7 +136,8 @@ uv run furnish export --db furnish.sqlite --out addon/Furnish_Data/Data.lua
 `FurnishData` with a `format` number, the `build`, each root file's sets (`wmo`), the root
 each gameobject entry spawns (`entries`), the roots Epsilon emptied (`blank`), each
 set's placements as one printable string
-(`blobs`), the sets each map placement draws (`maps`) and the model each spawned display draws
+(`blobs`), the sets beyond its base each map placement draws, with none kept for one that draws
+only its base (`maps`) and the model each spawned display draws
 (`models`), by its file id, which a model frame renders and the client's own catalogue names. A root is keyed by its file id,
 which is what a selected object's record reports; an entry, the number a lookup line
 prints, reaches it through `entries`.
