@@ -75,7 +75,9 @@ it into a gob that is selected like any other; while Source follows the selectio
 come chosen on it, and either block kept as it is stays so. The doodad is
 hidden, not gone, and stays selected; closing the panel lets it go. Group on spawn makes the objects one group,
 led by a pivot the button counts; Include the target makes the target lead it instead, and
-where the target is in a group already a mark warns and Spawn asks first. The status row
+where the target is in a group already a mark warns and Spawn asks first; No pivot makes the
+set's first object lead a group of its own, so no extra object spawns, the group then turning
+around that object. The status row
 holds Highlighting, which toggles the client's outline on selected objects, beside a run's
 progress with its time left, a warning before spawning onto a WMO the sets were not made for,
 or the reminder that highlighting too many objects can crash the game. During a run every

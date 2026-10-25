@@ -312,7 +312,8 @@
 				</Anchors>
 			</Button>
 
-			<!-- Whether the objects form a group, and whether the target is in it. -->
+			<!-- Whether the objects form a group, whether the target is in it, and whether a pivot
+			     leads a group of their own. -->
 			<CheckButton parentKey="Grouped" inherits="UICheckButtonTemplate">
 				<Size x="22" y="22"/>
 				<Anchors>
@@ -323,6 +324,13 @@
 				<Size x="22" y="22"/>
 				<Anchors>
 					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="150" y="92"/>
+				</Anchors>
+			</CheckButton>
+			<!-- No pivot: the set's first object leads its group instead of an invisible pivot. -->
+			<CheckButton parentKey="NoPivot" inherits="UICheckButtonTemplate">
+				<Size x="22" y="22"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="300" y="92"/>
 				</Anchors>
 			</CheckButton>
 			<!-- Shown where the target is in a group already; Window.lua stands it after the

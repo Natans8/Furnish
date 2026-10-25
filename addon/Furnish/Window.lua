@@ -242,13 +242,15 @@ local function cannotInclude()
 	return nil
 end
 
---- The request's group, from the two boxes: loose, a group the target joins, or a group of
--- their own that a pivot leads.
+--- The request's group, from the three boxes: loose, a group the target joins, or a group of
+-- their own that a pivot leads, or the set's first object where No pivot is ticked.
 local function grouped()
 	if not frame.Grouped:GetChecked() then
 		return "nogroup"
 	elseif frame.Include:GetChecked() and not cannotInclude() then
 		return "attach"
+	elseif frame.NoPivot:GetChecked() then
+		return "first"
 	end
 	return "pivot"
 end
@@ -452,6 +454,10 @@ local function updateTarget()
 	local canInclude = not run and frame.Grouped:GetChecked() and not cannotInclude()
 	frame.Include:SetEnabled(canInclude)
 	checkText(frame.Include, canInclude)
+	-- Who leads a group of the set's own, which a group the target leads has not.
+	local canChooseLeader = not run and frame.Grouped:GetChecked() and grouped() ~= "attach"
+	frame.NoPivot:SetEnabled(canChooseLeader)
+	checkText(frame.NoPivot, canChooseLeader)
 	checkText(frame.Grouped, not run)
 	frame.Warning:SetShown(grouped() == "attach" and (spot.groupLeader or 0) ~= 0)
 end
@@ -1279,18 +1285,25 @@ local function buildTarget()
 	frame.Grouped.text:SetText("Group on spawn")
 	frame.Grouped:SetChecked(true)
 	frame.Include.text:SetText("Include the target")
+	frame.NoPivot.text:SetText("No pivot")
 	frame.Warning:SetPoint("LEFT", frame.Include.text, "RIGHT", 4, 0)
-	for _, box in ipairs({ frame.Grouped, frame.Include }) do
+	for _, box in ipairs({ frame.Grouped, frame.Include, frame.NoPivot }) do
 		box:SetScript("OnClick", Client.Guarded(update))
 	end
 	hint(frame.Grouped, "Group on spawn", function()
 		return {
 			{ text = "The spawned objects form one group, so they move as one." },
 			{
-				text = "Unless the target is included, a pivot leads the group: one extra, invisible object where the WMO stands.",
+				text = "Unless the target is included or No pivot is ticked, a pivot leads the group: one extra, invisible object where the WMO stands.",
 			},
 		}
 	end, "<set>")
+	hint(frame.NoPivot, "No pivot", {
+		{ text = "The set's first object leads the group, so no extra object spawns." },
+		{
+			text = "A group turns and scales around its leader, so it then turns around that object rather than around the WMO.",
+		},
+	}, "<set> first")
 	hint(frame.Include, "Include the target", function()
 		local why = cannotInclude()
 		return {
