@@ -23,3 +23,4 @@ Console.lua
 Window.xml
 Window.lua
 Command.lua
+Options.lua

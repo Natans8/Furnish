@@ -14,17 +14,12 @@ local Chat = Furnish.Chat
 
 --- What can be typed after the command, in the order the help says it.
 Command.USAGE = {
-	{ "", "open the window" },
-	{ "help", "this help" },
-	{ "list", "list the selected WMO's sets" },
-	{ "list <entry>", "list the sets of the WMO an entry names, the number on a lookup line" },
-	{ "<set>", "spawn one of the selected WMO's sets onto that WMO" },
-	{ "<set> from <entry>", "spawn a set of the WMO an entry names onto the selected gob" },
-	{ "<set> here", "spawn the selected WMO's set at your feet" },
-	{ "<set> here <entry>", "spawn a set of the WMO an entry names at your feet" },
-	{ "import", "turn the selected doodad into a gob, then spawn the doodad's sets onto the gob" },
-	{ "stop", "stop spawning" },
-	{ "stop delete", "stop spawning, and delete what was spawned" },
+	{ "", "the window" },
+	{ "list [<entry>]", "a WMO's sets, as buttons" },
+	{ "<set> [from <entry>]", "spawn a set on the selected gob" },
+	{ "<set> here [<entry>]", "spawn a set at your feet" },
+	{ "import", "import the selected doodad with its set" },
+	{ "stop [delete]", "stop a run, deleting what it spawned with delete" },
 }
 
 --- The words that may follow a set, a list or an import, in the order the help says them.
@@ -44,6 +39,12 @@ Command.WORDS = {
 	},
 	{ word = "nogroup", field = "group", value = "nogroup", hint = "spawn every object ungrouped" },
 	{ word = "base", field = "base", value = true, hint = "spawn the base set as well" },
+	{
+		word = "quiet",
+		field = "quiet",
+		value = true,
+		hint = "leave the progress counts out of chat, saying only how the run began and ended",
+	},
 }
 
 local WORD = {}
@@ -124,16 +125,11 @@ function Command.Parse(text)
 	return request
 end
 
---- The help, as lines: what the command takes, then the words.
+--- The help, as lines: what the command takes, one short line each, then the words on one line,
+-- each a link that says what it does when rested on. No columns: a line short enough never
+-- wraps, and padding drawn in the chat font cannot be measured to the pixel. A list's buttons
+-- and a chat line's [Furnish] say what they do in their own tooltips, so the help leaves them out.
 local function helpLines()
-	local lefts = {}
-	for _, row in ipairs(Command.USAGE) do
-		lefts[#lefts + 1] = Chat.GOLD .. Chat.Typed(row[1]) .. Chat.END
-	end
-	for _, each in ipairs(Command.WORDS) do
-		lefts[#lefts + 1] = Chat.GOLD .. each.word .. Chat.END
-	end
-	local widest = Chat.Widest(lefts)
 	local lines = {
 		Chat.GOLD
 			.. "Furnish"
@@ -142,22 +138,19 @@ local function helpLines()
 			.. " spawns a WMO's doodad sets as objects"
 			.. Chat.END,
 	}
-	for i, row in ipairs(Command.USAGE) do
-		lines[#lines + 1] = "  " .. Chat.Cell(lefts[i], widest) .. row[2]
+	for _, row in ipairs(Command.USAGE) do
+		lines[#lines + 1] = "  " .. Chat.GOLD .. Chat.Typed(row[1]) .. Chat.END .. ": " .. row[2]
 	end
-	lines[#lines + 1] = Chat.GREY .. "After a set, list or import:" .. Chat.END
-	for i, each in ipairs(Command.WORDS) do
-		lines[#lines + 1] = "  " .. Chat.Cell(lefts[#Command.USAGE + i], widest) .. each.hint
+	local words = {}
+	for _, each in ipairs(Command.WORDS) do
+		words[#words + 1] = Chat.Link("word:" .. each.word, each.word)
 	end
-	lines[#lines + 1] = Chat.GREY
-		.. "Click a set in a list to spawn the set onto the selected WMO; ctrl-click spawns the set at your feet."
+	lines[#lines + 1] = "  "
+		.. Chat.GREY
+		.. "After a set or import:"
 		.. Chat.END
-	lines[#lines + 1] = Chat.GREY
-		.. "A .gob select or .gob spawn line for a WMO carries a [Furnish] button, which lists the WMO's sets."
-		.. Chat.END
-	lines[#lines + 1] = Chat.GREY
-		.. "A .doodad select or near line for a WMO placed with a set beyond its base carries one too, which imports the doodad and spawns that set onto the new gob."
-		.. Chat.END
+		.. " "
+		.. table.concat(words, " ")
 	return lines
 end
 
@@ -228,6 +221,11 @@ function Command.Hover(words, tooltip)
 	if words:match("^import:%d+$") then
 		return Console.DescribeImport(tooltip)
 	end
+	local word = WORD[words:match("^word:(%a+)$") or ""]
+	if word then
+		tooltip:SetText(word.word, 1, 1, 1)
+		return tooltip:AddLine(word.hint, 0.62, 0.62, 0.62, true)
+	end
 	if words:match("^list:%d+$") then
 		tooltip:SetText("Furnish", 1, 1, 1)
 		return tooltip:AddLine("List this WMO's doodad sets", 0.62, 0.62, 0.62, true)
@@ -278,8 +276,12 @@ function Command.SelectedWmo(line)
 end
 
 -- A WMO's doodad line, from a select or a near, gets a button that imports and furnishes
--- it, and a WMO gob's selection or spawn line one that lists its sets, beside the server's own.
+-- it, and a WMO gob's selection or spawn line one that lists its sets, beside the server's own,
+-- unless the player has turned the buttons off.
 Chat.OnServerLines(function(line)
+	if not Furnish.Settings.chatButtons then
+		return nil
+	end
 	local uid = Command.PlacedWmo(line)
 	if uid then
 		return " - " .. Chat.Link("import:" .. uid, "Furnish")

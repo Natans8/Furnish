@@ -1,0 +1,165 @@
+-- The settings panel, in the game's own Options under AddOns: every value in Settings.lua a
+-- player may change, written straight into Furnish.Settings, which the game keeps between
+-- sessions. A change takes effect at once; Cancel puts back what the panel showed when it
+-- opened, and Defaults what the addon ships with.
+
+_G.Furnish = _G.Furnish or {}
+local Furnish = _G.Furnish
+local Client = Furnish.Client
+local Settings = Furnish.Settings
+
+--- The values the addon ships with, read before the saved ones are restored over them.
+local DEFAULTS = {
+	chatButtons = Settings.chatButtons,
+	inFlight = Settings.inFlight,
+	marker = Settings.marker,
+}
+
+--- How many commands a run may have unanswered, at least and at most.
+local FEWEST, MOST = 1, 16
+
+-- Made hidden, so the Options window's Show fires OnShow, which reads the settings in.
+local panel = _G.CreateFrame("Frame")
+panel.name = "Furnish"
+panel:Hide()
+
+local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+title:SetPoint("TOPLEFT", 16, -16)
+title:SetText("Furnish")
+
+local about = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+about:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
+about:SetPoint("RIGHT", panel, "RIGHT", -16, 0)
+about:SetJustifyH("LEFT")
+about:SetText("Changes take effect at once and are kept between sessions.")
+
+-- The chat buttons. The plain check button the window uses: Blizzard's options template expects
+-- a console variable behind it and errors on a click without one.
+local buttons = _G.CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+buttons:SetPoint("TOPLEFT", about, "BOTTOMLEFT", -2, -20)
+buttons.text:SetText("Furnish buttons in chat")
+buttons:SetScript(
+	"OnClick",
+	Client.Guarded(function(box)
+		_G.PlaySound(_G.SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+		Settings.chatButtons = box:GetChecked() and true or false
+	end)
+)
+buttons:SetScript("OnEnter", function(self)
+	_G.GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	_G.GameTooltip:SetText(
+		"A [Furnish] button after a WMO's doodad, selection and spawn lines.",
+		nil,
+		nil,
+		nil,
+		nil,
+		true
+	)
+end)
+buttons:SetScript("OnLeave", _G.GameTooltip_Hide)
+
+-- How far ahead of the server's replies a run sends.
+local pace = _G.CreateFrame("Slider", nil, panel, "OptionsSliderTemplate")
+pace:SetPoint("TOPLEFT", buttons, "BOTTOMLEFT", 4, -40)
+pace:SetWidth(240)
+pace:SetMinMaxValues(FEWEST, MOST)
+pace:SetValueStep(1)
+pace:SetObeyStepOnDrag(true)
+pace.Low:SetText(FEWEST)
+pace.High:SetText(MOST)
+pace.tooltipText = "How many commands a run sends before the first is answered. More is faster where"
+	.. " the server is slow to answer; Stop takes back nothing already sent."
+local function paceText(value)
+	pace.Text:SetText(("Commands in flight: %d"):format(value))
+end
+pace:SetScript(
+	"OnValueChanged",
+	Client.Guarded(function(_, value)
+		local whole = math.floor(value + 0.5)
+		Settings.inFlight = whole
+		paceText(whole)
+	end)
+)
+pace:SetScript("OnEnter", function(self)
+	_G.GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	_G.GameTooltip:SetText(self.tooltipText, nil, nil, nil, nil, true)
+end)
+pace:SetScript("OnLeave", _G.GameTooltip_Hide)
+
+-- The display a pivot spawns as.
+local markerLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+markerLabel:SetPoint("TOPLEFT", pace, "BOTTOMLEFT", -4, -36)
+markerLabel:SetText("Pivot display")
+
+local marker = _G.CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
+marker:SetPoint("LEFT", markerLabel, "RIGHT", 14, 0)
+marker:SetSize(90, 20)
+marker:SetAutoFocus(false)
+marker:SetNumeric(true)
+marker:SetMaxLetters(9)
+
+local markerNote = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+markerNote:SetPoint("TOPLEFT", markerLabel, "BOTTOMLEFT", 0, -8)
+markerNote:SetPoint("RIGHT", panel, "RIGHT", -16, 0)
+markerNote:SetJustifyH("LEFT")
+markerNote:SetText(
+	(
+		"The object that leads a set's group where no other does. Furnish's own, %d, is invisible and"
+		.. " silent; a builder who signs with a marker of their own puts its display here."
+	):format(DEFAULTS.marker)
+)
+
+--- Take the display typed, or put back the one kept where what was typed is no display.
+local function markerEntered(box)
+	local value = tonumber(box:GetText())
+	if value and value > 0 then
+		Settings.marker = value
+	end
+	box:SetText(tostring(Settings.marker))
+end
+marker:SetScript("OnEnterPressed", marker.ClearFocus)
+marker:SetScript("OnEscapePressed", function(box)
+	box:SetText(tostring(Settings.marker))
+	box:ClearFocus()
+end)
+marker:HookScript("OnEditFocusLost", Client.Guarded(markerEntered))
+
+--- Show what the settings hold now.
+local function show()
+	buttons:SetChecked(Settings.chatButtons)
+	pace:SetValue(Settings.inFlight)
+	paceText(Settings.inFlight)
+	marker:SetText(tostring(Settings.marker))
+end
+
+--- What the panel showed when it opened, which Cancel puts back.
+local opened = {}
+
+panel:SetScript(
+	"OnShow",
+	Client.Guarded(function()
+		for key in pairs(DEFAULTS) do
+			opened[key] = Settings[key]
+		end
+		show()
+	end)
+)
+
+panel.okay = function() end
+
+panel.cancel = function()
+	for key, value in pairs(opened) do
+		Settings[key] = value
+	end
+end
+
+panel.default = function()
+	for key, value in pairs(DEFAULTS) do
+		Settings[key] = value
+	end
+	show()
+end
+
+panel.refresh = show
+
+_G.InterfaceOptions_AddCategory(panel)

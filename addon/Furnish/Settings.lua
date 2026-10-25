@@ -19,4 +19,7 @@ Furnish.Settings = {
 	-- bounds how far ahead of the replies a run gets, so a stop lands within a few lines,
 	-- since a line already queued cannot be taken back.
 	inFlight = 4,
+
+	--- Whether a WMO's doodad, selection and spawn lines in chat carry a [Furnish] button.
+	chatButtons = true,
 }

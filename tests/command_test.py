@@ -164,12 +164,22 @@ def test_the_help_names_every_command_and_word(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lines = run(lua, "help")
     assert lines[0] == "|cffffd100Furnish|r|cff9d9d9d spawns a WMO's doodad sets as objects|r"
-    assert lines[1] == "  |cffffd100/furn|r open the window"
-    assert lines[2] == "  |cffffd100/furn help|r this help"
-    assert lines[3] == "  |cffffd100/furn list|r list the selected WMO's sets"
-    assert "  |cffffd100attach|r include the selected gob in the group, so no pivot spawns" in lines
-    assert lines[-3].endswith("ctrl-click spawns the set at your feet.|r")
-    assert len(lines) == 1 + 11 + 1 + 4 + 3
+    assert lines[1] == "  |cffffd100/furn|r: the window"
+    assert lines[2] == "  |cffffd100/furn list [<entry>]|r: a WMO's sets, as buttons"
+    # The words share one line, each a link whose tooltip says what it does.
+    words = lines[-1]
+    for word in ("first", "attach", "nogroup", "base", "quiet"):
+        assert f"|Hgarrmission:furnish:word:{word}|h[{word}]|h" in words
+    assert len(lines) == 1 + 6 + 1
+    lua.execute(
+        "TIP = {}; FAKE = { SetText = function(_, t) TIP[#TIP + 1] = t end,"
+        " AddLine = function(_, t) TIP[#TIP + 1] = t end }"
+    )
+    lua.eval("Furnish.Command.Hover")("word:attach", lua.eval("FAKE"))
+    assert list(lua.eval("TIP").values()) == [
+        "attach",
+        "include the selected gob in the group, so no pivot spawns",
+    ]
 
 
 def test_the_command_alone_opens_the_window(tmp_path: Path) -> None:
@@ -777,6 +787,20 @@ def test_a_wmos_doodad_line_carries_a_button_that_imports_and_furnishes_it(
     lua.globals().HOOKS.SetItemRef("garrmission:furnish:import:4242")
     assert sent(lua)[:2] == ["doodad import 4242", "gobject select 500"]
     assert printed(lua)[-2] == (PREFIX + "spawning Full (set 1, 2 objects) on house, led by house")
+
+
+def test_the_quiet_word_asks_a_run_to_leave_its_progress_counts_out(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    request = lua.eval("Furnish.Command.Parse('1 quiet')")
+    assert (request.action, request.index, request.quiet) == ("spawn", 1, True)
+    assert lua.eval("Furnish.Command.Parse('import quiet')").quiet is True
+    assert any("quiet" in line for line in run(lua, "help"))
+
+
+def test_chat_buttons_turned_off_leave_every_line_as_it_came(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("Furnish.Settings.chatButtons = false")
+    assert shown_line(lua, WMO_LINE) == WMO_LINE
 
 
 def test_a_doodad_the_map_placed_with_only_its_base_set_gets_no_button(tmp_path: Path) -> None:

@@ -1,8 +1,9 @@
--- How Furnish writes to chat: its prefix, its colours, columns of exact width, and its links.
+-- How Furnish writes to chat: its prefix, its colours, a menu of buttons, and its links.
 --
 -- Chat has no columns, and spaces cannot make one, since the chat font is proportional. A
--- gap of an exact number of pixels is a texture the client ships that draws nothing, that
--- many pixels wide, measured on the chat frame in the player's own font.
+-- menu's buttons are laid as many to a line as the chat frame holds, measured in the player's
+-- own font, a texture the client ships that draws nothing standing between them. The help
+-- keeps to short lines instead, since padding to a column drifted in game.
 --
 -- A link is the client's garrison-mission link carrying Furnish's own words. The client
 -- ignores one it cannot read as a mission, and Furnish acts on the ones it wrote.
@@ -80,31 +81,6 @@ end
 local function gutter()
 	local _, height = frame():GetFont()
 	return math.floor(height / 2)
-end
-
---- Text padded to a column as wide as the widest text it holds, plus the gutter. Outside the
--- client, where nothing measures, one space stands in for the gap.
--- @param text the cell, markup and all
--- @param widest the widest text of the column
-function Chat.Cell(text, widest)
-	local column, drawn = width(widest), width(text)
-	if not column or not drawn then
-		return text .. " "
-	end
-	return text .. gap(column - drawn + gutter())
-end
-
---- The text of a column that draws widest, to size the column by; the longest where
--- nothing can measure.
-function Chat.Widest(texts)
-	local widest, most = "", -1
-	for _, text in ipairs(texts) do
-		local drawn = width(text) or #text
-		if drawn > most then
-			widest, most = text, drawn
-		end
-	end
-	return widest
 end
 
 --- Buttons laid out as a menu under a heading: indented, a gutter between each, and as many to

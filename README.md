@@ -10,7 +10,7 @@ every model to the display that spawns it, and writes one SQLite file.
 
 ## Commands
 
-The command is `/furn`, or `/furnish`, and `/furn help` prints what follows. Both names are
+The command is `/furn`, or `/furnish`, and `/furn help` prints a short form of what follows. Both names are
 placeholders: they are `SLASH_FURNISH1` and `SLASH_FURNISH2` in `Command.lua`, and every message
 reads the first.
 
@@ -29,12 +29,19 @@ reads the first.
 
 A set, list or import takes any of these words after it:
 
-| word      | does                                                                    |
-|-----------|-------------------------------------------------------------------------|
-| `first`   | the set's first object leads the group, so no pivot spawns              |
-| `attach`  | include the selected gob in the group, so no pivot spawns               |
-| `nogroup` | spawn every object ungrouped                                            |
-| `base`    | spawn the base set as well, as a WMO that comes unfurnished always gets |
+| word      | does                                                                             |
+|-----------|----------------------------------------------------------------------------------|
+| `first`   | the set's first object leads the group, so no pivot spawns                       |
+| `attach`  | include the selected gob in the group, so no pivot spawns                        |
+| `nogroup` | spawn every object ungrouped                                                     |
+| `base`    | spawn the base set as well, as a WMO that comes unfurnished always gets          |
+| `quiet`   | leave the progress counts out of chat, saying only how the run began and ended   |
+
+`/furn help` prints one short line a command and the words on one line, each a link whose tooltip
+says what it does. Furnish's settings are in the game's Options, under AddOns: whether chat lines
+carry `[Furnish]` buttons, how many commands a run sends before the first is answered, and the
+display a pivot spawns as. A change takes effect at once; Cancel puts back what the panel showed
+when it opened.
 
 A list is a menu of buttons, one a set: a click spawns the set onto the selected gob, WMO or
 not, a ctrl-click at your feet, and resting on one says its index, its objects and what it is.
@@ -186,7 +193,7 @@ lead to the first doodad.
 
 | file            | role                                                                                 |
 |-----------------|--------------------------------------------------------------------------------------|
-| `Settings.lua`  | the defaults: marker, in-flight width; `FurnishSettings` keeps changes               |
+| `Settings.lua`  | the defaults: marker, in-flight width, chat buttons; `FurnishSettings` keeps changes |
 | `Reader.lua`    | the data addon's reader                                                              |
 | `Names.lua`     | a set's name as a player reads it: `Set(name)`                                       |
 | `Transform.lua` | the placement maths: `Place(position, rotation, scale, row)`                         |
@@ -197,11 +204,12 @@ lead to the first doodad.
 | `Pose.lua`      | where: `At`, `Here`, `Selected`, `OfRecord`                                          |
 | `Sets.lua`      | which: `OfFile`, `Pick`, `OfEntry`, `IsBlank`, `OfPlacement`                         |
 | `Rows.lua`      | what: `OfSet`, `Union`, `Without`                                                    |
-| `Chat.lua`      | the prefix, the colours, columns of exact width, and Furnish's links                 |
+| `Chat.lua`      | the prefix, the colours, a menu measured to the chat frame, and Furnish's links      |
 | `Console.lua`   | what the commands and the window do: `List`, `Spawn`, `Import`, `Stop`, `Target`     |
 | `Window.xml`    | the window's layout, after ObjectMover's: a dark dialog of bordered panels           |
 | `Window.lua`    | the window: reads `Target`, `Busy` and `Watch`, spawns and stops through `Console`   |
 | `Command.lua`   | `/furnish` and `/furn`: reading what is typed, the help, a link's click              |
+| `Options.lua`   | the settings panel in the game's Options, writing into `Furnish.Settings`            |
 
 ## Develop
 
