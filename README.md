@@ -46,7 +46,8 @@ selected it stands for the object the run was on, so the next set or list needs 
 A WMO's doodad line, from `.doodad select` or `.doodad near`, carries a `[Furnish]` button
 that imports that WMO by its unique id and furnishes it as `/furn import` does, where the map
 placed it with a set beyond its base, so that the import spawns something; and a WMO gob's
-selection line, from `.gob select`, one that lists its sets.
+selection line, from `.gob select`, or its spawn line, from `.gob spawn`, which selects what it
+makes, one that lists its sets.
 
 The window reads top to bottom as where the sets come from, which to spawn, and where they go.
 Source is the WMO a gob entry is, held in its ID box as Target's numbers are: the selected gob's, one typed, which

@@ -153,7 +153,7 @@ local function helpLines()
 		.. "Click a set in a list to spawn the set onto the selected WMO; ctrl-click spawns the set at your feet."
 		.. Chat.END
 	lines[#lines + 1] = Chat.GREY
-		.. "A .gob select line for a WMO carries a [Furnish] button, which lists the WMO's sets."
+		.. "A .gob select or .gob spawn line for a WMO carries a [Furnish] button, which lists the WMO's sets."
 		.. Chat.END
 	lines[#lines + 1] = Chat.GREY
 		.. "A .doodad select or near line for a WMO placed with a set beyond its base carries one too, which imports the doodad and spawns that set onto the new gob."
@@ -264,11 +264,13 @@ function Command.PlacedWmo(line)
 	return nil
 end
 
---- The entry of the gob a selection line names, where it is a WMO Furnish has sets for; the
--- number in the link is the entry, and the name is never read.
+--- The entry of the gob a selection or a spawn line names, where it is a WMO Furnish has sets
+-- for, a spawn selecting what it makes; the number in the link is the entry, and the name is
+-- never read.
 function Command.SelectedWmo(line)
-	local entry = line:find("Selected gameobject", 1, true)
-		and line:match("|Hgameobject_entry:(%d+)|h")
+	local said = line:find("Selected gameobject", 1, true)
+		or line:find("Spawned gameobject", 1, true)
+	local entry = said and line:match("|Hgameobject_entry:(%d+)|h")
 	if entry and Furnish.Sets.OfEntry(tonumber(entry)) then
 		return entry
 	end
@@ -276,7 +278,7 @@ function Command.SelectedWmo(line)
 end
 
 -- A WMO's doodad line, from a select or a near, gets a button that imports and furnishes
--- it, and a WMO gob's selection line one that lists its sets, beside the server's own.
+-- it, and a WMO gob's selection or spawn line one that lists its sets, beside the server's own.
 Chat.OnServerLines(function(line)
 	local uid = Command.PlacedWmo(line)
 	if uid then

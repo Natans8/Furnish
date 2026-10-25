@@ -884,6 +884,19 @@ def test_a_wmo_gobs_selection_line_carries_a_button_that_lists_its_sets(tmp_path
     assert shown_line(lua, chair) == chair
 
 
+def test_a_wmo_gobs_spawn_line_carries_the_same_button(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    # As the server sends it, the name's link left unclosed.
+    spawned = (
+        "Spawned gameobject |cff00CCFF|Hgameobject_entry:817579|h[6dr_draenei_house2 - 817579]|r "
+        "(GUID: |cff00CCFF|Hgameobject_GUID:500|h500|h|r)"
+    )
+    line = shown_line(lua, spawned)
+    assert line == spawned + " - |cff71d5ff|Hgarrmission:furnish:list:817579|h[Furnish]|h|r"
+    moved = spawned.replace("Spawned gameobject", "Moved GameObject")
+    assert shown_line(lua, moved) == moved
+
+
 def test_the_first_run_reminds_about_highlighting_and_leaves_it_to_the_player(
     tmp_path: Path,
 ) -> None:
