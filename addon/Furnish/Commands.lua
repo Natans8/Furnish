@@ -35,7 +35,14 @@ end
 -- @param display the gameobject display id, as the data holds it, positive
 -- @param pose { x, y, z, roll, pitch, turn, scale }, what Transform.Place answers
 function Commands.Spawn(display, pose)
-	local words = { "gobject spawn -" .. display }
+	return Commands.SpawnObject(-display, pose)
+end
+
+--- The spawn command for what `.gob spawn` takes, at a world pose, as Spawn says it.
+-- @param id a gameobject entry, or a display as a negative number
+-- @param pose { x, y, z, roll, pitch, turn, scale }, what Transform.Place answers
+function Commands.SpawnObject(id, pose)
+	local words = { ("gobject spawn %d"):format(id) }
 	if math.abs(pose.scale - 1) >= 0.0005 then
 		words[#words + 1] = "scale " .. Commands.Number(pose.scale)
 	end

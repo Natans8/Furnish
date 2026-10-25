@@ -42,7 +42,7 @@ GLOW = Placement(1003, (4.0, 4.0, 1.0), (0.0, 0.0, 0.0, 1.0), 1.0)
 ANCHOR = "{ x = 10, y = 20, z = 30 }"
 SPAWN_CHAIR = "gobject spawn -20 posx 11.5 posy 18 posz 30.25 face north"
 SPAWN_LAMP = "gobject spawn -21 scale 0.5 posx 10 posy 20 posz 33 face north"
-SPAWN_MARKER = "gobject spawn -424242 posx 10 posy 20 posz 30 face north"
+SPAWN_PIVOT = "gobject spawn -424242 posx 10 posy 20 posz 30 face north"
 
 
 def write_database(path: Path, layered: bool = False) -> None:
@@ -106,7 +106,7 @@ def lua_core(tmp_path: Path, layered: bool = False) -> lua51.LuaRuntime:
     lua.execute("function LoadAddOn(name) dofile(DATA_PATH) return true end")
     for name in FILES:
         lua.execute((ADDON / name).read_text(encoding="utf-8"))
-    lua.execute("Furnish.Settings.marker = 424242")
+    lua.execute("Furnish.Settings.pivot = -424242")
     return lua
 
 
@@ -410,12 +410,12 @@ def test_a_second_abort_gives_up_on_the_replies_still_owed(tmp_path: Path) -> No
 # -- Kernel -----------------------------------------------------------------------------
 
 
-def test_pivot_spawns_the_marker_first_and_joins_every_doodad_to_it(tmp_path: Path) -> None:
+def test_pivot_spawns_the_pivot_first_and_joins_every_doodad_to_it(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     sent = fake_server(lua)
     result = spawn(lua, rows(lua, 2))
     assert sent() == [
-        SPAWN_MARKER,
+        SPAWN_PIVOT,
         SPAWN_CHAIR,
         "gobject group add 7001",
         SPAWN_LAMP,
@@ -433,8 +433,8 @@ def test_the_pivot_turns_and_scales_with_the_set_it_leads(tmp_path: Path) -> Non
         f"Furnish.Spawn({rows(lua, 2)}, {ANCHOR}, {{ roll = 0, pitch = 10, turn = 90 }}, 2,"
         " Furnish.Group.Pivot, SEND, {})"
     )
-    marker = "gobject spawn -424242 scale 2 posx 10 posy 20 posz 30 pitch 10 face north turn 90"
-    assert sent()[0] == marker
+    pivot = "gobject spawn -424242 scale 2 posx 10 posy 20 posz 30 pitch 10 face north turn 90"
+    assert sent()[0] == pivot
 
 
 def test_first_lets_the_first_doodad_lead_and_sends_it_no_join(tmp_path: Path) -> None:
@@ -461,22 +461,36 @@ def test_none_spawns_loose_objects_several_at_a_time(tmp_path: Path) -> None:
     assert result.leader is None and len(result.spawned) == 2
 
 
-def test_a_refused_marker_makes_the_first_doodad_lead(tmp_path: Path) -> None:
+def test_a_refused_pivot_makes_the_first_doodad_lead(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     sent = fake_server(lua, refuse=424242)
     result = spawn(lua, rows(lua, 2))
-    assert sent() == [SPAWN_MARKER, SPAWN_CHAIR, SPAWN_LAMP, "gobject group add 7001"]
+    assert sent() == [SPAWN_PIVOT, SPAWN_CHAIR, SPAWN_LAMP, "gobject group add 7001"]
     assert result.leader == "7001" and result.pivot is None
     refused = result.refused[1]
-    assert refused.display == 424242 and "doesn't exist" in refused.messages[1]
+    assert (refused.display, refused.pivot) == (-424242, True)
+    assert "doesn't exist" in refused.messages[1]
 
 
-def test_no_marker_setting_spawns_none(tmp_path: Path) -> None:
+def test_no_pivot_setting_spawns_none(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
-    lua.execute("Furnish.Settings.marker = nil")
+    lua.execute("Furnish.Settings.pivot = nil")
     sent = fake_server(lua)
     spawn(lua, rows(lua, 2))
     assert sent()[0] == SPAWN_CHAIR
+
+
+def test_a_pivot_set_to_an_entry_spawns_that_entry(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute("Furnish.Settings.pivot = 20")
+    sent = fake_server(lua, refuse=20)
+    result = spawn(lua, rows(lua, 2))
+    # The setting is what `.gob spawn` takes, so a positive one is an entry, spawned as it is;
+    # refused, it is the pivot, whatever doodad shares its number.
+    assert sent()[0] == "gobject spawn 20 posx 10 posy 20 posz 30 face north"
+    pivot = result.refused[1]
+    assert (pivot.display, pivot.pivot) == (20, True)
+    assert result.refused[2].pivot is False
 
 
 def test_a_refused_doodad_is_counted_with_the_servers_words(tmp_path: Path) -> None:
@@ -544,12 +558,12 @@ def test_a_word_group_waits_only_for_the_two_that_may_lead(tmp_path: Path) -> No
     lua = lua_core(tmp_path)
     sent = held_server(lua)
     spawn(lua, rows(lua, 2))
-    # The chair goes with its join, and the join waits for the marker.
-    assert sent() == [SPAWN_MARKER]
+    # The chair goes with its join, and the join waits for the pivot.
+    assert sent() == [SPAWN_PIVOT]
     lua.execute("ANSWER(1)")
-    # The lamp's join waits for the chair as well, which would lead had the marker been
+    # The lamp's join waits for the chair as well, which would lead had the pivot been
     # refused; nothing waits on the reply to the join before it.
-    assert sent() == [SPAWN_MARKER, SPAWN_CHAIR, "gobject group add 7001"]
+    assert sent() == [SPAWN_PIVOT, SPAWN_CHAIR, "gobject group add 7001"]
     lua.execute("ANSWER(2)")
     assert sent()[3:] == [SPAWN_LAMP, "gobject group add 7001"]
 
@@ -594,7 +608,7 @@ def test_a_join_behind_a_refused_spawn_speaks_for_nobody(tmp_path: Path) -> None
 
 def test_with_both_that_may_lead_refused_the_rest_stand_loose(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
-    lua.execute("Furnish.Settings.marker = 20")
+    lua.execute("Furnish.Settings.pivot = -20")
     sent = fake_server(lua, refuse=20)
     result = spawn(lua, rows(lua, 2))
     assert not [line for line in sent() if line.startswith("gobject group")]
@@ -651,7 +665,7 @@ def test_an_abort_with_cleanup_deletes_what_was_spawned(tmp_path: Path) -> None:
     lua.execute('ANSWER(2, true, { "|Hgameobject_GUID:7002|h7002|h" })')
     lua.execute("ANSWER(3, true, {})")
     sent = list(lua.eval("SENT").values())
-    assert sent[:3] == [SPAWN_MARKER, SPAWN_CHAIR, "gobject group add 7001"]
+    assert sent[:3] == [SPAWN_PIVOT, SPAWN_CHAIR, "gobject group add 7001"]
     assert sent[3:] == ["gobject delete 7001", "gobject delete 7002"]
     lua.execute("ANSWER(4, true, {}); ANSWER(5, true, {})")
     result = lua.eval("RESULT")
@@ -663,11 +677,11 @@ def test_an_abort_with_cleanup_deletes_what_was_spawned(tmp_path: Path) -> None:
 
 def test_settings_are_restored_from_the_saved_copy_and_then_are_it(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
-    lua.execute('FurnishSettings = { marker = 9653, inFlight = "yes", stray = 1 }')
+    lua.execute('FurnishSettings = { pivot = 9653, inFlight = "yes", stray = 1 }')
     lua.execute('FIRE("ADDON_LOADED", "Furnish")')
     settings = lua.eval("Furnish.Settings")
-    # The marker is taken; a value of the wrong type and a key the defaults lack are not.
-    assert (settings.marker, settings.inFlight) == (9653, 4)
+    # The pivot is taken; a value of the wrong type and a key the defaults lack are not.
+    assert (settings.pivot, settings.inFlight) == (9653, 4)
     assert settings.stray is None
     assert lua.eval("FurnishSettings == Furnish.Settings") is True
     lua.execute("Furnish.Settings.inFlight = 2")
@@ -678,7 +692,16 @@ def test_settings_stand_on_their_defaults_with_nothing_saved(tmp_path: Path) -> 
     lua = lua_core(tmp_path)
     lua.execute('FIRE("ADDON_LOADED", "Furnish")')
     assert lua.eval("FurnishSettings == Furnish.Settings") is True
-    assert lua.eval("Furnish.Settings.marker") == 424242
+    assert lua.eval("Furnish.Settings.pivot") == -424242
+
+
+def test_a_display_saved_as_the_old_marker_is_not_read_as_the_pivot(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    # A positive display under the old name would be an entry under the new one.
+    lua.execute("FurnishSettings = { marker = 9653 }")
+    lua.execute('FIRE("ADDON_LOADED", "Furnish")')
+    assert lua.eval("Furnish.Settings.pivot") == -424242
+    assert lua.eval("Furnish.Settings.marker") is None
 
 
 # -- Providers --------------------------------------------------------------------------

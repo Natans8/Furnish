@@ -7,12 +7,12 @@ _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
 
 Furnish.Settings = {
-	--- The display spawned as a set's invisible leader at the anchor. Chosen by scanning every
-	-- gameobject model: of 17,239, six draw nothing, light nothing, emit nothing, sound
-	-- nothing and collide with nothing, and the hologram base is the one that reads as a word
-	-- in every list. Spawned by display like every doodad. Nil spawns no marker, and the
-	-- first doodad leads instead.
-	marker = 16031,
+	--- What a set's invisible leader at the anchor is, as `.gob spawn` takes it: a gameobject
+	-- entry, or a display as a negative number. Furnish's own is display 16031, chosen by
+	-- scanning every gameobject model: of 17,239, six draw nothing, light nothing, emit
+	-- nothing, sound nothing and collide with nothing, and the hologram base is the one that
+	-- reads as a word in every list. Nil spawns no pivot, and the first doodad leads instead.
+	pivot = -16031,
 
 	--- How many commands may be out unanswered at once, joins counted, though a spawn and its
 	-- join always go together. No spawn waits on the reply to the one before it; this only

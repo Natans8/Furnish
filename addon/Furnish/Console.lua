@@ -214,11 +214,8 @@ local function groupOf(request, pose)
 	return pose.guid, "led by " .. pose.name
 end
 
---- What a line calls the model a display draws: its name, the pivot, or what it is not.
+--- What a line calls the model a display draws: its name, or what it is not.
 local function modelOf(display)
-	if display == Furnish.Settings.marker then
-		return "the pivot"
-	end
 	return Console.ModelName(display) or "a model the client's catalogue does not name"
 end
 
@@ -249,7 +246,8 @@ local function finish(result, started, anchor)
 		say(("done: %d of %d spawned%s in %s"):format(doodads, result.total, pivot, since(started)))
 	end
 	for _, refusal in ipairs(result.refused) do
-		say(("%s was refused: %s"):format(modelOf(refusal.display), quote(refusal.messages)))
+		local what = refusal.pivot and "the pivot" or modelOf(refusal.display)
+		say(("%s was refused: %s"):format(what, quote(refusal.messages)))
 	end
 	for _, miss in ipairs(result.unjoined) do
 		say(

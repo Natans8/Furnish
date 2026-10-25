@@ -8,7 +8,7 @@
 -- spawn line, adds the joins the group needs, and hands the lines to a run.
 --
 -- Who leads is decided by the replies, never in advance: of the first two spawns, the first
--- that answers a GUID leads. Under Pivot that is the marker, and when the marker is refused
+-- that answers a GUID leads. Under Pivot that is the pivot, and when the pivot is refused
 -- the first doodad leads, which is exactly what First does from the start. When both are
 -- refused nothing leads, and the rest stand loose.
 --
@@ -28,7 +28,7 @@ local Run = Furnish.Run
 --- The ways a spawned collection may be grouped. Any value that is not one of these is
 -- taken as the GUID of an existing object whose group the collection joins.
 Furnish.Group = {
-	Pivot = "pivot", -- an invisible marker at the anchor leads
+	Pivot = "pivot", -- the pivot Settings names, at the anchor, leads
 	First = "first", -- the first doodad spawned leads
 	None = "none", -- loose objects, no group
 }
@@ -38,7 +38,7 @@ local function isWord(group)
 	return group == Group.Pivot or group == Group.First or group == Group.None
 end
 
---- A placement at the anchor itself, which is where the marker stands.
+--- A placement at the anchor itself, which is where the pivot stands.
 local ORIGIN = { x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 }
 
 local function check(rows, position, rotation, scale, group, send)
@@ -95,7 +95,8 @@ end
 -- @param group a Furnish.Group value, or the GUID of the object whose group to join
 -- @param send function(text, callback(success, messages)), the door to the server
 -- @param hooks { progress = function(done, total), finished = function(outcome) }, optional.
---   The outcome carries total, spawned (GUIDs), refused ({ display, messages }), unjoined
+--   The outcome carries total, spawned (GUIDs), refused ({ display, pivot, messages }, the
+--   pivot's display being the setting as `.gob spawn` takes it), unjoined
 --   ({ display, guid, messages }: spawned, but the join was refused), leader, joined (how
 --   many objects joined the leader's group), pivot, aborted and, after a cleanup,
 --   deleted; a messages list is the server's reply lines as sent.
@@ -106,14 +107,14 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 		return nil, wrong
 	end
 	local settings = Furnish.Settings
-	local marker = group == Group.Pivot and settings.marker or nil
+	local marker = group == Group.Pivot and settings.pivot or nil
 	local joins = group ~= Group.None
 
-	-- Positions in the series: spawns[i] is the display spawned at i, joined[i] the spawn
-	-- a join at i acts for, and leads the spawns that may lead, the first two under a word.
+	-- Positions in the series: spawns[i] is the display spawned at i, or the pivot as the
+	-- setting names it, joined[i] the spawn a join at i acts for, and leads the spawns that may
+	-- lead, the first two under a word.
 	local commands, spawns, joined, leads = {}, {}, {}, {}
-	local function spawn(display, pose)
-		local line = Commands.Spawn(display, pose)
+	local function spawn(display, line)
 		if #line > Commands.LIMIT then
 			return ("a spawn line is %d characters, over the %d the server takes: %s"):format(
 				#line,
@@ -157,13 +158,15 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 
 	if marker then
 		-- Turned and scaled with the set, so the pivot stays in proportion to what it leads.
-		local long = spawn(marker, Transform.Place(position, rotation, scale, ORIGIN))
+		local pose = Transform.Place(position, rotation, scale, ORIGIN)
+		local long = spawn(marker, Commands.SpawnObject(marker, pose))
 		if long then
 			return nil, long
 		end
 	end
 	for _, row in ipairs(rows) do
-		local long = spawn(row.display, Transform.Place(position, rotation, scale, row))
+		local pose = Transform.Place(position, rotation, scale, row)
+		local long = spawn(row.display, Commands.Spawn(row.display, pose))
 		if long then
 			return nil, long
 		end
@@ -183,7 +186,11 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 				if display and result.success then
 					spawned[#spawned + 1] = Commands.GuidIn(result.messages)
 				elseif display then
-					refused[#refused + 1] = { display = display, messages = result.messages or {} }
+					refused[#refused + 1] = {
+						display = display,
+						pivot = marker ~= nil and index == 1,
+						messages = result.messages or {},
+					}
 				elseif own and own.success and result.success then
 					members = members + 1
 				elseif own and own.success then
@@ -232,7 +239,7 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 		end
 	end
 
-	-- The run counts joins too; the surface is told in doodads, the marker left out.
+	-- The run counts joins too; the surface is told in doodads, the pivot left out.
 	local progress, settled = hooks and hooks.progress, 0
 	local run, reason = Run.Start(commands, send, {
 		progress = progress and function(_, _, index)

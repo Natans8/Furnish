@@ -39,9 +39,9 @@ A set, list or import takes any of these words after it:
 
 `/furn help` prints one short line a command and the words on one line, each a link whose tooltip
 says what it does. Furnish's settings are in the game's Options, under AddOns: whether chat lines
-carry `[Furnish]` buttons, how many commands a run sends before the first is answered, and the
-display a pivot spawns as. A change takes effect at once; Cancel puts back what the panel showed
-when it opened.
+carry `[Furnish]` buttons, how many commands a run sends before the first is answered, and what
+a pivot spawns as, written as `.gob spawn` takes it: a gob entry, or a display as a negative
+number. A change takes effect at once; Cancel puts back what the panel showed when it opened.
 
 A list is a menu of buttons, one a set: a click spawns the set onto the selected gob, WMO or
 not, a ctrl-click at your feet, and resting on one says its index, its objects and what it is.
@@ -76,7 +76,8 @@ has no roll or pitch of its own; Include the target then joins that group. The g
 when it ends still stands for the WMO the run was on. The
 doodad `.doodad select` picks is a selection of its own, held beside the gob's: it never changes
 Source or Target, and while there is one a panel stands against the window's right edge with
-its name and the sets of the WMO it is, those it draws already marked baked. Use as source keeps
+its name and the sets of the WMO it is, those it draws already marked baked. Every pick takes
+the panel, the window open or not, and a doodad with no sets Furnish knows of empties it. Use as source keeps
 that WMO as the source, with the sets the doodad drew beyond its base chosen. Import doodad turns
 it into a gob that is selected like any other; while Source follows the selection, the same sets
 come chosen on it, and either block kept as it is stays so. The doodad is
@@ -179,21 +180,23 @@ Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
   set's rows as a trail from the origin, each beside the one before.
 - `position` `{ x, y, z }`, `rotation` `{ roll, pitch, turn }` in degrees or nil for level,
   `scale` or nil for 1.
-- `group`: `Furnish.Group.Pivot` (an invisible marker at the anchor leads), `First` (the
+- `group`: `Furnish.Group.Pivot` (the pivot at the anchor leads, `Settings.pivot` as
+  `.gob spawn` takes it), `First` (the
   first doodad leads), `None` (loose), or the GUID of an object whose group to join.
 - `send`: `function(text, callback(success, messages))`, the door to the server.
 - `hooks`: `progress(done, total)` and `finished(outcome)`, where the outcome carries
-  `spawned`, `refused` with each refusal's display and the server's words, `unjoined`,
+  `spawned`, `refused` with each refusal's display, whether it was the pivot and the server's
+  words, `unjoined`,
   `leader`, `joined` (how many besides the leader are in its group), `pivot` and `aborted`.
 
 It answers a handle with `Abort(cleanup)` and `Done()`, or nil and the reason; a second
 `Abort` while a reply is owed gives up on it, and a cleanup once asked for stays asked for. Who leads is
-read off the replies: the first command that answers a GUID, so a refused marker hands the
+read off the replies: the first command that answers a GUID, so a refused pivot hands the
 lead to the first doodad.
 
 | file            | role                                                                                 |
 |-----------------|--------------------------------------------------------------------------------------|
-| `Settings.lua`  | the defaults: marker, in-flight width, chat buttons; `FurnishSettings` keeps changes |
+| `Settings.lua`  | the defaults: pivot, in-flight width, chat buttons; `FurnishSettings` keeps changes  |
 | `Reader.lua`    | the data addon's reader                                                              |
 | `Names.lua`     | a set's name as a player reads it: `Set(name)`                                       |
 | `Transform.lua` | the placement maths: `Place(position, rotation, scale, row)`                         |

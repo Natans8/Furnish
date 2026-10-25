@@ -181,9 +181,9 @@ local function gobDetail(pose)
 end
 
 --- Whether a run spawns a pivot to lead its group: when grouped without the target, and while
--- a pivot display is set at all.
+-- a pivot is set at all.
 local function pivots(group)
-	return group == "pivot" and Furnish.Settings.marker ~= nil
+	return group == "pivot" and Furnish.Settings.pivot ~= nil
 end
 
 --- What Use selected fills the target from: the selected gob, or else a selected group, whose
@@ -982,9 +982,22 @@ local function initDrawn(button, set, new)
 end
 
 --- Fill the doodad panel with the doodad's name and the sets of the WMO it is, its list as tall
--- as its sets up to a point, past which it scrolls.
+-- as its sets up to a point, past which it scrolls. A doodad not yet read is read here, each set
+-- marked where the doodad draws it, as part of its model or as the map chose; one that is no WMO
+-- Furnish has sets for empties the slot, since it is still what `.doodad select` picked.
 local function fillDoodad()
 	drawn:Flush()
+	if doodad and not doodad.sets then
+		local of = Console.Source({ entry = doodad.entry, placement = doodad })
+		if of then
+			for _, set in ipairs(of.sets) do
+				set.draws = set.placed or (set.index == 0 and not of.blank)
+			end
+			doodad.name, doodad.sets = Client.ModelName(doodad.name), of.sets
+		else
+			doodad = nil
+		end
+	end
 	if not doodad then
 		return
 	end
@@ -1036,22 +1049,23 @@ local function numberChanged(box, typed)
 	update()
 end
 
---- A doodad `.doodad select` picked: a WMO Furnish has sets for fills the doodad slot and its
--- panel, each set marked where the doodad draws it, as part of its model or as the map chose;
--- the source and the target stay the gob selection's.
+--- A doodad `.doodad select` picked takes the doodad slot, whatever it is and whether the window
+-- is open or not, so the panel never shows one the server no longer holds; it is read once the
+-- window shows it. The source and the target stay the gob selection's.
 local function doodadSelected(line)
 	local named = Furnish.Commands.SelectedDoodad(line)
-	local of = named and Console.Source({ entry = named.entry, placement = named })
-	if run or not of then
+	if not named then
 		return
 	end
-	for _, set in ipairs(of.sets) do
-		set.draws = set.placed or (set.index == 0 and not of.blank)
+	-- Picked again, a doodad imported stays imported, since the server refuses a second import.
+	if doodad and doodad.uid == named.uid then
+		named.imported = doodad.imported
 	end
-	named.name, named.sets = Client.ModelName(named.name), of.sets
 	doodad = named
-	fillDoodad()
-	update()
+	if frame:IsShown() then
+		fillDoodad()
+		update()
+	end
 end
 
 --- The gob selection changed; the doodad slot is a selection of its own and keeps what it holds.
@@ -1131,16 +1145,17 @@ local function importHeard(line)
 	local uid = Furnish.Commands.Imported({ line })
 	if uid and doodad and tostring(doodad.uid) == uid and not doodad.imported then
 		doodad.imported = true
-		update()
+		if frame:IsShown() then
+			update()
+		end
 	end
 end
 
+--- What the window hears only while it is open; the doodad slot is heard always, in build.
 local function listen()
 	stops = {
 		Client.OnSelection(selectionChanged),
 		Client.OnPhaseChange(update),
-		Client.OnSystemLine(doodadSelected),
-		Client.OnSystemLine(importHeard),
 	}
 end
 
@@ -1436,6 +1451,8 @@ local function build()
 	buildTarget()
 	buildDoodad()
 	buildFooter()
+	Client.OnSystemLine(doodadSelected)
+	Client.OnSystemLine(importHeard)
 
 	frame:SetScript(
 		"OnShow",
@@ -1455,6 +1472,7 @@ local function build()
 			fitButtons()
 			layoutNumbers()
 			listen()
+			fillDoodad()
 			refresh()
 			-- Started now, so the models are usually named by the time a set is rested on; a WMO
 			-- shown by its entry takes its name from the same walk, once it ends.

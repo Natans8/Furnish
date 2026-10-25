@@ -12,7 +12,7 @@ local Settings = Furnish.Settings
 local DEFAULTS = {
 	chatButtons = Settings.chatButtons,
 	inFlight = Settings.inFlight,
-	marker = Settings.marker,
+	pivot = Settings.pivot,
 }
 
 --- How many commands a run may have unanswered, at least and at most.
@@ -86,50 +86,50 @@ pace:SetScript("OnEnter", function(self)
 end)
 pace:SetScript("OnLeave", _G.GameTooltip_Hide)
 
--- The display a pivot spawns as.
-local markerLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-markerLabel:SetPoint("TOPLEFT", pace, "BOTTOMLEFT", -4, -36)
-markerLabel:SetText("Pivot display")
+-- What a pivot spawns as, in the words `.gob spawn` takes.
+local pivotLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+pivotLabel:SetPoint("TOPLEFT", pace, "BOTTOMLEFT", -4, -36)
+pivotLabel:SetText("Pivot")
 
-local marker = _G.CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
-marker:SetPoint("LEFT", markerLabel, "RIGHT", 14, 0)
-marker:SetSize(90, 20)
-marker:SetAutoFocus(false)
-marker:SetNumeric(true)
-marker:SetMaxLetters(9)
+local pivot = _G.CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
+pivot:SetPoint("LEFT", pivotLabel, "RIGHT", 14, 0)
+pivot:SetSize(90, 20)
+pivot:SetAutoFocus(false)
+pivot:SetMaxLetters(10)
 
-local markerNote = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-markerNote:SetPoint("TOPLEFT", markerLabel, "BOTTOMLEFT", 0, -8)
-markerNote:SetPoint("RIGHT", panel, "RIGHT", -16, 0)
-markerNote:SetJustifyH("LEFT")
-markerNote:SetText(
+local pivotNote = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+pivotNote:SetPoint("TOPLEFT", pivotLabel, "BOTTOMLEFT", 0, -8)
+pivotNote:SetPoint("RIGHT", panel, "RIGHT", -16, 0)
+pivotNote:SetJustifyH("LEFT")
+pivotNote:SetText(
 	(
-		"The object that leads a set's group where no other does. Furnish's own, %d, is invisible and"
-		.. " silent; a builder who signs with a marker of their own puts its display here."
-	):format(DEFAULTS.marker)
+		"The object that leads a set's group where no other does, as .gob spawn takes it: a gob"
+		.. " entry, or a display as a negative number. Furnish's own, %d, is invisible and silent."
+	):format(DEFAULTS.pivot)
 )
 
---- Take the display typed, or put back the one kept where what was typed is no display.
-local function markerEntered(box)
+--- Take the id typed, or put back the one kept where what was typed is not a whole number
+-- other than nought.
+local function pivotEntered(box)
 	local value = tonumber(box:GetText())
-	if value and value > 0 then
-		Settings.marker = value
+	if value and value ~= 0 and value == math.floor(value) then
+		Settings.pivot = value
 	end
-	box:SetText(tostring(Settings.marker))
+	box:SetText(tostring(Settings.pivot))
 end
-marker:SetScript("OnEnterPressed", marker.ClearFocus)
-marker:SetScript("OnEscapePressed", function(box)
-	box:SetText(tostring(Settings.marker))
+pivot:SetScript("OnEnterPressed", pivot.ClearFocus)
+pivot:SetScript("OnEscapePressed", function(box)
+	box:SetText(tostring(Settings.pivot))
 	box:ClearFocus()
 end)
-marker:HookScript("OnEditFocusLost", Client.Guarded(markerEntered))
+pivot:HookScript("OnEditFocusLost", Client.Guarded(pivotEntered))
 
 --- Show what the settings hold now.
 local function show()
 	buttons:SetChecked(Settings.chatButtons)
 	pace:SetValue(Settings.inFlight)
 	paceText(Settings.inFlight)
-	marker:SetText(tostring(Settings.marker))
+	pivot:SetText(tostring(Settings.pivot))
 end
 
 --- What the panel showed when it opened, which Cancel puts back.
