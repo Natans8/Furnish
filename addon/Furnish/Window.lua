@@ -1124,11 +1124,23 @@ local function listOf(box, data, template, initializer)
 	box.ScrollBox:SetDataProvider(data)
 end
 
+--- An import the player typed marks the doodad in the panel imported where it is the one, since
+-- the server refuses a second import. The window sends nothing for it: the server selects the gob
+-- it made but sends no record of it, and reading that gob is the player's own `.gob select`.
+local function importHeard(line)
+	local uid = Furnish.Commands.Imported({ line })
+	if uid and doodad and tostring(doodad.uid) == uid and not doodad.imported then
+		doodad.imported = true
+		update()
+	end
+end
+
 local function listen()
 	stops = {
 		Client.OnSelection(selectionChanged),
 		Client.OnPhaseChange(update),
 		Client.OnSystemLine(doodadSelected),
+		Client.OnSystemLine(importHeard),
 	}
 end
 
