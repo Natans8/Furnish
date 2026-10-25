@@ -156,7 +156,7 @@ local function helpLines()
 		.. "A .gob select line for a WMO carries a [Furnish] button, which lists the WMO's sets."
 		.. Chat.END
 	lines[#lines + 1] = Chat.GREY
-		.. "A .doodad select line for a WMO carries one too, which imports the doodad and spawns its sets onto the new gob."
+		.. "A .doodad select or near line for a WMO placed with a set beyond its base carries one too, which imports the doodad and spawns that set onto the new gob."
 		.. Chat.END
 	return lines
 end
@@ -246,12 +246,19 @@ _G.SlashCmdList.FURNISH = Client.Guarded(Command.Run)
 Chat.OnLinks(Command.Click, Command.Hover)
 
 --- The unique id of the doodad a server line names by its link, where it is a WMO
--- Furnish has sets for. The number after the name in the link is the object's gameobject
+-- Furnish has sets for and the map placed it with a set beyond its base, so that importing
+-- it spawns something. The number after the name in the link is the object's gameobject
 -- entry, and the data answers for it; the name is never read, since many a WMO's
--- name has no `.wmo` in it. The first such line loads the data.
+-- name has no `.wmo` in it. A select line names its map, and a near line's doodads stand on
+-- the player's. The first such line loads the data.
 function Command.PlacedWmo(line)
 	local uid, entry = line:match("|Hdoodad_uid:(%d+):[^|]*|h%[.- %- (%d+)%]|h")
-	if uid and Furnish.Sets.OfEntry(tonumber(entry)) then
+	local file = uid and Furnish.Sets.OfEntry(tonumber(entry))
+	if not file then
+		return nil
+	end
+	local map = tonumber(line:match(" on map (%d+)")) or select(4, Client.Position())
+	if Furnish.Sets.DrawsBeyondBase(file, map, tonumber(uid)) then
 		return uid
 	end
 	return nil

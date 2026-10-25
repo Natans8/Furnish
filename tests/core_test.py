@@ -46,8 +46,9 @@ SPAWN_MARKER = "gobject spawn -424242 posx 10 posy 20 posz 30 face north"
 
 
 def write_database(path: Path, layered: bool = False) -> None:
-    """The house, its emptywmo twin and the map placement that draws Full. Layered, the house
-    has a second set, Lights, and placement 4343 draws both, as a tile naming a run of sets does."""
+    """The house, its emptywmo twin, the map placement that draws Full and placement 4244, which
+    draws only the base set. Layered, the house has a second set, Lights, and placement 4343
+    draws both, as a tile naming a run of sets does."""
     with Database(path) as db:
         db.meta({"build": "9.2.7.45745"})
         default = db.add_set(None, [(21, GLOW)])
@@ -58,7 +59,7 @@ def write_database(path: Path, layered: bool = False) -> None:
         db.add_wmo_sets([(EMPTY_HOUSE, 0, default), (EMPTY_HOUSE, 1, full)])
         db.add_root_displays([(30262, HOUSE)])
         db.add_entries([(817579, HOUSE)])
-        db.add_map_sets([(1116, 4242, full)])
+        db.add_map_sets([(1116, 4242, full), (1116, 4244, default)])
         # The model file each display draws, as the build writes it.
         db.add_models([(20, 1001), (21, 1002), (22, 1003)])
         if layered:

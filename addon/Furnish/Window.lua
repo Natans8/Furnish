@@ -1100,6 +1100,12 @@ local function listOf(box, data, template, initializer)
 	local view = _G.CreateScrollBoxListLinearView()
 	view:SetElementExtent(ROW)
 	view:SetElementInitializer("Button", template, Client.Guarded(initializer))
+	-- A list sized to its rows can come out a hair short of them once the screen rounds it to
+	-- whole pixels, which Blizzard's own test reads as something to scroll; less than a unit
+	-- hidden is nothing to scroll.
+	box.ScrollBox.HasScrollableExtent = function(scroll)
+		return scroll:GetVisibleExtent() > 0 and scroll:GetDerivedScrollRange() >= 1
+	end
 	_G.ScrollUtil.InitScrollBoxListWithScrollBar(box.ScrollBox, box.ScrollBar, view)
 	local anchor = _G.CreateAnchor
 	_G.ScrollUtil.AddManagedScrollBarVisibilityBehavior(box.ScrollBox, box.ScrollBar, {

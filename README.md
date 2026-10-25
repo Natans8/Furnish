@@ -44,7 +44,8 @@ many objects can crash the game; turning it off is yours to do. A run that leave
 when it ends, in the chat as if typed, so `.gob group` commands act on it next. While it stays
 selected it stands for the object the run was on, so the next set or list needs no reselecting.
 A WMO's doodad line, from `.doodad select` or `.doodad near`, carries a `[Furnish]` button
-that imports that WMO by its unique id and furnishes it as `/furn import` does, and a WMO gob's
+that imports that WMO by its unique id and furnishes it as `/furn import` does, where the map
+placed it with a set beyond its base, so that the import spawns something; and a WMO gob's
 selection line, from `.gob select`, one that lists its sets.
 
 The window reads top to bottom as where the sets come from, which to spawn, and where they go.

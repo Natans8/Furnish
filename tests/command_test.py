@@ -778,6 +778,25 @@ def test_a_wmos_doodad_line_carries_a_button_that_imports_and_furnishes_it(
     assert printed(lua)[-2] == (PREFIX + "spawning Full (set 1, 2 objects) on house, led by house")
 
 
+def test_a_doodad_the_map_placed_with_only_its_base_set_gets_no_button(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    # Importing it would spawn nothing, the gob drawing its base set itself.
+    base_only = WMO_LINE.replace("4242", "4244")
+    assert shown_line(lua, base_only) == base_only
+    # Nor does a placement the data does not know, whose sets cannot be told.
+    unknown = WMO_LINE.replace("4242", "9999")
+    assert shown_line(lua, unknown) == unknown
+
+
+def test_a_near_line_takes_the_map_the_player_stands_on(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    near = "|Hdoodad_uid:4242:0|h[6dr_draenei_house2 - 817579]|h"
+    assert (
+        shown_line(lua, near)
+        == near + " - |cff71d5ff|Hgarrmission:furnish:import:4242|h[Furnish]|h|r"
+    )
+
+
 def test_a_line_whose_entry_is_no_furnished_wmo_is_left_as_it_came(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     # Named like a WMO, but an entry the data has no sets for.

@@ -94,3 +94,24 @@ function Sets.OfPlacement(map, uid)
 	end
 	return ids
 end
+
+--- Whether a WMO placed on the map draws a set beyond its base, the one set the gob it is
+-- imported as draws itself; false where the data has no such placement.
+-- @param file the root's file id
+function Sets.DrawsBeyondBase(file, map, uid)
+	local ids = Sets.OfPlacement(map, uid)
+	local sets = ids and Sets.OfFile(file)
+	if not sets then
+		return false
+	end
+	local drawn = {}
+	for _, id in ipairs(ids) do
+		drawn[id] = true
+	end
+	for _, set in ipairs(sets) do
+		if set.index ~= 0 and drawn[set.id] then
+			return true
+		end
+	end
+	return false
+end
