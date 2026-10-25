@@ -1466,6 +1466,9 @@ local function build()
 		started = Client.Guarded(started),
 		progress = Client.Guarded(progressed),
 		finished = Client.Guarded(finished),
+		-- A wait ends on the record of the object it waited for, which reaches the window's own
+		-- listener while the wait still stands, so the button is redrawn when the wait ends too.
+		waiting = Client.Guarded(update),
 	})
 end
 

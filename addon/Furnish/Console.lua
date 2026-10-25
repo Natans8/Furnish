@@ -46,7 +46,7 @@ local say = Chat.Say
 local running, stopping, waiting, anchored
 
 --- Who hears a run besides the chat, as a window registers: { started(total, what),
--- progress(done, total), finished(result, seconds) }, each optional.
+-- progress(done, total), finished(result, seconds), waiting(waits) }, each optional.
 local watchers = {}
 
 local function tell(name, ...)
@@ -55,6 +55,14 @@ local function tell(name, ...)
 			watcher[name](...)
 		end
 	end
+end
+
+--- Start or end a wait for the server, and tell every watcher. A window cannot tell otherwise
+-- when a wait ends: the record that ends one reaches the window's own listener first, while
+-- the wait still stands.
+local function wait(what)
+	waiting = what
+	tell("waiting", what ~= nil)
 end
 
 --- A set's name as a line shows it; the base set has none of its own.
@@ -128,17 +136,18 @@ local function withSelection(what, otherwise, fn)
 	local guid = anchored.guid
 	local stopAwaiting
 	stopAwaiting, reason = Client.AwaitRecord(guid, function(record)
-		waiting = nil
+		wait(nil)
 		fn(Pose.OfRecord(record))
 	end)
 	if not stopAwaiting then
 		return say(reason)
 	end
-	waiting = { what = "object " .. guid, stop = stopAwaiting }
+	wait({ what = "object " .. guid, stop = stopAwaiting })
 	send(Commands.Select(guid), function(selected, replies)
 		if not selected and waiting then
 			waiting.stop()
-			waiting, anchored = nil, nil
+			anchored = nil
+			wait(nil)
 			say(
 				("the group stands for object %s, but selecting it was refused: %s; select %s first"):format(
 					guid,
@@ -489,8 +498,9 @@ function Console.ToggleHighlight()
 end
 
 --- Hear every run besides the chat.
--- @param watcher { started(total, what), progress(done, total), finished(result, seconds) },
---   each optional; finished has no result for a run refused before anything was sent
+-- @param watcher { started(total, what), progress(done, total), finished(result, seconds),
+--   waiting(waits) }, each optional; finished has no result for a run refused before anything
+--   was sent, and waiting is told whenever a wait for the server starts or ends
 -- @return a function that stops hearing
 function Console.Watch(watcher)
 	watchers[#watchers + 1] = watcher
@@ -759,7 +769,7 @@ function Console.Import(request)
 	-- silences both.
 	local stopped, heard = false, false
 	local stopHearing, stopAwaiting
-	waiting = {
+	wait({
 		what = "the imported object",
 		left = "an import already sent stands",
 		stop = function()
@@ -769,7 +779,7 @@ function Console.Import(request)
 				stopAwaiting()
 			end
 		end,
-	}
+	})
 
 	local function furnish(record, ids, guid, model)
 		if request.only then
@@ -826,17 +836,17 @@ function Console.Import(request)
 		stopHearing()
 		local ids = Sets.OfPlacement(map, tonumber(uid))
 		stopAwaiting, reason = Client.AwaitRecord(guid, function(record)
-			waiting = nil
+			wait(nil)
 			furnish(record, ids, guid, model)
 		end)
 		if not stopAwaiting then
-			waiting = nil
+			wait(nil)
 			return say(reason)
 		end
 		send(Commands.Select(guid), function(selected, replies)
 			if not selected and waiting then
 				waiting.stop()
-				waiting = nil
+				wait(nil)
 				say(
 					("imported %s as object %s, but selecting it was refused: %s"):format(
 						model,
@@ -867,7 +877,7 @@ function Console.Import(request)
 		end
 		if not success then
 			waiting.stop()
-			waiting = nil
+			wait(nil)
 			say("nothing was imported: " .. quote(messages))
 		end
 	end)
@@ -878,7 +888,7 @@ function Console.Stop(delete)
 	if waiting then
 		local left = waiting.left
 		waiting.stop()
-		waiting = nil
+		wait(nil)
 		return say("stopped; nothing was spawned" .. (left and ", and " .. left or ""))
 	end
 	if not (running and not running.Done()) then
