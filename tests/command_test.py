@@ -271,24 +271,58 @@ def test_a_set_spawns_at_a_pose_given_with_no_object_behind_it(tmp_path: Path) -
         + "led by a pivot, one extra invisible object"
     )
     assert sent(lua)[0] == "gobject spawn -424242 posx 1 posy 2 posz 3 face north"
-    # With no object behind the pose there is no group to join, and a pose names no WMO.
+    # A merge needs something selected to merge into, and a pose names no WMO.
+    lua.execute("SELECTED = nil")
     spawn(lua, "{ index = 1, file = 900, at = Furnish.Pose.At(1, 2, 3), group = 'merge' }")
-    assert printed(lua)[-1] == (
-        PREFIX + "a spawn at your feet has no selected gob to include in the group"
-    )
+    assert printed(lua)[-1] == PREFIX + MERGE_REFUSED
     spawn(lua, "{ index = 1, at = Furnish.Pose.At(1, 2, 3) }")
     assert printed(lua)[-1] == (
         PREFIX + "a position names no WMO; name the one whose sets to spawn"
     )
 
 
-def test_a_pose_read_off_an_object_joins_that_objects_group(tmp_path: Path) -> None:
+MERGE_REFUSED = (
+    "no object is selected; select the object whose group to join first, as with .gob select"
+)
+
+
+def test_numbers_given_merge_into_whatever_is_selected_not_what_they_were_read_off(
+    tmp_path: Path,
+) -> None:
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 500")
     lua.execute("AT = Furnish.Console.Selected(); SELECTED = 502")
     spawn(lua, "{ index = 1, file = 900, label = 'house', at = AT, group = 'merge' }")
-    assert printed(lua)[-2] == (PREFIX + "spawning Full (set 1, 2 objects) on house, led by house")
-    assert "gobject group add 500" in sent(lua)
+    # The numbers are the house's, but the chair is what is selected, so its group is joined.
+    assert printed(lua)[-2] == (
+        PREFIX + "spawning house's Full (set 1, 2 objects) at 10.0, 20.0, 30.0, led by chair"
+    )
+    assert "gobject group add 502" in sent(lua)
+    assert "gobject group add 500" not in sent(lua)
+
+
+def test_numbers_given_merge_into_a_selected_group(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute(
+        """
+        SELECTED, GROUP_LEADER = "group", 501
+        local plain = EpsilonLib.GameObject.GetSelected
+        EpsilonLib.GameObject.GetSelected = function(...)
+          local selected = plain(...)
+          if selected and selected.isGroup then
+            selected.GetLeader = function() return RECORDS[501] end
+          end
+          return selected
+        end
+        """
+    )
+    spawn(
+        lua,
+        "{ index = 1, file = 900, label = 'house', at = Furnish.Pose.At(1, 2, 3),"
+        " group = 'merge' }",
+    )
+    assert printed(lua)[-2].endswith("joining the group emptywmo_house is in")
+    assert "gobject group add 501" in sent(lua)
 
 
 def test_a_named_source_spawns_on_any_selected_object(tmp_path: Path) -> None:

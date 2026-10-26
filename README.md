@@ -65,16 +65,16 @@ marked. A set the selected WMO draws already, as part of its model, is marked ba
 base set, unless it comes unfurnished. A click chooses one set and a
 ctrl-click adds or removes one, a strip at either end of the list counts the chosen sets
 scrolled out of view, and resting on a set names the models it holds, as the client's own
-catalogue names them once a walk of it, started when the window opens, has ended. Destination is the selected
-gob, or, while nothing is selected, where you stood when it was read, which Here reads again, so every
-number always holds a value: X, Y
-and Z, then the roll, pitch and turn about each in ObjectMover's colours, then the scale. Here
-and Use selected gob fill it once; typing a number keeps what was typed; Tab moves through the
-boxes. Either block's Follow selection, unticked, keeps what it shows whatever you select. A
-selected group is used by neither block, as a model is no source: both say a group is selected, and
-Use selected group fills Destination once with the group's position and facing, level, since a group
-has no roll or pitch of its own; Selected group as the group leader then joins that group. The group a run selects
-when it ends still stands for the WMO the run was on. The
+catalogue names them once a walk of it, started when the window opens, has ended. Destination is
+numbers and nothing else: X, Y and Z, then the roll, pitch and turn about each in ObjectMover's
+colours, then the scale. Following the selected gob is one way to fill them, Here and Use
+selected gob fill them once, typing a number keeps what was typed, and while no gob is followed
+they hold where you stood when they were read, so every number always holds a value; Tab moves
+through the boxes. Either block's Follow selection, unticked, keeps what it shows whatever you
+select. A selected group is followed by neither block, as a model is no source, and Use selected
+group fills Destination once with the group's position and facing, level, since a group has no
+roll or pitch of its own. The selection decides nothing else about Destination: what it decides
+is the group. The group a run selects when it ends still stands for the WMO the run was on. The
 doodad `.doodad select` picks is a selection of its own, held beside the gob's: it never changes
 Source or Destination, and while there is one a panel stands against the window's right edge with
 its name and the sets of the WMO it is, those it draws already marked baked. Every pick takes
@@ -85,12 +85,14 @@ come chosen on it, and either block kept as it is stays so. The doodad is
 hidden, not gone, and stays selected; closing the panel lets it go. Group leader is one choice
 of four, all in view: No group spawns the objects loose; Pivot, the default, makes them one
 group led by an invisible pivot at the destination, which the button counts; First spawned lets
-the first object lead instead, so nothing extra spawns; Selected gob makes the selected gob lead,
-or joins its group where it is in one already, which a mark on the segment warns of and Spawn
-asks about first. A group moves, turns and scales about its leader. Selected gob greys while no
-gob can lead, Pivot standing in until one is selected again. The status row
+the first object lead instead, so nothing extra spawns; Selected gob makes whatever is selected
+when the run starts lead, wherever Destination's numbers came from, or joins its group where it is
+in one already, which a mark on the segment warns of and Spawn asks about first; with a group
+selected it reads Selected group and joins that group. A group moves, turns and scales about its
+leader. Selected gob greys while nothing is selected, Pivot standing in until something is. The
+status row
 holds Highlighting, which toggles the client's outline on selected objects, beside a run's
-progress with its time left, a warning before spawning onto a WMO the sets were not made for,
+progress with its time left, a warning while Destination follows a WMO the sets were not made for,
 or the reminder that highlighting too many objects can crash the game. During a run every
 control holds still and Stop and delete stands beside Stop; once the run ends, its group is
 yours to manage. The window resizes from its corner, and the game keeps its size and place.

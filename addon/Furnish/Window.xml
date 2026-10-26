@@ -268,18 +268,6 @@
 						<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="20" y="210"/>
 					</Anchors>
 				</FontString>
-				<FontString parentKey="DestinationName" inherits="GameFontHighlightMedium" justifyH="LEFT" wordwrap="false">
-					<Anchors>
-						<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="96" y="212"/>
-						<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-20" y="212"/>
-					</Anchors>
-				</FontString>
-				<FontString parentKey="DestinationDetail" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false">
-					<Anchors>
-						<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="96" y="192"/>
-						<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-150" y="192"/>
-					</Anchors>
-				</FontString>
 				<!-- The leader's name, level with the middle of its segments. -->
 				<FontString parentKey="LeaderLabel" inherits="GameFontNormalSmall" justifyH="LEFT">
 					<Anchors>

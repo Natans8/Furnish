@@ -13,8 +13,8 @@
 --   file    a root's file id, which a list link carries
 --   label   what to call that root in a line, which a list link carries
 --   here    true to spawn at the player rather than on the selected object
---   at      a pose to spawn at instead, as Pose gives one; with the guid of the object it was
---           read off, that object is the one a merge joins
+--   at      a pose to spawn at instead, as Pose gives one, its numbers alone: a merge joins the
+--           group of whatever is selected when the spawn runs, gob or group
 --   group   "pivot", "first", "merge" or "nogroup"; nil is "pivot"
 --   base    true to lay the root's base set under the sets, unless it is one of them
 --   quiet   true when a window shows the run's progress, so the chat leaves it out
@@ -205,8 +205,8 @@ local function groupOf(request, pose)
 	elseif word == "nogroup" then
 		return Group.None, "ungrouped"
 	end
-	if not pose.guid then
-		return nil, "a spawn at your feet has no selected gob to include in the group"
+	if not (pose and pose.guid) then
+		return nil, "no gob is selected whose group to merge into"
 	end
 	if pose.groupLeader ~= 0 then
 		return pose.groupLeader, "joining the group " .. pose.name .. " is in"
@@ -462,15 +462,15 @@ function Console.Find(words)
 	return found
 end
 
---- What a window's sets may spawn on and whose group they may join: the selected object's
--- pose, whatever it is, with its name, guid, groupLeader and canEdit beside it; or nil and
--- why nothing is selected.
+--- The selected object's pose, whatever it is, with its name, guid, groupLeader and canEdit
+-- beside it; or nil and why nothing is selected. A window reads it for its source, as one source
+-- of a destination's numbers, and for the group a merge would join.
 function Console.Selected()
 	return selectedPose()
 end
 
---- The selected group, which neither a source nor a destination takes by itself, as a
--- destination may be filled from it once: its pose as Pose.OfGroup gives it. Nil when no group is selected, when
+--- The selected group, which a merge joins and a destination may take its numbers from once,
+-- never by following it: its pose as Pose.OfGroup gives it. Nil when no group is selected, when
 -- the group is the one Furnish's last run made, which stands for the object that run was on,
 -- or when its leader's record has not arrived yet.
 function Console.Group()
@@ -617,17 +617,19 @@ local function gather(chosen)
 		)
 end
 
---- Spawn sets; pose is the selected object's, or nil where they go at the player from a named
--- root and join no object's group.
-local function spawnOn(request, pose)
-	local destination, reason = pose, nil
+--- Spawn sets at a destination, a pose's numbers. Selected is the selected object, or nil: the
+-- group a merge joins, the object the run's group stands for once it ends, and, where the
+-- request gives no position, the object the sets go onto and whose root they may be.
+local function spawnOn(request, destination, selected)
+	local onto = not (request.here or request.at) and selected or nil
+	local reason
 	if request.here then
 		destination, reason = Pose.Here()
 		if not destination then
 			return say(reason)
 		end
 	end
-	local file, label, listing = rootOf(request, pose)
+	local file, label, listing = rootOf(request, selected)
 	if not file then
 		return say(label)
 	end
@@ -645,9 +647,9 @@ local function spawnOn(request, pose)
 		chosen[#chosen + 1] = set
 		hasBase = hasBase or set.index == 0
 	end
-	-- A WMO Epsilon emptied draws no base set of its own, so one standing as the destination gets
-	-- it, under the rest and once.
-	local base = request.base or (not request.here and Sets.IsBlank(pose.file))
+	-- A WMO Epsilon emptied draws no base set of its own, so one the sets go onto gets it, under
+	-- the rest and once.
+	local base = request.base or (onto and Sets.IsBlank(onto.file))
 	if base and not hasBase and sets[1].index == 0 then
 		table.insert(chosen, 1, sets[1])
 	end
@@ -656,10 +658,10 @@ local function spawnOn(request, pose)
 		return say(what)
 	end
 	-- The set is named by its WMO wherever it is not going onto that WMO.
-	if request.here or label ~= pose.name then
+	if not onto or label ~= onto.name then
 		what = label .. "'s " .. what
 	end
-	local group, lead = groupOf(request, pose)
+	local group, lead = groupOf(request, selected)
 	if not group then
 		return say(lead)
 	end
@@ -667,10 +669,10 @@ local function spawnOn(request, pose)
 	start(rows, destination, group, {
 		what = what,
 		where = request.here and "at your feet"
-			or pose.name and ("on " .. pose.name)
+			or onto and ("on " .. onto.name)
 			or ("at %.1f, %.1f, %.1f"):format(spot.x, spot.y, spot.z),
 		lead = lead,
-		anchor = pose and pose.guid and pose or nil,
+		anchor = selected and selected.guid and selected or nil,
 		quiet = request.quiet,
 	})
 end
@@ -689,20 +691,27 @@ function Console.Spawn(request)
 	if not loaded then
 		return say(reason)
 	end
-	-- A pose given is the destination, and the object it was read off, if any, is the one a merge
-	-- joins; its root must be named, since a pose names none.
+	-- A pose given is the destination, its numbers alone, and its root must be named, since a pose
+	-- names none. The selection is read apart from it: a merge joins whatever is selected, a group
+	-- as readily as a gob, and the run's group stands for it once the run ends.
 	local named = request.entry or request.file
 	if request.at then
 		if not named then
 			return say("a position names no WMO; name the one whose sets to spawn")
 		end
-		return spawnOn(request, request.at)
+		local group = request.group == "merge" and Console.Group()
+		if group or request.group ~= "merge" then
+			return spawnOn(request, request.at, group or (selectedPose()))
+		end
+		return withSelection("the object whose group to join", nil, function(selected)
+			spawnOn(request, request.at, selected)
+		end)
 	end
 	-- The selected object is the destination unless the set goes at the player, and any object
 	-- will do. It must be a WMO only where the set is its own, read off it because
 	-- neither a link nor an entry names one; and it leads the group a set merges into.
 	if request.here and named and request.group ~= "merge" then
-		return spawnOn(request, nil)
+		return spawnOn(request, nil, nil)
 	end
 	local what = not named and "the WMO"
 		or request.here and "the object whose group to join"
@@ -717,7 +726,7 @@ function Console.Spawn(request)
 			if wrong then
 				return say(wrong)
 			end
-			spawnOn(request, pose)
+			spawnOn(request, pose, pose)
 		end
 	)
 end

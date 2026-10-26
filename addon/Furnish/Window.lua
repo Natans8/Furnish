@@ -9,8 +9,11 @@
 --
 -- Source and Destination each follow the gob selection until their box is unticked. The source is
 -- the WMO a gob entry is, shown in its ID box as the destination's numbers are: the selected gob's,
--- one typed, the lowest of a WMO searched, or the doodad's. The destination is the selected gob's
--- position, or where the player stands while no gob is selected, so every number always holds a value. The doodad `.doodad select`
+-- one typed, the lowest of a WMO searched, or the doodad's. The destination is numbers and nothing
+-- else: following the selected gob is one way to fill them, Here, Use selected and typing the
+-- others, and while no gob is followed they hold where the player stood, so every number always
+-- holds a value. The selection matters to the destination only as a source of numbers; what it
+-- decides is the group, which the Selected gob leader joins. The doodad `.doodad select`
 -- picks is another selection, held at the same time and shown in a panel of its own beside the
 -- window: picking it never changes the source or the destination, and selecting a gob never clears
 -- it. It is a step before the gob pipeline, giving each side something in advance. Use as source
@@ -137,9 +140,10 @@ local provider, found, drawn =
 local pinned, doodad, marks, shown, shownEntry
 local chosen = {}
 
---- Where the sets go: the pose shown, its own copy, with what to call it and say of it; whether
--- it stays when the selection moves; and whether a number of it was typed.
-local spot, spotPinned, edited = nil, false, false
+--- Where the sets go: the position, rotation and scale shown, and nothing of what they were read
+-- from; whether they stay when the selection moves; and whether they were last read off the
+-- selection, so that losing it reads where the player stands once.
+local spot, spotPinned, spotFollowed = nil, false, false
 
 --- What the player chose to lead the objects' group, as a request's group says it.
 local lead = "pivot"
@@ -182,17 +186,18 @@ local function shownNumber(value)
 end
 
 --- A pose of the window's own, so a number changed never reaches the record it was read off.
-local function copy(pose, name, detail)
-	local own = {}
-	for key, value in pairs(pose) do
-		own[key] = value
-	end
-	own.position = { x = pose.position.x, y = pose.position.y, z = pose.position.z }
-	own.rotation =
-		{ roll = pose.rotation.roll, pitch = pose.rotation.pitch, turn = pose.rotation.turn }
-	own.name = name or pose.name
-	own.detail = detail
-	return own
+--- A pose's numbers, its own copy: the position, the rotation and the scale, and nothing of the
+-- object they were read off.
+local function numbers(pose)
+	return {
+		position = { x = pose.position.x, y = pose.position.y, z = pose.position.z },
+		rotation = {
+			roll = pose.rotation.roll,
+			pitch = pose.rotation.pitch,
+			turn = pose.rotation.turn,
+		},
+		scale = pose.scale,
+	}
 end
 
 local function valueOf(pose, number)
@@ -202,20 +207,16 @@ local function valueOf(pose, number)
 	return pose.scale
 end
 
---- What a selected gob is, in a word or two.
-local function gobDetail(pose)
-	return (pose.groupLeader or 0) ~= 0 and "Gob, in a group" or "Gob"
-end
-
 --- Whether a run spawns a pivot to lead its group: when grouped without the selected gob, and while
 -- a pivot is set at all.
 local function pivots(group)
 	return group == "pivot" and Furnish.Settings.pivot ~= nil
 end
 
---- What Use selected fills the destination from: the selected gob, or else a selected group, whose
--- pose says group; nil when neither is selected. The destination never follows a group by itself.
-local function selectedForDestination()
+--- What is selected: the selected gob, or else a selected group, whose pose says group; nil when
+-- neither is. Use selected takes its numbers once, the destination never following a group by
+-- itself, and the Selected gob leader merges into its group.
+local function selection()
 	return Console.Selected() or Console.Group()
 end
 
@@ -259,18 +260,15 @@ local function hint(owner, title, lines, words)
 	owner:SetScript("OnLeave", _G.GameTooltip_Hide)
 end
 
---- What the destination was taken from, as a line names it: the selected group, or the
--- selected gob.
-local function selectedWhat()
-	return spot and spot.group and "the selected group" or "the selected gob"
-end
-
---- Why the selected gob cannot lead the group, or nil when it can.
+--- Why the selected gob or group cannot take the objects into its group, or nil when it can.
 local function cannotLead()
-	if not spot or not spot.guid then
-		return "The destination is a position, not a selected gob."
-	elseif not Client.CanEdit(spot) then
-		return "You can't edit " .. selectedWhat() .. " in this phase."
+	local selected = selection()
+	if not selected then
+		return "No gob or group is selected."
+	elseif not Client.CanEdit(selected) then
+		return ("You can't edit the selected %s in this phase."):format(
+			selected.group and "group" or "gob"
+		)
 	end
 	return nil
 end
@@ -284,9 +282,11 @@ local function grouped()
 	return lead
 end
 
---- Whether the objects would join a group that stands already, which Spawn asks about first.
+--- The selected gob, where the objects would join a group it is in already, which Spawn asks
+-- about first; a selected group is chosen as one, so it is not asked about.
 local function joinsGroup()
-	return grouped() == "merge" and (spot.groupLeader or 0) ~= 0
+	local selected = grouped() == "merge" and Console.Selected()
+	return selected and (selected.groupLeader or 0) ~= 0 and selected or nil
 end
 
 --- Whether the selected gob draws a set already, as part of its model: its base set, unless
@@ -400,13 +400,16 @@ end
 --- What to know before the next spawn, the weightiest first, each { text, colour }.
 local function warnings()
 	local said = {}
-	if run or not shown or not spot then
+	if run or not shown then
 		return said
 	end
-	if spot.wmo and spot.file ~= shown.file and not sameSets(spot.file, shown.file) then
+	-- Only a destination following the selected WMO stands on it; numbers taken once stand
+	-- wherever they were taken.
+	local onto = not spotPinned and Console.Selected()
+	if onto and onto.wmo and onto.file ~= shown.file and not sameSets(onto.file, shown.file) then
 		local text = ("These sets are %s's, not %s's, so they may not fit."):format(
 			shown.name,
-			spot.name
+			onto.name
 		)
 		said[#said + 1] = { text = text, colour = WARN }
 	end
@@ -448,9 +451,10 @@ local function controls()
 	return all
 end
 
---- The selected gob's segment's words: what the destination was taken from.
+--- The selected gob's segment's words: what is selected, a group or a gob.
 local function selectedLabel()
-	return spot and spot.group and "Selected group" or "Selected gob"
+	local selected = selection()
+	return selected and selected.group and "Selected group" or "Selected gob"
 end
 
 --- The leader's segments, in LEADS's order, made once by buildLeader.
@@ -506,14 +510,6 @@ local function updateLeader()
 end
 
 local function updateDestination()
-	-- A gob, or a group filled from its leader, is named, and a number typed into its position says
-	-- so; a position is its numbers and needs no words, whether read, taken with Here or typed.
-	local name, detail = "", ""
-	if spot and spot.guid then
-		name, detail = spot.name or "", (spot.detail or "") .. (edited and ", edited" or "")
-	end
-	frame.DestinationName:SetText(name)
-	frame.DestinationDetail:SetText(detail)
 	frame.DestinationFollow:SetChecked(not spotPinned)
 	for _, number in ipairs(NUMBERS) do
 		local box = frame[number.box]
@@ -525,7 +521,7 @@ local function updateDestination()
 		box:SetTextColor(run and 0.5 or 1, run and 0.5 or 1, run and 0.5 or 1)
 	end
 	-- The button names what it reads, a gob or a group, and is as wide as its words.
-	local from = selectedForDestination()
+	local from = selection()
 	local label = from and from.group and "Use selected group" or "Use selected gob"
 	if frame.UseSelected:GetText() ~= label then
 		frame.UseSelected:SetText(label)
@@ -579,7 +575,7 @@ local function request()
 		indexes = (chosenSets()),
 		file = shown.file,
 		label = shown.name,
-		at = copy(spot),
+		at = numbers(spot),
 		group = grouped(),
 		quiet = true,
 	}
@@ -598,8 +594,8 @@ _G.StaticPopupDialogs.FURNISH_JOIN_GROUP = {
 	preferredIndex = 3,
 }
 
---- Spawn the chosen sets, asking first where they would join a group the selected gob is in already,
--- and spawning then what was asked about, whatever has been selected since; or stop the run.
+--- Spawn the chosen sets, asking first where they would join a group the selected gob is in
+-- already, the merge reading the selection when the answer comes; or stop the run.
 local function spawn()
 	if run then
 		return Console.Stop(false)
@@ -608,9 +604,10 @@ local function spawn()
 	if not enabled then
 		return Chat.Say(text)
 	end
-	if joinsGroup() then
+	local member = joinsGroup()
+	if member then
 		local _, count = chosenSets()
-		local dialog = _G.StaticPopup_Show("FURNISH_JOIN_GROUP", spot.name, objects(count))
+		local dialog = _G.StaticPopup_Show("FURNISH_JOIN_GROUP", member.name, objects(count))
 		if dialog then
 			dialog.data = request()
 		end
@@ -696,15 +693,14 @@ local function refresh()
 	if not spotPinned then
 		local selected = Console.Selected()
 		if selected then
-			spot = copy(selected, nil, gobDetail(selected))
-		elseif not spot or spot.guid then
+			spot, spotFollowed = numbers(selected), true
+		elseif not spot or spotFollowed then
 			-- With nothing selected the destination takes where the player stands, read once so no number
 			-- is empty, and never again while it stays so: it does not follow the player, and Here
 			-- reads it afresh.
 			local here = Pose.Here()
-			spot = here and copy(here, "", "")
+			spot, spotFollowed = here and numbers(here), false
 		end
-		edited = false
 	end
 	frame.SourceFollow:SetChecked(not pinned)
 	shownEntry = sourceEntry()
@@ -999,7 +995,7 @@ end
 --- Fill the destination once from a pose, and keep it there until Follow selection is ticked.
 local function fillDestination(pose)
 	if pose then
-		spot, spotPinned, edited = pose, true, false
+		spot, spotPinned, spotFollowed = pose, true, false
 	end
 	update()
 end
@@ -1109,13 +1105,13 @@ local function numberChanged(box, typed)
 	if not value then
 		return
 	end
-	spot = spot or copy(Pose.At(0, 0, 0), "A position", "")
+	spot = spot or numbers(Pose.At(0, 0, 0))
 	if box.number.part then
 		spot[box.number.part][box.number.key] = value
 	else
 		spot.scale = value
 	end
-	spotPinned, edited = true, true
+	spotPinned, spotFollowed = true, false
 	update()
 end
 
@@ -1330,7 +1326,8 @@ local function leadLines(choice)
 		}
 	end
 	local lines
-	if spot and spot.group then
+	local selected = selection()
+	if selected and selected.group then
 		lines = {
 			{
 				text = "The objects join the selected group, so moving the group moves them too. No pivot spawns.",
@@ -1342,9 +1339,9 @@ local function leadLines(choice)
 				text = "The selected gob leads the group, so moving it moves everything. No pivot spawns.",
 			},
 		}
-		if spot and (spot.groupLeader or 0) ~= 0 then
+		if selected and (selected.groupLeader or 0) ~= 0 then
 			lines[#lines + 1] = {
-				text = spot.name
+				text = selected.name
 					.. " is in a group already, so the objects join that group; Spawn asks first.",
 				colour = WARN,
 			}
@@ -1423,17 +1420,14 @@ local function buildDestination()
 		"OnClick",
 		Client.Guarded(function()
 			local here = Pose.Here()
-			fillDestination(here and copy(here, "", ""))
+			fillDestination(here and numbers(here))
 		end)
 	)
 	frame.UseSelected:SetScript(
 		"OnClick",
 		Client.Guarded(function()
-			local from = selectedForDestination()
-			if from and from.group then
-				return fillDestination(copy(from, "A group", "Led by " .. from.name))
-			end
-			fillDestination(from and copy(from, nil, gobDetail(from)))
+			local from = selection()
+			fillDestination(from and numbers(from))
 		end)
 	)
 	hint(
@@ -1445,7 +1439,7 @@ local function buildDestination()
 	hint(frame.UseSelected, function()
 		return frame.UseSelected:GetText()
 	end, function()
-		local from = selectedForDestination()
+		local from = selection()
 		if from and from.group then
 			return {
 				{
@@ -1571,7 +1565,7 @@ local function build()
 			end
 			-- A position read when nothing was selected is read again when the window opens, so it is
 			-- where the player stands now rather than wherever they stood last time.
-			if not spotPinned and spot and not spot.guid then
+			if not spotPinned and not spotFollowed then
 				spot = nil
 			end
 			-- Fitted here, once every label is set and the client's fonts are certainly loaded.
