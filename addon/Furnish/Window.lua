@@ -533,10 +533,12 @@ local function updateDestination()
 	updateLeader()
 end
 
---- The doodad panel, there while a doodad is selected; a doodad imported once is not again.
+--- The doodad panel, there while a doodad is selected; a doodad imported once is not again. A
+-- doodad picked while the window was shut has not been read yet, since reading it loads the data,
+-- and the panel waits for the window to open; a run redraws the window shut or not.
 local function updateDoodad()
-	panel:SetShown(doodad ~= nil)
-	if not doodad then
+	panel:SetShown(doodad ~= nil and doodad.sets ~= nil)
+	if not (doodad and doodad.sets) then
 		return
 	end
 	local count = #doodad.sets .. (#doodad.sets == 1 and " set" or " sets")
