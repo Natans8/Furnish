@@ -98,8 +98,9 @@ end
 --   The outcome carries total, spawned (GUIDs), refused ({ display, pivot, messages }, the
 --   pivot's display being the setting as `.gob spawn` takes it), unjoined
 --   ({ display, guid, messages }: spawned, but the join was refused), leader, joined (how
---   many objects joined the leader's group), pivot, aborted and, after a cleanup,
---   deleted; a messages list is the server's reply lines as sent.
+--   many objects joined the leader's group), pivot, placed (how many of the rows stood, the
+--   pivot left out), aborted and, after a cleanup, deleted; a messages list is the server's
+--   reply lines as sent.
 -- @return a handle with Abort(cleanup), Done() and total, or nil and the reason
 function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 	local wrong = check(rows, position, rotation, scale, group, send)
@@ -114,6 +115,7 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 	-- setting names it, joined[i] the spawn a join at i acts for, and leads the spawns that may
 	-- lead, the first two under a word.
 	local commands, spawns, joined, leads = {}, {}, {}, {}
+	local leader
 	local function spawn(display, line)
 		if #line > Commands.LIMIT then
 			return ("a spawn line is %d characters, over the %d the server takes: %s"):format(
@@ -146,7 +148,8 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 			glued = true,
 			needs = needs,
 			text = function(results)
-				local leader = leaderOf(group, results, needs)
+				-- Once one answers, it leads every join after, so its reply is read once.
+				leader = leader or leaderOf(group, results, needs)
 				if not leader then
 					return nil
 				end
@@ -156,17 +159,16 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 		return nil
 	end
 
+	local place = Transform.Placer(position, rotation, scale)
 	if marker then
 		-- Turned and scaled with the set, so the pivot stays in proportion to what it leads.
-		local pose = Transform.Place(position, rotation, scale, ORIGIN)
-		local long = spawn(marker, Commands.SpawnObject(marker, pose))
+		local long = spawn(marker, Commands.SpawnObject(marker, place(ORIGIN)))
 		if long then
 			return nil, long
 		end
 	end
 	for _, row in ipairs(rows) do
-		local pose = Transform.Place(position, rotation, scale, row)
-		local long = spawn(row.display, Commands.Spawn(row.display, pose))
+		local long = spawn(row.display, Commands.Spawn(row.display, place(row)))
 		if long then
 			return nil, long
 		end
@@ -203,15 +205,16 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 			end
 		end
 		local first = results[1]
-		local leader = joins and leaderOf(group, results, leads) or nil
+		local pivot = marker and first and first.success and Commands.GuidIn(first.messages) or nil
 		return {
 			total = #rows,
 			spawned = spawned,
 			refused = refused,
 			unjoined = unjoined,
-			leader = leader,
+			leader = joins and leaderOf(group, results, leads) or nil,
 			joined = members,
-			pivot = marker and first and first.success and Commands.GuidIn(first.messages) or nil,
+			pivot = pivot,
+			placed = #spawned - (pivot and 1 or 0),
 			aborted = ended.aborted,
 		}
 	end

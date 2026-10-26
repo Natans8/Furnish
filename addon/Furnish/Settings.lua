@@ -11,7 +11,8 @@ Furnish.Settings = {
 	-- entry, or a display as a negative number. Furnish's own is display 16031, chosen by
 	-- scanning every gameobject model: of 17,239, six draw nothing, light nothing, emit
 	-- nothing, sound nothing and collide with nothing, and the hologram base is the one that
-	-- reads as a word in every list. Nil spawns no pivot, and the first doodad leads instead.
+	-- reads as a word in every list. A set led by its first object instead is the group word
+	-- first, never an empty setting.
 	pivot = -16031,
 
 	--- How many commands may be out unanswered at once, joins counted, though a spawn and its

@@ -8,12 +8,12 @@ local Furnish = _G.Furnish
 local Client = Furnish.Client
 local Settings = Furnish.Settings
 
---- The values the addon ships with, read before the saved ones are restored over them.
-local DEFAULTS = {
-	chatButtons = Settings.chatButtons,
-	inFlight = Settings.inFlight,
-	pivot = Settings.pivot,
-}
+--- The values the addon ships with: every setting, copied as this file loads, before the saved
+-- ones are restored over them.
+local DEFAULTS = {}
+for key, value in pairs(Settings) do
+	DEFAULTS[key] = value
+end
 
 --- How many commands a run may have unanswered, at least and at most.
 local FEWEST, MOST = 1, 16
@@ -80,11 +80,6 @@ pace:SetScript(
 		paceText(whole)
 	end)
 )
-pace:SetScript("OnEnter", function(self)
-	_G.GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	_G.GameTooltip:SetText(self.tooltipText, nil, nil, nil, nil, true)
-end)
-pace:SetScript("OnLeave", _G.GameTooltip_Hide)
 
 -- What a pivot spawns as, in the words `.gob spawn` takes.
 local pivotLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")

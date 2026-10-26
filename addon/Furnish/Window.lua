@@ -32,6 +32,7 @@ local Client = Furnish.Client
 local Pose = Furnish.Pose
 local Rows = Furnish.Rows
 local Reader = Furnish.Reader
+local Sets = Furnish.Sets
 local Chat = Furnish.Chat
 
 --- The border a list wears, ObjectMover's: a tooltip's edge over a dark shade.
@@ -66,8 +67,8 @@ local SEGMENTS = {
 }
 
 --- What can lead the objects' group, left to right: the group a request asks for, the words on
--- the segment, and how a command types it. The selected gob's words follow what the destination
--- was taken from, so they are read when drawn.
+-- the segment, and how a command types it. The selected gob's words follow what is selected, a
+-- gob or a group, so they are read when drawn.
 local LEADS = {
 	{ group = "nogroup", label = "No group", words = "<set> nogroup" },
 	{ group = "pivot", label = "Pivot", words = "<set>" },
@@ -78,12 +79,9 @@ local LEADS = {
 --- The room either side of a segment's words, and what the alert mark takes beside them.
 local SEGMENT_PAD, ALERT_ROOM = 6, 17
 
---- The tooltip's colours: a label, a value, a heading, what a click does, and a refusal.
-local GREY, WHITE, GOLD = { 0.62, 0.62, 0.62 }, { 1, 1, 1 }, { 1, 0.82, 0 }
-local GREEN, RED = { 0.25, 1, 0.25 }, { 1, 0.13, 0.13 }
-
---- A warning's colour, Tiler's: a red light enough to read on the dark panel.
-local WARN = { 1, 0.5, 0.5 }
+--- The tooltip's colours, Chat's: a label, a heading, what a click does, a warning and a refusal.
+local GREY, GOLD, GREEN = Chat.TIP.label, Chat.TIP.title, Chat.TIP.click
+local WARN, RED = Chat.TIP.warning, Chat.TIP.refusal
 
 local ROW = 22
 
@@ -113,7 +111,7 @@ local NUMBERS = {
 	{ box = "Roll", row = 2, part = "rotation", key = "roll", colour = RED_AXIS },
 	{ box = "Pitch", row = 2, part = "rotation", key = "pitch", colour = BLUE_AXIS },
 	{ box = "Turn", row = 2, part = "rotation", key = "turn", colour = GREEN_AXIS },
-	{ box = "Scale", row = 2, colour = GREY },
+	{ box = "Scale", row = 2, key = "scale", colour = GREY },
 }
 
 --- Where each row of boxes stands, measured up from the window's foot to its top, and how far
@@ -132,6 +130,19 @@ local panel = frame.Doodad
 local provider, found, drawn =
 	_G.CreateDataProvider(), _G.CreateDataProvider(), _G.CreateDataProvider()
 
+--- Every control the player may change, which a run holds still.
+local CONTROLS = {
+	frame.Search,
+	frame.SourceFollow,
+	frame.SourceID,
+	frame.DestinationFollow,
+	frame.Here,
+	frame.UseSelected,
+}
+for _, number in ipairs(NUMBERS) do
+	CONTROLS[#CONTROLS + 1] = frame[number.box]
+end
+
 --- Where the sets come from: the Source request pinned, or nil to follow the gob selection; the
 -- doodad `.doodad select` picked, in its own slot, imported or not, with the sets of the WMO it
 -- is; the doodad imported last while the source followed the selection, whose sets come chosen
@@ -139,6 +150,11 @@ local provider, found, drawn =
 -- and the sets chosen, by index.
 local pinned, doodad, marks, shown, shownEntry
 local chosen = {}
+
+--- Whether the next source shown has its sets chosen afresh, even where it is the WMO shown
+-- already: a doodad used or imported brings its own; and what the list shows, as listKey says
+-- it, so the list is rebuilt only when that changes.
+local rechoose, listed = false, nil
 
 --- Where the sets go: the position, rotation and scale shown, and nothing of what they were read
 -- from; whether they stay when the selection moves; and whether they were last read off the
@@ -148,25 +164,19 @@ local spot, spotPinned, spotFollowed = nil, false, false
 --- What the player chose to lead the objects' group, as a request's group says it.
 local lead = "pivot"
 
---- The run going on, as the window draws it: { total, done, started }.
-local run
+--- The run going on, as the window draws it: { total, done, started }; and the last run's
+-- result the bar has said.
+local run, told
 
 --- The search match Enter takes, by its place in the list.
 local picked = 1
 
 local stops = {}
 
---- A count with its thousands set apart.
-local function thousands(count)
-	local text, done = tostring(count), 1
-	while done > 0 do
-		text, done = text:gsub("^(%-?%d+)(%d%d%d)", "%1,%2")
-	end
-	return text
-end
+local thousands = Chat.Thousands
 
 local function objects(count)
-	return count == 1 and "1 object" or thousands(count) .. " objects"
+	return Chat.Count(count, "object")
 end
 
 --- Seconds as a clock reads them.
@@ -185,32 +195,15 @@ local function shownNumber(value)
 	return text == "-0" and "0" or text
 end
 
---- A pose of the window's own, so a number changed never reaches the record it was read off.
---- A pose's numbers, its own copy: the position, the rotation and the scale, and nothing of the
--- object they were read off.
-local function numbers(pose)
-	return {
-		position = { x = pose.position.x, y = pose.position.y, z = pose.position.z },
-		rotation = {
-			roll = pose.rotation.roll,
-			pitch = pose.rotation.pitch,
-			turn = pose.rotation.turn,
-		},
-		scale = pose.scale,
-	}
+--- Where a pose keeps the value a number box shows: its position or rotation, or the pose
+-- itself for the scale.
+local function holder(pose, number)
+	return number.part and pose[number.part] or pose
 end
 
-local function valueOf(pose, number)
-	if number.part then
-		return pose[number.part][number.key]
-	end
-	return pose.scale
-end
-
---- Whether a run spawns a pivot to lead its group: when grouped without the selected gob, and while
--- a pivot is set at all.
+--- Whether a run spawns a pivot to lead its group.
 local function pivots(group)
-	return group == "pivot" and Furnish.Settings.pivot ~= nil
+	return group == Furnish.Group.Pivot
 end
 
 --- What is selected: the selected gob, or else a selected group, whose pose says group; nil when
@@ -220,22 +213,21 @@ local function selection()
 	return Console.Selected() or Console.Group()
 end
 
---- Show a tooltip: a title, label and value pairs, and lines in a colour of their own.
--- @param lines each { label, value } for a pair, or { text, colour } for a line of its own
+--- What is selected as a word: "group" for a group, else "gob".
+local function kindOf(selected)
+	return selected and selected.group and "group" or "gob"
+end
+
+--- Show a tooltip beside a control, its lines as Chat.Tip takes them.
 local function tip(owner, title, lines)
-	local tooltip = _G.GameTooltip
-	tooltip:SetOwner(owner, "ANCHOR_RIGHT")
-	tooltip:SetText(title, GOLD[1], GOLD[2], GOLD[3])
-	for _, line in ipairs(lines) do
-		if line.value then
-			local value = tostring(line.value)
-			tooltip:AddDoubleLine(line.label, value, GREY[1], GREY[2], GREY[3], 1, 1, 1)
-		elseif line.text then
-			local colour = line.colour or WHITE
-			tooltip:AddLine(line.text, colour[1], colour[2], colour[3], true)
-		end
-	end
-	tooltip:Show()
+	_G.GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+	Chat.Tip(_G.GameTooltip, title, lines)
+	_G.GameTooltip:Show()
+end
+
+--- Size a button to its words and its caps.
+local function fit(button)
+	button:SetWidth(math.ceil(button:GetFontString():GetStringWidth()) + CAPS)
 end
 
 --- Give a control a tooltip, its lines read when shown: a function's answer, or a fixed list.
@@ -266,9 +258,7 @@ local function cannotLead()
 	if not selected then
 		return "No gob or group is selected."
 	elseif not Client.CanEdit(selected) then
-		return ("You can't edit the selected %s in this phase."):format(
-			selected.group and "group" or "gob"
-		)
+		return ("You can't edit the selected %s in this phase."):format(kindOf(selected))
 	end
 	return nil
 end
@@ -290,7 +280,8 @@ local function joinsGroup()
 end
 
 --- Whether the selected gob draws a set already, as part of its model: its base set, unless
--- the WMO comes unfurnished. A WMO searched stands nowhere and draws nothing.
+-- the WMO comes unfurnished. A source kept, by a search, an ID typed, Use as source or Follow
+-- selection unticked, stands nowhere and draws nothing.
 local function baked(set)
 	if pinned or not shown then
 		return false
@@ -361,9 +352,16 @@ local function updateMore()
 	end
 end
 
+--- What each set holds, once worked out, by set id: the catalogue's names do not change.
+local holding = {}
+
 --- What a set holds, by model, the most numerous first: a list of { name, count }, and how many
--- of its objects the client's catalogue does not name.
+-- of its objects the client's catalogue does not name. Asked only once the catalogue is walked.
 local function holds(set)
+	local known = holding[set.id]
+	if known then
+		return known[1], known[2]
+	end
 	local counts, unnamed = {}, 0
 	for _, row in ipairs(Rows.OfSet(set.id) or {}) do
 		local name = Console.ModelName(row.display)
@@ -380,21 +378,8 @@ local function holds(set)
 	table.sort(held, function(a, b)
 		return a.count > b.count or (a.count == b.count and a.name < b.name)
 	end)
+	holding[set.id] = { held, unnamed }
 	return held, unnamed
-end
-
---- Whether two roots offer the same sets, as an emptied copy and the WMO it was emptied from do.
-local function sameSets(a, b)
-	local one, other = Reader.Sets(a), Reader.Sets(b)
-	if not (one and other) or #one ~= #other then
-		return false
-	end
-	for i, set in ipairs(one) do
-		if set[2] ~= other[i][2] then
-			return false
-		end
-	end
-	return true
 end
 
 --- What to know before the next spawn, the weightiest first, each { text, colour }.
@@ -406,7 +391,7 @@ local function warnings()
 	-- Only a destination following the selected WMO stands on it; numbers taken once stand
 	-- wherever they were taken.
 	local onto = not spotPinned and Console.Selected()
-	if onto and onto.wmo and onto.file ~= shown.file and not sameSets(onto.file, shown.file) then
+	if onto and onto.wmo and onto.file ~= shown.file and not Sets.Same(onto.file, shown.file) then
 		local text = ("These sets are %s's, not %s's, so they may not fit."):format(
 			shown.name,
 			onto.name
@@ -415,8 +400,7 @@ local function warnings()
 	end
 	-- A reminder, not a warning: whether highlighting is on is the player's call.
 	if #(chosenSets()) > 0 then
-		said[#said + 1] =
-			{ text = "Highlighting too many objects can crash the game.", colour = GREY }
+		said[#said + 1] = { text = Chat.HIGHLIGHT .. ".", colour = GREY }
 	end
 	return said
 end
@@ -435,30 +419,15 @@ local function updateStatus()
 	frame.Progress:SetShown(run ~= nil or (#said == 0 and frame.Progress.ended == true))
 end
 
---- Every control the player may change, which a run holds still.
-local function controls()
-	local all = {
-		frame.Search,
-		frame.SourceFollow,
-		frame.SourceID,
-		frame.DestinationFollow,
-		frame.Here,
-		frame.UseSelected,
-	}
-	for _, number in ipairs(NUMBERS) do
-		all[#all + 1] = frame[number.box]
-	end
-	return all
-end
-
 --- The selected gob's segment's words: what is selected, a group or a gob.
 local function selectedLabel()
-	local selected = selection()
-	return selected and selected.group and "Selected group" or "Selected gob"
+	return "Selected " .. kindOf(selection())
 end
 
---- The leader's segments, in LEADS's order, made once by buildLeader.
+--- The leader's segments, in LEADS's order, made once by buildLeader; and the words and mark they
+-- were last laid out for, since laying them out measures text.
 local segments = {}
+local laidOut
 
 --- Lay the segments across the bar: each as wide as its words, with the alert mark's room where it
 -- shows, and what the bar has left shared out evenly, so a long name never crowds.
@@ -487,10 +456,11 @@ local function layoutLeader()
 end
 
 --- The leader's segments: the one in force lit as a chosen set row is, the selected gob's named
--- for what the destination was taken from and greyed while it cannot lead, its mark shown while
--- the objects would join a group that stands already. A run holds them still.
+-- for what is selected and greyed while it cannot lead, its mark shown while the objects would
+-- join a group that stands already. A run holds them still.
 local function updateLeader()
 	local current = grouped()
+	local marked = false
 	frame.LeaderLabel:SetFontObject(run and _G.GameFontDisableSmall or _G.GameFontNormalSmall)
 	for _, segment in ipairs(segments) do
 		local choice = segment.choice
@@ -504,9 +474,14 @@ local function updateLeader()
 		segment.Chosen:SetShown(inForce)
 		segment.Accent:SetShown(inForce)
 		segment.Accent:SetColorTexture(run and 0.5 or 1, run and 0.5 or 0.82, run and 0.5 or 0, 0.9)
-		segment.Alert:SetShown(inForce and joinsGroup())
+		segment.Alert:SetShown(inForce and joinsGroup() ~= nil)
+		marked = marked or segment.Alert:IsShown()
 	end
-	layoutLeader()
+	local shape = selectedLabel() .. tostring(marked)
+	if shape ~= laidOut then
+		laidOut = shape
+		layoutLeader()
+	end
 end
 
 local function updateDestination()
@@ -514,7 +489,7 @@ local function updateDestination()
 	for _, number in ipairs(NUMBERS) do
 		local box = frame[number.box]
 		if not box:HasFocus() then
-			box:SetText(spot and shownNumber(valueOf(spot, number)) or "")
+			box:SetText(spot and shownNumber(holder(spot, number)[number.key]) or "")
 		end
 		local colour = run and GREY or number.colour
 		box.Axis:SetTextColor(colour[1], colour[2], colour[3])
@@ -522,12 +497,10 @@ local function updateDestination()
 	end
 	-- The button names what it reads, a gob or a group, and is as wide as its words.
 	local from = selection()
-	local label = from and from.group and "Use selected group" or "Use selected gob"
+	local label = "Use selected " .. kindOf(from)
 	if frame.UseSelected:GetText() ~= label then
 		frame.UseSelected:SetText(label)
-		frame.UseSelected:SetWidth(
-			math.ceil(frame.UseSelected:GetFontString():GetStringWidth()) + CAPS
-		)
+		fit(frame.UseSelected)
 	end
 	frame.UseSelected:SetEnabled(not run and from ~= nil)
 	updateLeader()
@@ -535,20 +508,20 @@ end
 
 --- The doodad panel, there while a doodad is selected; a doodad imported once is not again. A
 -- doodad picked while the window was shut has not been read yet, since reading it loads the data,
--- and the panel waits for the window to open; a run redraws the window shut or not.
+-- and is read when the window opens.
 local function updateDoodad()
 	panel:SetShown(doodad ~= nil and doodad.sets ~= nil)
 	if not (doodad and doodad.sets) then
 		return
 	end
-	local count = #doodad.sets .. (#doodad.sets == 1 and " set" or " sets")
+	local count = Chat.Count(#doodad.sets, "set")
 	panel.Detail:SetText(count .. (doodad.imported and ", imported" or ""))
 	panel.UseSource:SetEnabled(not run)
 	panel.Import:SetEnabled(not run and not doodad.imported)
 end
 
 local function update()
-	for _, control in ipairs(controls()) do
+	for _, control in ipairs(CONTROLS) do
 		control:SetEnabled(not run)
 	end
 	updateDoodad()
@@ -577,7 +550,7 @@ local function request()
 		indexes = (chosenSets()),
 		file = shown.file,
 		label = shown.name,
-		at = numbers(spot),
+		at = Pose.Copy(spot),
 		group = grouped(),
 		quiet = true,
 	}
@@ -619,8 +592,8 @@ local function spawn()
 end
 
 --- What is chosen when a WMO is first shown: the sets a doodad drew beyond the base set, which the
--- WMO draws itself unless it comes unfurnished; where no doodad adds one, its first set it does not
--- draw already, and the base too where it comes unfurnished.
+-- WMO draws itself unless it comes unfurnished; where no doodad adds one, its first set beyond the
+-- base, and the base too where it comes unfurnished.
 local function chooseFirst(sets, blank)
 	chosen = {}
 	for _, set in ipairs(sets) do
@@ -632,7 +605,7 @@ local function chooseFirst(sets, blank)
 		return
 	end
 	for _, set in ipairs(sets) do
-		if not baked(set) and set.index ~= 0 then
+		if set.index ~= 0 then
 			chosen[set.index] = true
 			break
 		end
@@ -655,8 +628,22 @@ end
 
 --- The source's detail line: what it is and how many sets it has.
 local function sourceDetail()
-	local count = #shown.sets .. (#shown.sets == 1 and " set" or " sets")
-	return count .. (shown.blank and ", unfurnished" or "")
+	return Chat.Count(#shown.sets, "set") .. (shown.blank and ", unfurnished" or "")
+end
+
+--- What the set list shows for a source, as a string to compare: its WMO, whether it is kept,
+-- which sets the doodad marks; nil for none. Its rows are rebuilt only when this changes.
+local function listKey(source)
+	if not source then
+		return nil
+	end
+	local placed = {}
+	for _, set in ipairs(source.sets) do
+		if set.placed then
+			placed[#placed + 1] = set.index
+		end
+	end
+	return table.concat({ source.file, tostring(pinned ~= nil), table.concat(placed, ",") }, ":")
 end
 
 --- The gob entry the source's ID box holds: the one kept, the lowest of a WMO searched, or the
@@ -683,8 +670,8 @@ local function refresh()
 			shown.placed = shown.placed or set.placed
 		end
 	end
-	local fresh = shown and not (before and before.file == shown.file)
-	if fresh then
+	if shown and (rechoose or not (before and before.file == shown.file)) then
+		rechoose = false
 		chooseFirst(shown.sets, shown.blank)
 	end
 	-- The doodad imported last says which sets come chosen on the gob it became, once that gob is
@@ -695,49 +682,54 @@ local function refresh()
 	if not spotPinned then
 		local selected = Console.Selected()
 		if selected then
-			spot, spotFollowed = numbers(selected), true
+			spot, spotFollowed = Pose.Copy(selected), true
 		elseif not spot or spotFollowed then
 			-- With nothing selected the destination takes where the player stands, read once so no number
 			-- is empty, and never again while it stays so: it does not follow the player, and Here
 			-- reads it afresh.
 			local here = Pose.Here()
-			spot, spotFollowed = here and numbers(here), false
+			spot, spotFollowed = here and Pose.Copy(here), false
 		end
 	end
 	frame.SourceFollow:SetChecked(not pinned)
 	shownEntry = sourceEntry()
-	provider:Flush()
-	if shown then
-		frame.SourceName:SetText(shown.name)
-		frame.SourceName:SetTextColor(1, 1, 1)
-		frame.SourceDetail:SetText(sourceDetail())
-		provider:InsertTable(shown.sets)
-	else
-		local selected = not pinned and Console.Selected()
-		frame.SourceName:SetTextColor(1, 1, 1)
-		if pinned and pinned.empty then
-			frame.SourceName:SetText("Nothing kept")
-			frame.SourceName:SetTextColor(0.5, 0.5, 0.5)
-			frame.SourceDetail:SetText("")
-		elseif pinned then
-			frame.SourceName:SetText(pinned.name or ("Entry %d"):format(pinned.entry))
-			frame.SourceDetail:SetText("No sets")
-		elseif selected then
-			frame.SourceName:SetText(selected.name)
-			frame.SourceDetail:SetText(selected.wmo and "No sets" or "Not a WMO")
-		else
-			-- A group is no source, whatever leads it, as a model is not.
-			local group = not pinned and Console.Group()
-			frame.SourceName:SetText(group and "A group" or "No WMO selected")
-			frame.SourceName:SetTextColor(0.5, 0.5, 0.5)
-			frame.SourceDetail:SetText(group and "Led by " .. group.name or "")
+	-- Filling the list again redraws every row, so it is done only when what it shows changed.
+	local key = listKey(shown)
+	if key ~= listed then
+		listed = key
+		provider:Flush()
+		if shown then
+			provider:InsertTable(shown.sets)
 		end
-		list.Empty:SetText(
-			pinned and pinned.empty and "Search a WMO, or tick Follow selection."
-				or pinned and "Search another WMO."
-				or "Select one WMO, or search one."
-		)
 	end
+	-- What the source says: its name, greyed where there is none, its detail, and what the
+	-- empty list suggests.
+	local name, detail, dim, empty
+	if shown then
+		name, detail = shown.name, sourceDetail()
+	elseif pinned and pinned.empty then
+		name, detail, dim = "Nothing kept", "", true
+		empty = "Search a WMO, or tick Follow selection."
+	elseif pinned then
+		name, detail = pinned.name or ("Entry %d"):format(pinned.entry), "No sets"
+		empty = "Search another WMO."
+	else
+		local selected = Console.Selected()
+		-- A group is no source, whatever leads it, as a model is not.
+		local group = not selected and Console.Group()
+		empty = "Select one WMO, or search one."
+		if selected then
+			name, detail = selected.name, selected.wmo and "No sets" or "Not a WMO"
+		else
+			name, dim = group and "A group" or "No WMO selected", true
+			detail = group and "Led by " .. group.name or ""
+		end
+	end
+	local shade = dim and 0.5 or 1
+	frame.SourceName:SetText(name)
+	frame.SourceName:SetTextColor(shade, shade, shade)
+	frame.SourceDetail:SetText(detail)
+	list.Empty:SetText(empty or "")
 	list.Empty:SetShown(not shown)
 	update()
 end
@@ -753,12 +745,23 @@ local function progressText()
 	frame.Progress.Text:SetText(line)
 end
 
+--- The clock on the bar moves between replies too, a few times a second while a run goes.
+local since = 0
+local function tick(_, elapsed)
+	since = since + elapsed
+	if since >= 0.25 then
+		since = 0
+		progressText()
+	end
+end
+
 local function started(total)
 	run = { total = total, done = 0, started = Client.Now() }
 	frame.Results:Hide()
 	frame.Progress:SetMinMaxValues(0, math.max(total, 1))
 	frame.Progress:SetValue(0)
 	frame.Progress.ended = false
+	frame.Progress:SetScript("OnUpdate", tick)
 	progressText()
 	update()
 end
@@ -774,13 +777,14 @@ end
 
 --- Say how a run ended on the bar, which stays until the next one starts.
 local function finished(result, seconds)
-	local was = run
 	run = nil
-	if not (result and was) then
+	frame.Progress:SetScript("OnUpdate", nil)
+	if not result then
 		frame.Progress.ended = false
 		return refresh()
 	end
-	local placed = #result.spawned - (result.pivot and 1 or 0)
+	told = result
+	local placed = result.placed
 	local pivot = result.pivot and " and a pivot" or ""
 	local line
 	if result.deleted then
@@ -815,10 +819,8 @@ local function rowClick(button)
 	update()
 end
 
---- A set's tooltip, read off the row as it stands, since rows are reused as the list scrolls:
--- what it is, whether the source draws it already, and the models it holds.
-local function rowEnter(button)
-	local set = button:GetElementData()
+--- The lines every set's tooltip opens with: its index, its objects and its name in the file.
+local function setLines(set)
 	local lines = {
 		{ label = "Set", value = set.index },
 		{ label = "Objects", value = thousands(set.count) },
@@ -826,6 +828,22 @@ local function rowEnter(button)
 	if set.canonical ~= "" then
 		lines[#lines + 1] = { label = "In the file", value = set.canonical }
 	end
+	return lines
+end
+
+--- Fill a set's row: its index, its name, its objects, and the word beside the name, if any.
+local function fillSetRow(button, set, tag)
+	button.Index:SetText(set.index)
+	button.Label:SetText(set.name)
+	button.Count:SetText(thousands(set.count))
+	button.Tag:SetText(tag or "")
+end
+
+--- A set's tooltip, read off the row as it stands, since rows are reused as the list scrolls:
+-- what it is, whether the source draws it already, and the models it holds.
+local function rowEnter(button)
+	local set = button:GetElementData()
+	local lines = setLines(set)
 	if baked(set) then
 		lines[#lines + 1] =
 			{ text = "The WMO draws this set already, as part of its model.", colour = GREEN }
@@ -869,11 +887,7 @@ local function initRow(button, set, new)
 		button:SetScript("OnEnter", Client.Guarded(rowEnter))
 		button:SetScript("OnLeave", _G.GameTooltip_Hide)
 	end
-	button.Index:SetText(set.index)
-	button.Label:SetText(set.name)
-	button.Count:SetText(thousands(set.count))
-	button.Tag:SetText(baked(set) and "baked" or "")
-	button.Label:SetPoint("RIGHT", baked(set) and -100 or -44, 0)
+	fillSetRow(button, set, baked(set) and "baked")
 	mark(button, set)
 end
 
@@ -926,9 +940,8 @@ local function initResult(button, wmo, new)
 		button:SetScript("OnLeave", _G.GameTooltip_Hide)
 	end
 	button.Label:SetText(wmo.name)
-	button.Count:SetText(wmo.sets == 1 and "1 set" or wmo.sets .. " sets")
+	button.Count:SetText(Chat.Count(wmo.sets, "set"))
 	button.Tag:SetText(wmo.blank and "unfurnished" or "")
-	button.Label:SetPoint("RIGHT", wmo.blank and -128 or -60, 0)
 	button.Picked:SetShown(found:FindIndex(wmo) == picked)
 end
 
@@ -944,10 +957,12 @@ local function searchChanged(box, typed)
 	if #text < SEARCH_FROM then
 		return frame.Results:Hide()
 	end
-	local wmos = Console.Find(text)
+	-- Inserted at once, since every insert redraws the whole list.
+	local wmos, shownFound = Console.Find(text), {}
 	for i = 1, math.min(RESULTS, #wmos) do
-		found:Insert(wmos[i])
+		shownFound[i] = wmos[i]
 	end
+	found:InsertTable(shownFound)
 	frame.Results.Empty:SetText(("No WMO with sets is named like %s."):format(text))
 	frame.Results.Empty:SetShown(#wmos == 0)
 	frame.Results:SetHeight(math.min(#wmos, RESULT_ROWS) * ROW + 16 + (#wmos == 0 and 40 or 0))
@@ -1021,13 +1036,7 @@ end
 --- A doodad's set's tooltip: what it is, and whether the doodad draws it.
 local function drawnEnter(button)
 	local set = button:GetElementData()
-	local lines = {
-		{ label = "Set", value = set.index },
-		{ label = "Objects", value = thousands(set.count) },
-	}
-	if set.canonical ~= "" then
-		lines[#lines + 1] = { label = "In the file", value = set.canonical }
-	end
+	local lines = setLines(set)
 	if set.draws then
 		local text = set.placed and "The doodad draws this set on the map."
 			or "The doodad draws this set as part of its model."
@@ -1041,12 +1050,7 @@ local function initDrawn(button, set, new)
 		button:SetScript("OnEnter", Client.Guarded(drawnEnter))
 		button:SetScript("OnLeave", _G.GameTooltip_Hide)
 	end
-	button.Index:SetText(set.index)
-	button.Label:SetText(set.name)
-	button.Count:SetText(thousands(set.count))
-	button.Tag:SetText(set.draws and "baked" or "")
-	-- The name ends where the tag begins, which is where the count's column begins when there is none.
-	button.Label:SetPoint("RIGHT", button.Tag, "LEFT", -6, 0)
+	fillSetRow(button, set, set.draws and "baked")
 end
 
 --- Fill the doodad panel with the doodad's name and the sets of the WMO it is, its list as tall
@@ -1081,7 +1085,7 @@ local function useDoodad()
 	pinned = { entry = doodad.entry, placement = doodad, name = doodad.name }
 	frame.Search:SetText("")
 	frame.Results:Hide()
-	shown = nil
+	rechoose = true
 	refresh()
 end
 
@@ -1092,7 +1096,7 @@ end
 local function importDoodad()
 	doodad.imported = true
 	if not pinned then
-		marks, chosen, shown = doodad, {}, nil
+		marks, chosen, rechoose = doodad, {}, true
 	end
 	Console.Import({ uid = doodad.uid, only = true })
 	update()
@@ -1107,12 +1111,8 @@ local function numberChanged(box, typed)
 	if not value then
 		return
 	end
-	spot = spot or numbers(Pose.At(0, 0, 0))
-	if box.number.part then
-		spot[box.number.part][box.number.key] = value
-	else
-		spot.scale = value
-	end
+	spot = spot or Pose.At(0, 0, 0)
+	holder(spot, box.number)[box.number.key] = value
 	spotPinned, spotFollowed = true, false
 	update()
 end
@@ -1134,11 +1134,6 @@ local function doodadSelected(line)
 		fillDoodad()
 		update()
 	end
-end
-
---- The gob selection changed; the doodad slot is a selection of its own and keeps what it holds.
-local function selectionChanged()
-	refresh()
 end
 
 --- Lay the position's boxes across the window's width, each row split into equal boxes with the
@@ -1175,7 +1170,7 @@ end
 --- Size each button to its words and its caps.
 local function fitButtons()
 	for _, button in ipairs({ frame.Here, frame.UseSelected, frame.Highlight }) do
-		button:SetWidth(math.ceil(button:GetFontString():GetStringWidth()) + CAPS)
+		fit(button)
 	end
 end
 
@@ -1183,7 +1178,7 @@ end
 -- whose scroll bar shows only while there is somewhere to scroll.
 local function listOf(box, data, template, initializer)
 	box:SetBackdrop(PANEL)
-	box:SetBackdropColor(0, 0, 0, 0.6)
+	box:SetBackdropColor(0, 0, 0, 0.25)
 	box:SetBackdropBorderColor(0.75, 0.75, 0.75)
 	local view = _G.CreateScrollBoxListLinearView()
 	view:SetElementExtent(ROW)
@@ -1219,12 +1214,39 @@ local function importHeard(line)
 	end
 end
 
---- What the window hears only while it is open; the doodad slot is heard always, in build.
+--- What the window hears only while it is open: the gob selection, the phase, and runs, since
+-- a shut window draws nothing and catches up as it opens. The doodad slot is heard always, in
+-- build, since a doodad picked while the window is shut is still the one picked.
 local function listen()
 	stops = {
-		Client.OnSelection(selectionChanged),
+		Client.OnSelection(refresh),
 		Client.OnPhaseChange(update),
+		Console.Watch({
+			started = Client.Guarded(started),
+			progress = Client.Guarded(progressed),
+			finished = Client.Guarded(finished),
+			-- A wait ends on the record of the object it waited for, which reaches the window's own
+			-- listener while the wait still stands, so the button is redrawn when the wait ends too.
+			waiting = Client.Guarded(update),
+		}),
 	}
+end
+
+--- Catch up with runs the window did not hear while it was shut: one going on is drawn where it
+-- has got to, and one that ended is said on the bar, unless it was said already.
+local function catchUp()
+	local going, ended = Console.Run()
+	if going then
+		started(going.total)
+		run.started = going.started
+		progressed(going.done)
+	elseif run then
+		run = nil
+		frame.Progress:SetScript("OnUpdate", nil)
+	end
+	if not going and ended and ended.result ~= told then
+		finished(ended.result, ended.seconds)
+	end
 end
 
 local function stopListening()
@@ -1286,7 +1308,6 @@ local function buildSource()
 		{ text = "Type one to keep that WMO whatever gob is selected." },
 	})
 	listOf(list, provider, "FurnishSetRowTemplate", initRow)
-	list:SetBackdropColor(0, 0, 0, 0.25)
 	list.ScrollBox:RegisterCallback(
 		_G.BaseScrollBoxEvents.OnScroll,
 		Client.Guarded(updateMore),
@@ -1367,7 +1388,6 @@ local function buildLeader()
 		segment.choice = choice
 		-- Greyed, a segment still says why when rested on.
 		segment:SetMotionScriptsWhileDisabled(true)
-		segment.Alert:SetPoint("RIGHT", segment.Label, "LEFT", -3, 0)
 		segment:SetScript(
 			"OnClick",
 			Client.Guarded(function()
@@ -1399,7 +1419,6 @@ local function buildDestination()
 	for order, number in ipairs(NUMBERS) do
 		local box = frame[number.box]
 		box.number = number
-		number.order = order
 		box.Axis:SetText(number.box)
 		box:HookScript("OnTextChanged", Client.Guarded(numberChanged))
 		box:SetScript("OnEnterPressed", box.ClearFocus)
@@ -1409,9 +1428,9 @@ local function buildDestination()
 		box:HookScript("OnEditFocusGained", box.HighlightText)
 		box:SetScript(
 			"OnTabPressed",
-			Client.Guarded(function(self)
+			Client.Guarded(function()
 				local step = _G.IsShiftKeyDown() and -1 or 1
-				local after = NUMBERS[(self.number.order - 1 + step) % #NUMBERS + 1]
+				local after = NUMBERS[(order - 1 + step) % #NUMBERS + 1]
 				frame[after.box]:SetFocus()
 			end)
 		)
@@ -1422,14 +1441,14 @@ local function buildDestination()
 		"OnClick",
 		Client.Guarded(function()
 			local here = Pose.Here()
-			fillDestination(here and numbers(here))
+			fillDestination(here and Pose.Copy(here))
 		end)
 	)
 	frame.UseSelected:SetScript(
 		"OnClick",
 		Client.Guarded(function()
 			local from = selection()
-			fillDestination(from and numbers(from))
+			fillDestination(from and Pose.Copy(from))
 		end)
 	)
 	hint(
@@ -1464,7 +1483,6 @@ local function buildDoodad()
 	panel.UseSource:SetText("Use as source")
 	panel.Import:SetText("Import doodad")
 	listOf(panel.Sets, drawn, "FurnishSetRowTemplate", initDrawn)
-	panel.Sets:SetBackdropColor(0, 0, 0, 0.25)
 	-- Closed, the panel lets the doodad go; selecting one again brings it back.
 	panel.CloseButton:SetScript(
 		"OnClick",
@@ -1490,9 +1508,7 @@ local function buildFooter()
 	frame.Highlight:SetScript("OnClick", Client.Guarded(Console.ToggleHighlight))
 	hint(frame.Highlight, "Highlighting", {
 		{ text = "The client's outline on selected objects, on or off." },
-		{
-			text = "Highlighting too many objects can crash the game, so you may want it off before a big spawn.",
-		},
+		{ text = Chat.HIGHLIGHT .. ", so you may want it off before a big spawn." },
 	})
 	frame.Notice:SetScript(
 		"OnEnter",
@@ -1514,16 +1530,6 @@ local function buildFooter()
 		"Stop and delete",
 		{ { text = "Stop, then delete everything this run spawned." } }
 	)
-
-	-- The clock on the bar moves between replies too.
-	local since = 0
-	frame.Progress:SetScript("OnUpdate", function(_, elapsed)
-		since = since + elapsed
-		if run and since >= 0.25 then
-			since = 0
-			progressText()
-		end
-	end)
 end
 
 local function build()
@@ -1575,6 +1581,7 @@ local function build()
 			layoutNumbers()
 			listen()
 			fillDoodad()
+			catchUp()
 			refresh()
 			-- Started now, so the models are usually named by the time a set is rested on; a WMO
 			-- shown by its entry takes its name from the same walk, once it ends.
@@ -1593,15 +1600,6 @@ local function build()
 			stopListening()
 		end)
 	)
-
-	Console.Watch({
-		started = Client.Guarded(started),
-		progress = Client.Guarded(progressed),
-		finished = Client.Guarded(finished),
-		-- A wait ends on the record of the object it waited for, which reaches the window's own
-		-- listener while the wait still stands, so the button is redrawn when the wait ends too.
-		waiting = Client.Guarded(update),
-	})
 end
 
 --- Show the window, or hide it when it shows.

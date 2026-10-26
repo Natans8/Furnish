@@ -45,6 +45,10 @@ local say = Chat.Say
 -- selected and the object that run was anchored on: { leader, guid, pose }.
 local running, stopping, waiting, anchored
 
+--- The run as a window draws it: { total, done, started } while one goes, and { result, seconds }
+-- for the one that ended last, so a window opened in the middle of either can catch up.
+local current, last
+
 --- Who hears a run besides the chat, as a window registers: { started(total, what),
 -- progress(done, total), finished(result, seconds), waiting(waits) }, each optional.
 local watchers = {}
@@ -88,7 +92,7 @@ local function since(moment)
 end
 
 local function objects(count)
-	return count == 1 and "1 object" or count .. " objects"
+	return Chat.Count(count, "object")
 end
 
 --- Why nothing new can start, or nil.
@@ -99,6 +103,59 @@ local function busy()
 		return "Furnish is still spawning; " .. Chat.Typed("stop") .. " ends it"
 	end
 	return nil
+end
+
+--- Whether a spawn or an import may begin: nothing else under way, the player allowed to spawn
+-- here, the data loaded and the server's door open. Says why not; answers the door when it may.
+local function ready()
+	local blocked = busy()
+	if blocked then
+		return say(blocked)
+	end
+	if not Client.CanSpawn() then
+		return nil
+	end
+	local loaded, reason = Reader.Load()
+	if not loaded then
+		return say(reason)
+	end
+	local send
+	send, reason = Client.Send()
+	if not send then
+		return say(reason)
+	end
+	return send
+end
+
+--- Whether the group the last run selected is still selected, standing for the object that run
+-- was anchored on.
+local function anchorHeld()
+	return anchored ~= nil and Client.SelectedGroup() == anchored.leader
+end
+
+--- Select an object by its GUID and hand onRecord the record the server pushes for it; refused,
+-- end the wait and call refused(replies). With waitFor, the wait starts here, before anything is
+-- sent; without, the caller's wait stands already.
+-- @return a function that stops waiting for the record; or nil and the reason
+local function reselect(send, guid, onRecord, refused, waitFor)
+	local stopAwaiting, reason = Client.AwaitRecord(guid, function(record)
+		wait(nil)
+		onRecord(record)
+	end)
+	if not stopAwaiting then
+		return nil, reason
+	end
+	if waitFor then
+		wait({ what = waitFor, stop = stopAwaiting })
+	end
+	send(Commands.Select(guid), function(selected, replies)
+		if not selected and waiting then
+			waiting.stop()
+			wait(nil)
+			refused(replies)
+		end
+	end)
+	return stopAwaiting
 end
 
 --- The selected object's pose, or nil and the way out.
@@ -121,7 +178,7 @@ local function withSelection(what, otherwise, fn)
 	if pose then
 		return fn(pose)
 	end
-	if not (anchored and Client.SelectedGroup() == anchored.leader) then
+	if not anchorHeld() then
 		return say(reason)
 	end
 	local blocked = busy()
@@ -135,36 +192,30 @@ local function withSelection(what, otherwise, fn)
 	end
 	local guid = anchored.guid
 	local stopAwaiting
-	stopAwaiting, reason = Client.AwaitRecord(guid, function(record)
-		wait(nil)
+	stopAwaiting, reason = reselect(send, guid, function(record)
 		fn(Pose.OfRecord(record))
-	end)
+	end, function(replies)
+		anchored = nil
+		say(
+			("the group stands for object %s, but selecting it was refused: %s; select %s first"):format(
+				guid,
+				quote(replies),
+				what
+			)
+		)
+	end, "object " .. guid)
 	if not stopAwaiting then
 		return say(reason)
 	end
-	wait({ what = "object " .. guid, stop = stopAwaiting })
-	send(Commands.Select(guid), function(selected, replies)
-		if not selected and waiting then
-			waiting.stop()
-			anchored = nil
-			wait(nil)
-			say(
-				("the group stands for object %s, but selecting it was refused: %s; select %s first"):format(
-					guid,
-					quote(replies),
-					what
-				)
-			)
-		end
-	end)
 end
 
---- Why an object's own sets cannot be read, or nil when it is a WMO that has them.
+--- Why an object's own sets cannot be read, or nil when it is a WMO that has them; instead,
+-- if given, says what to do.
 local function notWmo(pose, instead)
 	if pose.wmo then
 		return nil
 	end
-	return pose.name .. " is not a WMO, so it has no sets; " .. instead
+	return pose.name .. " is not a WMO, so it has no sets" .. (instead and "; " .. instead or "")
 end
 
 --- The root a request names, what to call it, and the list command that shows its sets;
@@ -222,7 +273,7 @@ end
 --- Report a finished run, how long it took, and select its group so the next group
 -- command acts on it, the group standing for the object the run was anchored on, if any.
 local function finish(result, started, anchor)
-	local doodads = #result.spawned - (result.pivot and 1 or 0)
+	local doodads = result.placed
 	local pivot = result.pivot and ", and the pivot," or ""
 	if result.deleted == #result.spawned then
 		say(("stopped, and deleted the %s spawned"):format(objects(result.deleted)))
@@ -270,6 +321,9 @@ local function hooks(about)
 	local told, started = 0, Client.Now()
 	return {
 		progress = function(done, total)
+			if current then
+				current.done = done
+			end
 			tell("progress", done, total)
 			if not about.quiet and done < total and done - told >= 10 then
 				told = done
@@ -278,7 +332,8 @@ local function hooks(about)
 		end,
 		finished = function(result)
 			finish(result, started, about.anchor)
-			tell("finished", result, Client.Now() - started)
+			current, last = nil, { result = result, seconds = Client.Now() - started }
+			tell("finished", result, last.seconds)
 		end,
 	}
 end
@@ -301,11 +356,12 @@ local function start(rows, destination, group, about)
 	-- Whether it is on is the player's to decide, so the first run of a session only reminds them.
 	if not reminded then
 		reminded = true
-		say("highlighting too many objects can crash the game; .toggle highlight off turns it off")
+		say(Chat.HIGHLIGHT:lower() .. "; .toggle highlight off turns it off")
 	end
 	-- Started now, so a refusal at the end of the run can name its model.
 	Console.NameModels(function() end)
 	-- Told before the run, which may answer whole before Spawn returns.
+	current, last = { total = #rows, done = 0, started = Client.Now() }, nil
 	tell("started", #rows, about.what)
 	local handle, refused = Furnish.Spawn(
 		rows,
@@ -317,6 +373,7 @@ local function start(rows, destination, group, about)
 		hooks(about)
 	)
 	if not handle then
+		current = nil
 		tell("finished", nil, 0)
 		return say("nothing was sent: " .. refused)
 	end
@@ -327,7 +384,7 @@ end
 -- last run selected stays selected, it is the object that run was on.
 local function selectedPose()
 	local pose, reason = Pose.Selected()
-	if not pose and anchored and Client.SelectedGroup() == anchored.leader then
+	if not pose and anchorHeld() then
 		return anchored.pose
 	end
 	return pose, reason
@@ -339,9 +396,9 @@ local function described(file, name, drawn)
 	if not loaded then
 		return nil, why
 	end
-	local sets = Sets.OfFile(file)
+	local sets, none = setsOf(file, name)
 	if not sets then
-		return nil, name .. " has no doodad sets in Furnish's data"
+		return nil, none
 	end
 	local placed = {}
 	for _, id in ipairs(drawn or {}) do
@@ -392,8 +449,9 @@ function Console.Source(of)
 	if not pose then
 		return nil, reason
 	end
-	if not pose.wmo then
-		return nil, pose.name .. " is not a WMO, so it has no sets"
+	local wrong = notWmo(pose)
+	if wrong then
+		return nil, wrong
 	end
 	return described(pose.file, pose.name, drawn)
 end
@@ -442,7 +500,8 @@ function Console.Find(words)
 	end
 	local found, seen = {}, {}
 	for _, row in ipairs(Client.SearchDisplays(words)) do
-		local sets = not seen[row.file] and Sets.OfFile(row.file)
+		-- Read raw, since only the count is wanted and most files the catalogue names have none.
+		local sets = not seen[row.file] and Reader.Sets(row.file)
 		seen[row.file] = true
 		if sets then
 			found[#found + 1] = {
@@ -474,11 +533,18 @@ end
 -- the group is the one Furnish's last run made, which stands for the object that run was on,
 -- or when its leader's record has not arrived yet.
 function Console.Group()
-	if anchored and Client.SelectedGroup() == anchored.leader then
+	if anchorHeld() then
 		return nil
 	end
 	local leader = Client.SelectedGroupLeader()
 	return leader and Pose.OfGroup(leader) or nil
+end
+
+--- The run going on, { total, done, started }, or nil; and the one that ended last,
+-- { result, seconds }, or nil. A window that hears runs only while it shows reads these as it
+-- opens.
+function Console.Run()
+	return current, last
 end
 
 --- Why nothing new can start, or nil.
@@ -529,7 +595,7 @@ local function list(request, pose)
 	for i, set in ipairs(sets) do
 		buttons[i] = Chat.Link(table.concat({ file, set.index, carried, label }, ":"), setName(set))
 	end
-	say(("%s has %d sets:"):format(label, #sets))
+	say(("%s has %s:"):format(label, Chat.Count(#sets, "set")))
 	for _, line in ipairs(Chat.Menu(buttons)) do
 		Chat.Line(line)
 	end
@@ -574,26 +640,21 @@ function Console.Describe(request, tooltip)
 	if request.base then
 		said[#said + 1] = "base"
 	end
-	tooltip:SetText(setName(set), 1, 1, 1)
-	tooltip:AddLine(about, 0.62, 0.62, 0.62, true)
-	if #said > 0 then
-		tooltip:AddLine("with " .. table.concat(said, " and "), 0.62, 0.62, 0.62)
-	end
-	tooltip:AddLine("Click: spawn the set onto the selected gob", 1, 1, 1)
-	tooltip:AddLine("Ctrl-click: spawn the set at your feet", 1, 1, 1)
+	local tip = Chat.TIP
+	Chat.Tip(tooltip, setName(set), {
+		{ text = about, colour = tip.label },
+		#said > 0 and { text = "with " .. table.concat(said, " and "), colour = tip.label } or {},
+		{ text = "Click: spawn the set onto the selected gob", colour = tip.click },
+		{ text = "Ctrl-click: spawn the set at your feet", colour = tip.click },
+	})
 end
 
 --- Fill a tooltip for the button on a WMO's doodad line.
 -- @param tooltip a tooltip owned and empty
 function Console.DescribeImport(tooltip)
-	tooltip:SetText("Furnish", 1, 1, 1)
-	tooltip:AddLine(
-		"Import this WMO and spawn the sets it shows now, grouped on it",
-		0.62,
-		0.62,
-		0.62,
-		true
-	)
+	Chat.Tip(tooltip, "Furnish", {
+		{ text = "Import this WMO and spawn the sets it shows now, grouped on it" },
+	})
 end
 
 --- The rows of several sets in the order given, and how a line names them, as "Base and Full
@@ -605,7 +666,9 @@ local function gather(chosen)
 		if not own then
 			return nil, missing
 		end
-		rows = Rows.Union(rows, own)
+		for _, row in ipairs(own) do
+			rows[#rows + 1] = row
+		end
 		names[i], indexes[i] = setName(set), set.index
 	end
 	return rows,
@@ -680,16 +743,8 @@ end
 --- Spawn a set on the selected object, or at the player.
 -- @param request as the head of this file describes it
 function Console.Spawn(request)
-	local blocked = busy()
-	if blocked then
-		return say(blocked)
-	end
-	if not Client.CanSpawn() then
+	if not ready() then
 		return
-	end
-	local loaded, reason = Reader.Load()
-	if not loaded then
-		return say(reason)
 	end
 	-- A pose given is the destination, its numbers alone, and its root must be named, since a pose
 	-- names none. The selection is read apart from it: a merge joins whatever is selected, a group
@@ -735,12 +790,12 @@ end
 -- itself; with base, the base set as well, whether the doodad showed it or not.
 local function placed(pose, ids, base)
 	local chosen = {}
-	for _, set in ipairs(Sets.OfFile(pose.file) or {}) do
-		local named = false
-		for _, id in ipairs(ids) do
-			named = named or id == set.id
-		end
-		if set.index == 0 and base or set.index ~= 0 and named then
+	local first = base and (Sets.OfFile(pose.file) or {})[1]
+	if first and first.index == 0 then
+		chosen[1] = first
+	end
+	for _, set in ipairs(Sets.Named(pose.file, ids)) do
+		if set.index ~= 0 then
 			chosen[#chosen + 1] = set
 		end
 	end
@@ -754,22 +809,11 @@ end
 --   spawn in place of the ones it showed, the base among them only with base; group and base,
 --   as for a spawn
 function Console.Import(request)
-	local blocked = busy()
-	if blocked then
-		return say(blocked)
-	end
-	if not Client.CanSpawn() then
+	local send = ready()
+	if not send then
 		return
 	end
-	local loaded, reason = Reader.Load()
-	if not loaded then
-		return say(reason)
-	end
-	local send
-	send, reason = Client.Send()
-	if not send then
-		return say(reason)
-	end
+	local reason
 	local _, _, _, map = Client.Position()
 
 	-- What may still answer: the import's line and the record of the object it made. A stop
@@ -842,27 +886,21 @@ function Console.Import(request)
 		heard = true
 		stopHearing()
 		local ids = Sets.OfPlacement(map, tonumber(uid))
-		stopAwaiting, reason = Client.AwaitRecord(guid, function(record)
-			wait(nil)
+		stopAwaiting, reason = reselect(send, guid, function(record)
 			furnish(record, ids, guid, model)
+		end, function(replies)
+			say(
+				("imported %s as object %s, but selecting it was refused: %s"):format(
+					model,
+					guid,
+					quote(replies)
+				)
+			)
 		end)
 		if not stopAwaiting then
 			wait(nil)
 			return say(reason)
 		end
-		send(Commands.Select(guid), function(selected, replies)
-			if not selected and waiting then
-				waiting.stop()
-				wait(nil)
-				say(
-					("imported %s as object %s, but selecting it was refused: %s"):format(
-						model,
-						guid,
-						quote(replies)
-					)
-				)
-			end
-		end)
 	end
 
 	-- The server names the object an import made in one line, sent in the command's reply or

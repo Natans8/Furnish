@@ -1,8 +1,8 @@
 -- What to spawn: placements, as collections the kernel takes whole and spawns in order.
 --
 -- A set's rows come from the data as a trail, each beside the one before, so a player can
--- follow the furnishing with their eyes; after that they are only rows, to be put together,
--- thinned or picked from before the kernel sees them.
+-- follow the furnishing with their eyes; after that they are only rows, to be put together
+-- before the kernel sees them.
 
 _G.Furnish = _G.Furnish or {}
 local Furnish = _G.Furnish
@@ -31,17 +31,6 @@ function Rows.Union(...)
 	local out = {}
 	for i = 1, select("#", ...) do
 		for _, row in ipairs(select(i, ...) or {}) do
-			out[#out + 1] = row
-		end
-	end
-	return out
-end
-
---- The rows whose display is not the one given.
-function Rows.Without(rows, display)
-	local out = {}
-	for _, row in ipairs(rows) do
-		if row.display ~= display then
 			out[#out + 1] = row
 		end
 	end

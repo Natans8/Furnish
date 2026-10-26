@@ -150,13 +150,18 @@ function Client.OnPhaseChange(fn)
 	return listen("EPSILON_PHASE_CHANGE", fn)
 end
 
---- The GUID of the selected group's leader, or nil when no group is selected.
-function Client.SelectedGroup()
+--- The selected group as EpsilonLib holds it, or nil when no group is selected.
+local function selectedGroup()
 	local lib = _G.EpsilonLib
 	if not (lib and lib.GameObject and lib.GameObject:IsGroupSelected()) then
 		return nil
 	end
-	local group = lib.GameObject:GetSelected()
+	return lib.GameObject:GetSelected()
+end
+
+--- The GUID of the selected group's leader, or nil when no group is selected.
+function Client.SelectedGroup()
+	local group = selectedGroup()
 	if not (group and group.leaderGUID) then
 		return nil
 	end
@@ -166,11 +171,7 @@ end
 --- The record of the selected group's leader, which EpsilonLib fetches for itself when a group is
 -- selected; or nil when no group is selected or the record has not arrived yet.
 function Client.SelectedGroupLeader()
-	local lib = _G.EpsilonLib
-	if not (lib and lib.GameObject and lib.GameObject:IsGroupSelected()) then
-		return nil
-	end
-	local group = lib.GameObject:GetSelected()
+	local group = selectedGroup()
 	if not (group and group.GetLeader) then
 		return nil
 	end

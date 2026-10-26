@@ -84,20 +84,28 @@ end
 -- @param row { x, y, z, qx, qy, qz, qw, scale } as the reader gives a placement
 -- @return { x, y, z, roll, pitch, turn, scale }, angles in degrees within [0, 360)
 function Transform.Place(position, rotation, scale, row)
+	return Transform.Placer(position, rotation, scale)(row)
+end
+
+--- Transform.Place for many placements at one anchor: the anchor's rotation is worked out once.
+-- @return function(row) answering what Transform.Place answers
+function Transform.Placer(position, rotation, scale)
 	rotation = rotation or {}
 	scale = scale or 1
 	local anchor = Transform.FromAngles(rotation.roll, rotation.pitch, rotation.turn)
-	local offset =
-		Transform.Rotate(anchor, { x = row.x * scale, y = row.y * scale, z = row.z * scale })
-	local own = { x = row.qx, y = row.qy, z = row.qz, w = row.qw }
-	local roll, pitch, turn = Transform.ToAngles(Transform.Multiply(anchor, own))
-	return {
-		x = position.x + offset.x,
-		y = position.y + offset.y,
-		z = position.z + offset.z,
-		roll = roll,
-		pitch = pitch,
-		turn = turn,
-		scale = row.scale * scale,
-	}
+	return function(row)
+		local offset =
+			Transform.Rotate(anchor, { x = row.x * scale, y = row.y * scale, z = row.z * scale })
+		local own = { x = row.qx, y = row.qy, z = row.qz, w = row.qw }
+		local roll, pitch, turn = Transform.ToAngles(Transform.Multiply(anchor, own))
+		return {
+			x = position.x + offset.x,
+			y = position.y + offset.y,
+			z = position.z + offset.z,
+			roll = roll,
+			pitch = pitch,
+			turn = turn,
+			scale = row.scale * scale,
+		}
+	end
 end

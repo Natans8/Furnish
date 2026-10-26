@@ -101,19 +101,45 @@ end
 -- GUID, both as strings, and the model's name; or nil for any other reply.
 function Commands.Imported(messages)
 	for _, message in ipairs(messages or {}) do
-		local plain = Commands.Plain(message)
-		local uid, guid = plain:match("%(UniqueId: (%d+)%) as GUID (%d+)")
-		if uid then
-			return uid, guid, plain:match("%[(.-) %- %d+%]")
+		-- Every system line comes here, so one that cannot be an import is passed over unscrubbed.
+		if message:find("UniqueId", 1, true) then
+			local plain = Commands.Plain(message)
+			local uid, guid = plain:match("%(UniqueId: (%d+)%) as GUID (%d+)")
+			if uid then
+				return uid, guid, plain:match("%[(.-) %- %d+%]")
+			end
 		end
 	end
 	return nil
+end
+
+--- What a doodad link in a server line names: the doodad's unique id, the gameobject entry the
+-- number after its name is, and the map the line says it stands on, nil for a line that names
+-- none, as a near line does; or nil for a line with no doodad link.
+function Commands.DoodadLink(line)
+	local uid, entry = line:match("|Hdoodad_uid:(%d+):[^|]*|h%[.- %- (%d+)%]|h")
+	if not uid then
+		return nil
+	end
+	return tonumber(uid), tonumber(entry), tonumber(line:match(" on map (%d+)"))
+end
+
+--- The gameobject entry a gob's selection or spawn line names, a spawn selecting what it makes;
+-- or nil for any other line.
+function Commands.GobLine(line)
+	local said = line:find("Selected gameobject", 1, true)
+		or line:find("Spawned gameobject", 1, true)
+	return said and tonumber(line:match("|Hgameobject_entry:(%d+)|h")) or nil
 end
 
 --- What a doodad selection's line names, the line `.doodad select` prints and no addon message
 -- carries: { uid, entry, name, map }, the doodad's unique id, the entry after its name, its name
 -- as the line spells it and the map it stands on; or nil for any other line.
 function Commands.SelectedDoodad(line)
+	-- Every system line comes here, so one that cannot be a selection is passed over unscrubbed.
+	if not line:find("Selected doodad", 1, true) then
+		return nil
+	end
 	local plain = Commands.Plain(line)
 	local name, entry, uid = plain:match("Selected doodad %[(.-) %- (%d+)%] %(UID: (%d+)%)")
 	local map = plain:match(" on map (%d+)")

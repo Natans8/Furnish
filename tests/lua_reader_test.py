@@ -11,9 +11,9 @@ from furnish.database import Database
 from furnish.export import LINE_WIDTH, export
 from furnish.order import trail
 from furnish.wmo import Placement
+from tests.core_test import bare_lua
 from tests.files import varied_placements
 
-LIBDEFLATE = Path(__file__).parent / "lua" / "LibDeflate.lua"
 READER = Path(__file__).parents[1] / "addon" / "Furnish" / "Reader.lua"
 
 CHAIR = Placement(1001, (1.5, -2.0, 0.25), (0.0, 0.0, 0.5, 0.75), 1.0)
@@ -33,15 +33,7 @@ def write_database(path: Path) -> None:
 
 
 def lua_with(data: Path, format_override: str = "") -> lua51.LuaRuntime:
-    lua = lua51.LuaRuntime(unpack_returned_tuples=True)
-    lua.execute(
-        """
-        LibStub = { libs = {} }
-        function LibStub:NewLibrary(name, minor) local lib = {} self.libs[name] = lib return lib end
-        function LibStub:GetLibrary(name, silent) return self.libs[name] end
-        """
-    )
-    lua.execute(LIBDEFLATE.read_text(encoding="utf-8"))
+    lua = bare_lua()
     lua.globals().DATA_PATH = data.as_posix()
     lua.execute(
         "function LoadAddOn(name) if name == 'Furnish_Data' then dofile(DATA_PATH) "

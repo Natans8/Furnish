@@ -42,10 +42,12 @@
 						<Anchor point="RIGHT" x="-44"/>
 					</Anchors>
 				</FontString>
+				<!-- The name ends where the tag begins, which is where the count's column begins
+				     while there is no tag. -->
 				<FontString parentKey="Label" inherits="GameFontHighlight" justifyH="LEFT" wordwrap="false">
 					<Anchors>
 						<Anchor point="LEFT" x="36"/>
-						<Anchor point="RIGHT" x="-44"/>
+						<Anchor point="RIGHT" relativeKey="$parent.Tag" relativePoint="LEFT" x="-6"/>
 					</Anchors>
 				</FontString>
 			</Layer>
@@ -89,6 +91,9 @@
 				<FontString parentKey="Label" inherits="GameFontHighlightSmall" wordwrap="false"/>
 				<Texture parentKey="Alert" file="Interface\DialogFrame\UI-Dialog-Icon-AlertNew" hidden="true">
 					<Size x="14" y="14"/>
+					<Anchors>
+						<Anchor point="RIGHT" relativeKey="$parent.Label" relativePoint="LEFT" x="-3"/>
+					</Anchors>
 				</Texture>
 			</Layer>
 			<Layer level="HIGHLIGHT">
@@ -121,7 +126,7 @@
 				<FontString parentKey="Label" inherits="GameFontHighlight" justifyH="LEFT" wordwrap="false">
 					<Anchors>
 						<Anchor point="LEFT" x="8"/>
-						<Anchor point="RIGHT" x="-60"/>
+						<Anchor point="RIGHT" relativeKey="$parent.Tag" relativePoint="LEFT" x="-6"/>
 					</Anchors>
 				</FontString>
 			</Layer>
@@ -333,8 +338,8 @@
 			<EditBox parentKey="Turn" inherits="FurnishNumberTemplate"/>
 			<EditBox parentKey="Scale" inherits="FurnishNumberTemplate"/>
 
-			<!-- What fills the position, once each, each button as wide as its words, laid left to
-			     right by Window.lua. -->
+			<!-- What fills the position, once each, each button as wide as its words, which
+			     Window.lua sets. -->
 			<Button parentKey="Here" inherits="UIPanelButtonTemplate">
 				<Size y="22"/>
 				<Anchors>
@@ -416,8 +421,8 @@
 				</Layers>
 			</StatusBar>
 
-			<!-- Spawn, or stop a run; beside it, stop and delete during a run, or delete what the
-			     last run left after one. -->
+			<!-- Spawn, or stop a run; beside it, during a run, stop and delete. Once a run ends its
+			     group is the player's. -->
 			<Button parentKey="DeleteButton" inherits="UIPanelButtonTemplate" hidden="true">
 				<Size x="120" y="22"/>
 				<Anchors>

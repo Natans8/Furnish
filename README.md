@@ -204,16 +204,16 @@ lead to the first doodad.
 | `Settings.lua`  | the defaults: pivot, in-flight width, chat buttons; `FurnishSettings` keeps changes  |
 | `Reader.lua`    | the data addon's reader                                                              |
 | `Names.lua`     | a set's name as a player reads it: `Set(name)`                                       |
-| `Transform.lua` | the placement maths: `Place(position, rotation, scale, row)`                         |
+| `Transform.lua` | the placement maths: `Place(position, rotation, scale, row)` and `Placer`            |
 | `Commands.lua`  | every command spelling and every reply reader                                        |
 | `Run.lua`       | any series of commands through `send`, in order, with needs and a width              |
 | `Kernel.lua`    | `Furnish.Spawn` and `Furnish.Group`                                                  |
 | `Client.lua`    | the one file naming EpsilonLib and `C_Epsilon`; it reads, and never selects          |
-| `Pose.lua`      | where: `At`, `Here`, `Selected`, `OfRecord`                                          |
-| `Sets.lua`      | which: `OfFile`, `Pick`, `OfEntry`, `IsBlank`, `OfPlacement`                         |
-| `Rows.lua`      | what: `OfSet`, `Union`, `Without`                                                    |
-| `Chat.lua`      | the prefix, the colours, a menu measured to the chat frame, and Furnish's links      |
-| `Console.lua`   | what the commands and the window do: `List`, `Spawn`, `Import`, `Stop`, `Selected`   |
+| `Pose.lua`      | where: `At`, `Copy`, `Here`, `Selected`, `OfRecord`                                  |
+| `Sets.lua`      | which: `OfFile`, `Pick`, `OfEntry`, `IsBlank`, `OfPlacement`, `Named`, `Same`        |
+| `Rows.lua`      | what: `OfSet`, `Union`                                                               |
+| `Chat.lua`      | the prefix, counts, the colours, every tooltip, a menu measured to chat, the links   |
+| `Console.lua`   | what the commands and the window do: `List`, `Spawn`, `Import`, `Stop`, `Run`        |
 | `Window.xml`    | the window's layout, after ObjectMover's: a dark dialog of bordered panels           |
 | `Window.lua`    | the window: reads `Selected`, `Busy` and `Watch`, spawns and stops through `Console`   |
 | `Command.lua`   | `/furnish` and `/furn`: reading what is typed, the help, a link's click              |

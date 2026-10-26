@@ -24,6 +24,17 @@ function Pose.At(x, y, z, turn, scale)
 	}
 end
 
+--- A pose's numbers, a copy of its own: the position, the rotation and the scale, and nothing of
+-- what they were read off, so a number changed never reaches the record.
+function Pose.Copy(pose)
+	local at, turned = pose.position, pose.rotation
+	return {
+		position = { x = at.x, y = at.y, z = at.z },
+		rotation = { roll = turned.roll, pitch = turned.pitch, turn = turned.turn },
+		scale = pose.scale,
+	}
+end
+
 --- The player's own spot and facing, level, at scale 1; `map` beside it.
 function Pose.Here()
 	local x, y, z, map = Client.Position()

@@ -45,9 +45,16 @@ local function cased(word, shouted)
 	return word:sub(1, 1):upper() .. word:sub(2):lower()
 end
 
+--- Every name worked out so far, by its spelling; the names a session meets are few.
+local spelled = {}
+
 --- A set name as a player reads it. The default set's empty name stays empty, and a name
 -- that is nothing but its prefix is drawn as spelled.
 function Names.Set(name)
+	local known = spelled[name]
+	if known then
+		return known
+	end
 	local rest = name:gsub("^%s+", ""):gsub("%s+$", ""):gsub("^[Ss][Ee][Tt]_", "")
 	local shouted = not rest:find("%l")
 	local words = {}
@@ -72,8 +79,7 @@ function Names.Set(name)
 	if word ~= "" then
 		words[#words + 1] = cased(word, shouted)
 	end
-	if #words == 0 then
-		return name
-	end
-	return table.concat(words, " ")
+	local drawn = #words == 0 and name or table.concat(words, " ")
+	spelled[name] = drawn
+	return drawn
 end

@@ -20,6 +20,64 @@ Chat.GOLD, Chat.WHITE, Chat.BLUE, Chat.GREY, Chat.PREFIX =
 	"|cffffd100", "|cffffffff", "|cff71d5ff", "|cff9d9d9d", "|cff66ccff"
 Chat.END = "|r"
 
+--- A count with its thousands set apart.
+function Chat.Thousands(count)
+	local text, done = tostring(count), 1
+	while done > 0 do
+		text, done = text:gsub("^(%-?%d+)(%d%d%d)", "%1,%2")
+	end
+	return text
+end
+
+--- A count and what it counts, singular for one: "1 set", "1,204 objects".
+function Chat.Count(count, noun)
+	if count == 1 then
+		return "1 " .. noun
+	end
+	return Chat.Thousands(count) .. " " .. noun .. "s"
+end
+
+--- The risk a player is reminded of before a big spawn. Whether highlighting is on stays the
+-- player's to decide, so Furnish only says this and never turns it off.
+Chat.HIGHLIGHT = "Highlighting too many objects can crash the game"
+
+--- A tooltip's colours: the title, a label beside its value, a plain line, what a click does,
+-- a warning and a refusal.
+Chat.TIP = {
+	title = { 1, 0.82, 0 },
+	label = { 0.62, 0.62, 0.62 },
+	text = { 1, 1, 1 },
+	click = { 0.25, 1, 0.25 },
+	warning = { 1, 0.5, 0.5 },
+	refusal = { 1, 0.13, 0.13 },
+}
+
+--- Fill a tooltip that is owned already: a gold title, then each line, a { label, value } pair
+-- drawn as two columns, or a { text, colour } line of its own, wrapped. Every tooltip Furnish
+-- draws goes through here, so the same kind of line looks the same wherever it is.
+function Chat.Tip(tooltip, title, lines)
+	local tip = Chat.TIP
+	tooltip:SetText(title, tip.title[1], tip.title[2], tip.title[3])
+	for _, line in ipairs(lines) do
+		if line.value then
+			local label, value = tip.label, tip.text
+			tooltip:AddDoubleLine(
+				line.label,
+				tostring(line.value),
+				label[1],
+				label[2],
+				label[3],
+				value[1],
+				value[2],
+				value[3]
+			)
+		elseif line.text then
+			local colour = line.colour or tip.text
+			tooltip:AddLine(line.text, colour[1], colour[2], colour[3], true)
+		end
+	end
+end
+
 --- What a player types for an action, as a message spells it: the command's first name, as
 -- Command.lua registers it, and the words, if any.
 function Chat.Typed(words)

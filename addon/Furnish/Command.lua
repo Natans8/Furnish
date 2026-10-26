@@ -223,12 +223,10 @@ function Command.Hover(words, tooltip)
 	end
 	local word = WORD[words:match("^word:(%a+)$") or ""]
 	if word then
-		tooltip:SetText(word.word, 1, 1, 1)
-		return tooltip:AddLine(word.hint, 0.62, 0.62, 0.62, true)
+		return Chat.Tip(tooltip, word.word, { { text = word.hint } })
 	end
 	if words:match("^list:%d+$") then
-		tooltip:SetText("Furnish", 1, 1, 1)
-		return tooltip:AddLine("List this WMO's doodad sets", 0.62, 0.62, 0.62, true)
+		return Chat.Tip(tooltip, "Furnish", { { text = "List this WMO's doodad sets" } })
 	end
 	local request = fromLink(words)
 	if request then
@@ -250,13 +248,12 @@ Chat.OnLinks(Command.Click, Command.Hover)
 -- name has no `.wmo` in it. A select line names its map, and a near line's doodads stand on
 -- the player's. The first such line loads the data.
 function Command.PlacedWmo(line)
-	local uid, entry = line:match("|Hdoodad_uid:(%d+):[^|]*|h%[.- %- (%d+)%]|h")
-	local file = uid and Furnish.Sets.OfEntry(tonumber(entry))
+	local uid, entry, map = Furnish.Commands.DoodadLink(line)
+	local file = uid and Furnish.Sets.OfEntry(entry)
 	if not file then
 		return nil
 	end
-	local map = tonumber(line:match(" on map (%d+)")) or select(4, Client.Position())
-	if Furnish.Sets.DrawsBeyondBase(file, map, tonumber(uid)) then
+	if Furnish.Sets.DrawsBeyondBase(file, map or select(4, Client.Position()), uid) then
 		return uid
 	end
 	return nil
@@ -266,10 +263,8 @@ end
 -- for, a spawn selecting what it makes; the number in the link is the entry, and the name is
 -- never read.
 function Command.SelectedWmo(line)
-	local said = line:find("Selected gameobject", 1, true)
-		or line:find("Spawned gameobject", 1, true)
-	local entry = said and line:match("|Hgameobject_entry:(%d+)|h")
-	if entry and Furnish.Sets.OfEntry(tonumber(entry)) then
+	local entry = Furnish.Commands.GobLine(line)
+	if entry and Furnish.Sets.OfEntry(entry) then
 		return entry
 	end
 	return nil

@@ -38,11 +38,13 @@ function Sets.Pick(file, index)
 	if not sets then
 		return nil, reason
 	end
-	local offered = {}
-	for i, set in ipairs(sets) do
+	for _, set in ipairs(sets) do
 		if set.index == index then
 			return set
 		end
+	end
+	local offered = {}
+	for i, set in ipairs(sets) do
 		offered[i] = set.name ~= "" and ("%d %s"):format(set.index, Names.Set(set.name))
 			or tostring(set.index)
 	end
@@ -95,23 +97,43 @@ function Sets.OfPlacement(map, uid)
 	return ids
 end
 
+--- The sets of a root that a list of set ids names, in index order.
+function Sets.Named(file, ids)
+	local wanted = {}
+	for _, id in ipairs(ids or {}) do
+		wanted[id] = true
+	end
+	local named = {}
+	for _, set in ipairs(Sets.OfFile(file) or {}) do
+		if wanted[set.id] then
+			named[#named + 1] = set
+		end
+	end
+	return named
+end
+
 --- Whether a WMO placed on the map draws a set beyond its base, the one set the gob it is
 -- imported as draws itself; false where the data has no such placement.
 -- @param file the root's file id
 function Sets.DrawsBeyondBase(file, map, uid)
-	local ids = Sets.OfPlacement(map, uid)
-	local sets = ids and Sets.OfFile(file)
-	if not sets then
-		return false
-	end
-	local drawn = {}
-	for _, id in ipairs(ids) do
-		drawn[id] = true
-	end
-	for _, set in ipairs(sets) do
-		if set.index ~= 0 and drawn[set.id] then
+	for _, set in ipairs(Sets.Named(file, Sets.OfPlacement(map, uid))) do
+		if set.index ~= 0 then
 			return true
 		end
 	end
 	return false
+end
+
+--- Whether two roots offer the same sets, as an emptied copy and the WMO it was emptied from do.
+function Sets.Same(a, b)
+	local one, other = Sets.OfFile(a), Sets.OfFile(b)
+	if not (one and other) or #one ~= #other then
+		return false
+	end
+	for i, set in ipairs(one) do
+		if set.id ~= other[i].id then
+			return false
+		end
+	end
+	return true
 end

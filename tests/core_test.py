@@ -16,21 +16,13 @@ from furnish.wmo import Placement
 
 LIBDEFLATE = Path(__file__).parent / "lua" / "LibDeflate.lua"
 ADDON = Path(__file__).parents[1] / "addon" / "Furnish"
-FILES = (
-    "Settings.lua",
-    "Reader.lua",
-    "Names.lua",
-    "Transform.lua",
-    "Commands.lua",
-    "Run.lua",
-    "Kernel.lua",
-    "Client.lua",
-    "Pose.lua",
-    "Sets.lua",
-    "Rows.lua",
-    "Chat.lua",
-    "Console.lua",
-    "Command.lua",
+#: The files that draw frames, which need a client and are tried in the simulator instead.
+DRAWN = {"Window.lua", "Options.lua"}
+#: The addon's files in the toc's own order, read off it, so a file the toc gains loads here too.
+FILES = tuple(
+    line.strip()
+    for line in (ADDON / "Furnish.toc").read_text(encoding="utf-8").splitlines()
+    if line.strip().endswith(".lua") and line.strip() not in DRAWN
 )
 
 HOUSE = 900
@@ -68,15 +60,26 @@ def write_database(path: Path, layered: bool = False) -> None:
             db.add_map_sets([(1116, 4343, full), (1116, 4343, lights)])
 
 
-def lua_core(tmp_path: Path, layered: bool = False) -> lua51.LuaRuntime:
-    write_database(tmp_path / "f.sqlite", layered)
-    export(tmp_path / "f.sqlite", tmp_path / "Data.lua")
+def bare_lua() -> lua51.LuaRuntime:
+    """A Lua 5.1 with LibStub and the real LibDeflate, which the reader needs and nothing more."""
     lua = lua51.LuaRuntime(unpack_returned_tuples=True)
     lua.execute(
         """
         LibStub = { libs = {} }
         function LibStub:NewLibrary(name, minor) local lib = {} self.libs[name] = lib return lib end
         function LibStub:GetLibrary(name, silent) return self.libs[name] end
+        """
+    )
+    lua.execute(LIBDEFLATE.read_text(encoding="utf-8"))
+    return lua
+
+
+def lua_core(tmp_path: Path, layered: bool = False) -> lua51.LuaRuntime:
+    write_database(tmp_path / "f.sqlite", layered)
+    export(tmp_path / "f.sqlite", tmp_path / "Data.lua")
+    lua = bare_lua()
+    lua.execute(
+        """
         PRINTED = {}
         function print(...) PRINTED[#PRINTED + 1] = table.concat({ ... }, " ") end
         FRAMES = {}
@@ -101,7 +104,6 @@ def lua_core(tmp_path: Path, layered: bool = False) -> lua51.LuaRuntime:
         end
         """
     )
-    lua.execute(LIBDEFLATE.read_text(encoding="utf-8"))
     lua.globals().DATA_PATH = (tmp_path / "Data.lua").as_posix()
     lua.execute("function LoadAddOn(name) dofile(DATA_PATH) return true end")
     for name in FILES:
@@ -327,13 +329,7 @@ def test_a_need_that_is_not_earlier_is_refused_before_anything_is_sent(tmp_path:
 
 def test_width_bounds_what_is_in_flight(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
-    lua.execute(
-        """
-        SENT, PENDING = {}, {}
-        function SEND(text, callback) SENT[#SENT + 1] = text PENDING[#SENT] = callback end
-        function ANSWER(index) local cb = PENDING[index] PENDING[index] = nil cb(true, {}) end
-        """
-    )
+    held_server(lua)
     start_run(lua, '{ { text = "a" }, { text = "b" }, { text = "c" }, { text = "d" } }', width=2)
     assert list(lua.eval("SENT").values()) == ["a", "b"]
     lua.execute("ANSWER(1)")
@@ -348,13 +344,7 @@ def test_width_bounds_what_is_in_flight(tmp_path: Path) -> None:
 
 def test_a_glued_command_goes_with_the_one_before_it_or_not_at_all(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
-    lua.execute(
-        """
-        SENT, PENDING = {}, {}
-        function SEND(text, callback) SENT[#SENT + 1] = text PENDING[#SENT] = callback end
-        function ANSWER(index) local cb = PENDING[index] PENDING[index] = nil cb(true, {}) end
-        """
-    )
+    held_server(lua)
     # b waits for c, glued to it, which waits for a; the width of one never parts them.
     start_run(
         lua,
@@ -388,13 +378,7 @@ def test_a_glued_run_that_could_never_go_is_refused(tmp_path: Path, commands: st
 
 def test_a_second_abort_gives_up_on_the_replies_still_owed(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
-    lua.execute(
-        """
-        SENT, PENDING = {}, {}
-        function SEND(text, callback) SENT[#SENT + 1] = text PENDING[#SENT] = callback end
-        function ANSWER(index) local cb = PENDING[index] PENDING[index] = nil cb(true, {}) end
-        """
-    )
+    held_server(lua)
     start_run(lua, '{ { text = "a" }, { text = "b" }, { text = "c" } }', width=2)
     lua.execute("HANDLE.Abort()")
     assert lua.eval("OUT") is None  # two replies are still owed
@@ -472,14 +456,6 @@ def test_a_refused_pivot_makes_the_first_doodad_lead(tmp_path: Path) -> None:
     assert "doesn't exist" in refused.messages[1]
 
 
-def test_no_pivot_setting_spawns_none(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    lua.execute("Furnish.Settings.pivot = nil")
-    sent = fake_server(lua)
-    spawn(lua, rows(lua, 2))
-    assert sent()[0] == SPAWN_CHAIR
-
-
 def test_a_pivot_set_to_an_entry_spawns_that_entry(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     lua.execute("Furnish.Settings.pivot = 20")
@@ -527,15 +503,18 @@ def test_a_refused_join_is_reported_as_unjoined(tmp_path: Path) -> None:
 
 def held_server(lua: lua51.LuaRuntime) -> Callable[[], list[str]]:
     """A send() that holds every reply until ANSWER(n) answers the n-th line sent: a spawn
-    with a GUID line, numbered in the order spawns are answered, anything else with success."""
+    with a GUID line, numbered in the order spawns are answered, anything else with success;
+    ANSWER(n, success, messages) answers it as given instead."""
     lua.execute(
         """
         SENT, PENDING, NEXT_GUID = {}, {}, 7000
         function SEND(text, callback) SENT[#SENT + 1] = text PENDING[#SENT] = callback end
-        function ANSWER(index)
+        function ANSWER(index, ...)
           local callback = PENDING[index]
           PENDING[index] = nil
-          if SENT[index]:match("^gobject spawn") then
+          if select("#", ...) > 0 then
+            callback(...)
+          elseif SENT[index]:match("^gobject spawn") then
             NEXT_GUID = NEXT_GUID + 1
             callback(true, { "|Hgameobject_GUID:" .. NEXT_GUID .. "|h" .. NEXT_GUID .. "|h" })
           else
@@ -620,8 +599,6 @@ def test_rows_from_two_sets_spawn_as_one_collection(tmp_path: Path) -> None:
     sent = fake_server(lua)
     result = spawn(lua, rows(lua, 1, 2), "Furnish.Group.None")
     assert len(sent()) == 3 and result.total == 3
-    thinned = lua.eval(f"#Furnish.Rows.Without({rows(lua, 1, 2)}, 21)")
-    assert thinned == 1
 
 
 def test_the_kernel_refuses_bad_values_by_name(tmp_path: Path) -> None:
@@ -650,13 +627,7 @@ def test_the_kernel_refuses_bad_values_by_name(tmp_path: Path) -> None:
 def test_an_abort_with_cleanup_deletes_what_was_spawned(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     # A server that answers nothing until asked, so the run can be aborted mid-way.
-    lua.execute(
-        """
-        SENT, PENDING = {}, {}
-        function SEND(text, callback) SENT[#SENT + 1] = text PENDING[#SENT] = callback end
-        function ANSWER(index, ...) local cb = PENDING[index] PENDING[index] = nil cb(...) end
-        """
-    )
+    held_server(lua)
     spawn(lua, rows(lua, 2))
     lua.execute('ANSWER(1, true, { "|Hgameobject_GUID:7001|h7001|h" })')
     lua.execute("HANDLE.Abort(true)")
@@ -708,8 +679,9 @@ def test_a_display_saved_as_the_old_marker_is_not_read_as_the_pivot(tmp_path: Pa
 
 
 def fake_client(lua: lua51.LuaRuntime) -> None:
-    """EpsilonLib and C_Epsilon as the providers see them: a selection record arrives when an
-    object is selected, gobject info answers a display, and the model search knows one root."""
+    """EpsilonLib and C_Epsilon as the providers see them: the records of three objects, which
+    one is selected or whether a group is, permission to spawn, the player's position, and a
+    server that selects what it is asked to select."""
     lua.execute(
         """
         RECORDS = {
@@ -761,17 +733,13 @@ def fake_client(lua: lua51.LuaRuntime) -> None:
         local plain = SEND
         function SEND(text, callback)
           local guid = text:match("^gobject select (%d+)")
-          local entry = text:match("^gobject info (%d+)")
           local leader = text:match("^gobject group select (%d+)")
-          if guid or entry then SENT[#SENT + 1] = text end
-          if guid then SELECTED = tonumber(guid) return callback(true, {}) end
-          if leader then SELECTED, GROUP_LEADER = "group", tonumber(leader) end
-          if entry == "817579" then
-            return callback(true, { "Entry: |cff00CCFF817579|r",
-                                    "Template GameObject DisplayID: |cff00CCFF30262|r" })
-          elseif entry then
-            return callback(true, { "Template GameObject DisplayID: |cff00CCFF1|r" })
+          if guid then
+            SENT[#SENT + 1] = text
+            SELECTED = tonumber(guid)
+            return callback(true, {})
           end
+          if leader then SELECTED, GROUP_LEADER = "group", tonumber(leader) end
           plain(text, callback)
         end
         """
