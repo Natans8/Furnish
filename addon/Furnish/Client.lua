@@ -15,12 +15,13 @@ local reported = {}
 
 --- Report a fault: in chat, once for each, since a client with its Lua errors switched off
 -- shows nothing at all; and to the client's own error handler, so BugSack and the error
--- frame keep it the way they keep any addon's.
+-- frame keep it the way they keep any addon's. A fault ends only the call it happened in, a
+-- click, a hover or a reply, so the line says what went wrong and claims nothing stopped.
 function Client.Fault(message)
 	local text = tostring(message)
 	if not reported[text] then
 		reported[text] = true
-		print("|cff66ccffFurnish:|r |cffff2020stopped by an error: " .. text .. "|r")
+		print("|cff66ccffFurnish:|r |cffff2020error: " .. text .. "|r")
 	end
 	local handler = _G.geterrorhandler and _G.geterrorhandler()
 	if handler then

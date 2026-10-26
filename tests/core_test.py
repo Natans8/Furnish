@@ -845,8 +845,8 @@ def test_a_fault_is_said_in_chat_once(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     lua.execute("BROKEN = Furnish.Client.Guarded(function() error('the reader broke', 0) end)")
     lua.execute("BROKEN(); BROKEN()")
-    faults = [line for line in printed(lua) if "stopped by an error" in line]
-    assert faults == ["|cff66ccffFurnish:|r |cffff2020stopped by an error: the reader broke|r"]
+    faults = [line for line in printed(lua) if "error:" in line]
+    assert faults == ["|cff66ccffFurnish:|r |cffff2020error: the reader broke|r"]
 
 
 #: A stand-in for the client's catalogue of gameobject displays: ROWS in the order given, and a
