@@ -57,6 +57,48 @@
 		</Layers>
 	</Button>
 
+	<!-- One choice of a segmented control: its words, lit as a chosen set row is when it is the one
+	     in force, a hairline between it and the one before, and room for the alert mark. Window.lua
+	     lays the segments out, each as wide as its words. -->
+	<Button name="FurnishSegmentTemplate" virtual="true">
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Chosen" setAllPoints="true" hidden="true">
+					<Color r="1" g="0.82" b="0" a="0.14"/>
+				</Texture>
+			</Layer>
+			<Layer level="BORDER">
+				<Texture parentKey="Accent" hidden="true">
+					<Size y="2"/>
+					<Anchors>
+						<Anchor point="BOTTOMLEFT"/>
+						<Anchor point="BOTTOMRIGHT"/>
+					</Anchors>
+					<Color r="1" g="0.82" b="0" a="0.9"/>
+				</Texture>
+				<Texture parentKey="Divider">
+					<Size x="1"/>
+					<Anchors>
+						<Anchor point="TOPLEFT"/>
+						<Anchor point="BOTTOMLEFT"/>
+					</Anchors>
+					<Color r="0.54" g="0.54" b="0.54" a="0.55"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString parentKey="Label" inherits="GameFontHighlightSmall" wordwrap="false"/>
+				<Texture parentKey="Alert" file="Interface\DialogFrame\UI-Dialog-Icon-AlertNew" hidden="true">
+					<Size x="14" y="14"/>
+				</Texture>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture setAllPoints="true">
+					<Color r="1" g="1" b="1" a="0.07"/>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Button>
+
 	<!-- One WMO a search found: its name, marked where it comes unfurnished, and its set count.
 	     Picked is the match Enter takes, lit as Blizzard's own search lists light it. -->
 	<Button name="FurnishResultRowTemplate" virtual="true">
@@ -238,6 +280,12 @@
 						<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-150" y="192"/>
 					</Anchors>
 				</FontString>
+				<!-- The leader's name, level with the middle of its segments. -->
+				<FontString parentKey="LeaderLabel" inherits="GameFontNormalSmall" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="LEFT" relativePoint="BOTTOMLEFT" x="20" y="81"/>
+					</Anchors>
+				</FontString>
 			</Layer>
 		</Layers>
 		<Frames>
@@ -312,33 +360,15 @@
 				</Anchors>
 			</Button>
 
-			<!-- Whether the objects form a group, whether the selected gob is in it, and whether a pivot
-			     leads a group of their own. -->
-			<CheckButton parentKey="Grouped" inherits="UICheckButtonTemplate">
-				<Size x="22" y="22"/>
+			<!-- What leads the objects' group, or that they form none: one choice of four, all in view,
+			     in the names' column. Window.lua makes the segments. -->
+			<Frame parentKey="Leader" inherits="BackdropTemplate">
+				<Size y="22"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="16" y="92"/>
+					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="96" y="92"/>
+					<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-20" y="92"/>
 				</Anchors>
-			</CheckButton>
-			<CheckButton parentKey="Include" inherits="UICheckButtonTemplate">
-				<Size x="22" y="22"/>
-				<Anchors>
-					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="140" y="92"/>
-				</Anchors>
-			</CheckButton>
-			<!-- No pivot: the set's first object leads its group instead of an invisible pivot. -->
-			<CheckButton parentKey="NoPivot" inherits="UICheckButtonTemplate">
-				<Size x="22" y="22"/>
-				<Anchors>
-					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="300" y="92"/>
-				</Anchors>
-			</CheckButton>
-			<!-- Shown where the selected gob is in a group already; Window.lua stands it after the
-			     include box's words. -->
-			<Button parentKey="Warning" hidden="true">
-				<Size x="18" y="18"/>
-				<NormalTexture file="Interface\DialogFrame\UI-Dialog-Icon-AlertNew"/>
-			</Button>
+			</Frame>
 
 			<!-- The status row: the client's highlighting at its right, as Tiler offers it; beside it a
 			     run's progress, or what to know before the next. -->

@@ -72,7 +72,7 @@ and Use selected gob fill it once; typing a number keeps what was typed; Tab mov
 boxes. Either block's Follow selection, unticked, keeps what it shows whatever you select. A
 selected group is used by neither block, as a model is no source: both say a group is selected, and
 Use selected group fills Destination once with the group's position and facing, level, since a group
-has no roll or pitch of its own; Include the selected group then joins that group. The group a run selects
+has no roll or pitch of its own; Selected group as the group leader then joins that group. The group a run selects
 when it ends still stands for the WMO the run was on. The
 doodad `.doodad select` picks is a selection of its own, held beside the gob's: it never changes
 Source or Destination, and while there is one a panel stands against the window's right edge with
@@ -81,11 +81,13 @@ the panel, the window open or not, and a doodad with no sets Furnish knows of em
 that WMO as the source, with the sets the doodad drew beyond its base chosen. Import doodad turns
 it into a gob that is selected like any other; while Source follows the selection, the same sets
 come chosen on it, and either block kept as it is stays so. The doodad is
-hidden, not gone, and stays selected; closing the panel lets it go. Group on spawn makes the objects one group,
-led by a pivot the button counts; Include the selected gob makes that gob lead it instead,
-and where the selected gob is in a group already a mark warns and Spawn asks first; No pivot makes the
-set's first object lead a group of its own, so no extra object spawns, the group then turning
-around that object. The status row
+hidden, not gone, and stays selected; closing the panel lets it go. Group leader is one choice
+of four, all in view: No group spawns the objects loose; Pivot, the default, makes them one
+group led by an invisible pivot at the destination, which the button counts; First spawned lets
+the first object lead instead, so nothing extra spawns; Selected gob makes the selected gob lead,
+or joins its group where it is in one already, which a mark on the segment warns of and Spawn
+asks about first. A group moves, turns and scales about its leader. Selected gob greys while no
+gob can lead, Pivot standing in until one is selected again. The status row
 holds Highlighting, which toggles the client's outline on selected objects, beside a run's
 progress with its time left, a warning before spawning onto a WMO the sets were not made for,
 or the reminder that highlighting too many objects can crash the game. During a run every

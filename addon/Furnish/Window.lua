@@ -51,6 +51,30 @@ local OVERLAY = {
 	insets = { left = 4, right = 4, top = 4, bottom = 4 },
 }
 
+--- The leader's bar: the list's edge, drawn finer for a control one row high.
+local SEGMENTS = {
+	bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+	edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+	tile = true,
+	tileEdge = true,
+	tileSize = 16,
+	edgeSize = 12,
+	insets = { left = 3, right = 3, top = 3, bottom = 3 },
+}
+
+--- What can lead the objects' group, left to right: the group a request asks for, the words on
+-- the segment, and how a command types it. The selected gob's words follow what the destination
+-- was taken from, so they are read when drawn.
+local LEADS = {
+	{ group = "nogroup", label = "No group", words = "<set> nogroup" },
+	{ group = "pivot", label = "Pivot", words = "<set>" },
+	{ group = "first", label = "First spawned", words = "<set> first" },
+	{ group = "attach", words = "<set> attach" },
+}
+
+--- The room either side of a segment's words, and what the alert mark takes beside them.
+local SEGMENT_PAD, ALERT_ROOM = 6, 17
+
 --- The tooltip's colours: a label, a value, a heading, what a click does, and a refusal.
 local GREY, WHITE, GOLD = { 0.62, 0.62, 0.62 }, { 1, 1, 1 }, { 1, 0.82, 0 }
 local GREEN, RED = { 0.25, 1, 0.25 }, { 1, 0.13, 0.13 }
@@ -116,6 +140,9 @@ local chosen = {}
 --- Where the sets go: the pose shown, its own copy, with what to call it and say of it; whether
 -- it stays when the selection moves; and whether a number of it was typed.
 local spot, spotPinned, edited = nil, false, false
+
+--- What the player chose to lead the objects' group, as a request's group says it.
+local lead = "pivot"
 
 --- The run going on, as the window draws it: { total, done, started }.
 local run
@@ -238,8 +265,8 @@ local function selectedWhat()
 	return spot and spot.group and "the selected group" or "the selected gob"
 end
 
---- Why the selected gob cannot be included in the group, or nil when it can.
-local function cannotInclude()
+--- Why the selected gob cannot lead the group, or nil when it can.
+local function cannotLead()
 	if not spot or not spot.guid then
 		return "The destination is a position, not a selected gob."
 	elseif not Client.CanEdit(spot) then
@@ -248,17 +275,18 @@ local function cannotInclude()
 	return nil
 end
 
---- The request's group, from the three boxes: loose, a group the selected gob joins, or a group of
--- their own that a pivot leads, or the set's first object where No pivot is ticked.
+--- The request's group: the leader chosen, the selected gob standing down to the pivot while it
+-- cannot lead, and coming back as chosen once it can.
 local function grouped()
-	if not frame.Grouped:GetChecked() then
-		return "nogroup"
-	elseif frame.Include:GetChecked() and not cannotInclude() then
-		return "attach"
-	elseif frame.NoPivot:GetChecked() then
-		return "first"
+	if lead == "attach" and cannotLead() then
+		return "pivot"
 	end
-	return "pivot"
+	return lead
+end
+
+--- Whether the objects would join a group that stands already, which Spawn asks about first.
+local function joinsGroup()
+	return grouped() == "attach" and (spot.groupLeader or 0) ~= 0
 end
 
 --- Whether the selected gob draws a set already, as part of its model: its base set, unless
@@ -413,7 +441,6 @@ local function controls()
 		frame.DestinationFollow,
 		frame.Here,
 		frame.UseSelected,
-		frame.Grouped,
 	}
 	for _, number in ipairs(NUMBERS) do
 		all[#all + 1] = frame[number.box]
@@ -421,9 +448,61 @@ local function controls()
 	return all
 end
 
---- A checkbox's words, white while it may be ticked and grey while it may not.
-local function checkText(box, enabled)
-	box.text:SetFontObject(enabled and _G.GameFontHighlightSmall or _G.GameFontDisableSmall)
+--- The selected gob's segment's words: what the destination was taken from.
+local function selectedLabel()
+	return spot and spot.group and "Selected group" or "Selected gob"
+end
+
+--- The leader's segments, in LEADS's order, made once by buildLeader.
+local segments = {}
+
+--- Lay the segments across the bar: each as wide as its words, with the alert mark's room where it
+-- shows, and what the bar has left shared out evenly, so a long name never crowds.
+local function layoutLeader()
+	local bar = frame.Leader
+	local inset = SEGMENTS.insets.left
+	local natural, total = {}, 0
+	for i, segment in ipairs(segments) do
+		natural[i] = segment.Label:GetStringWidth()
+			+ 2 * SEGMENT_PAD
+			+ (segment.Alert:IsShown() and ALERT_ROOM or 0)
+		total = total + natural[i]
+	end
+	local spare, left = (bar:GetWidth() - 2 * inset - total) / #segments, inset
+	for i, segment in ipairs(segments) do
+		local width = natural[i] + spare
+		segment:ClearAllPoints()
+		segment:SetPoint("TOPLEFT", bar, "TOPLEFT", left, -inset)
+		segment:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", left, inset)
+		segment:SetWidth(width)
+		segment.Divider:SetShown(i > 1)
+		segment.Label:ClearAllPoints()
+		segment.Label:SetPoint("CENTER", segment.Alert:IsShown() and ALERT_ROOM / 2 or 0, 0)
+		left = left + width
+	end
+end
+
+--- The leader's segments: the one in force lit as a chosen set row is, the selected gob's named
+-- for what the destination was taken from and greyed while it cannot lead, its mark shown while
+-- the objects would join a group that stands already. A run holds them still.
+local function updateLeader()
+	local current = grouped()
+	frame.LeaderLabel:SetFontObject(run and _G.GameFontDisableSmall or _G.GameFontNormalSmall)
+	for _, segment in ipairs(segments) do
+		local choice = segment.choice
+		local enabled = not run and (choice.group ~= "attach" or not cannotLead())
+		segment.Label:SetText(choice.label or selectedLabel())
+		segment.Label:SetFontObject(
+			enabled and _G.GameFontHighlightSmall or _G.GameFontDisableSmall
+		)
+		segment:SetEnabled(enabled)
+		local inForce = choice.group == current
+		segment.Chosen:SetShown(inForce)
+		segment.Accent:SetShown(inForce)
+		segment.Accent:SetColorTexture(run and 0.5 or 1, run and 0.5 or 0.82, run and 0.5 or 0, 0.9)
+		segment.Alert:SetShown(inForce and joinsGroup())
+	end
+	layoutLeader()
 end
 
 local function updateDestination()
@@ -457,16 +536,7 @@ local function updateDestination()
 		)
 	end
 	frame.UseSelected:SetEnabled(not run and from ~= nil)
-	local canInclude = not run and frame.Grouped:GetChecked() and not cannotInclude()
-	frame.Include.text:SetText("Include " .. selectedWhat())
-	frame.Include:SetEnabled(canInclude)
-	checkText(frame.Include, canInclude)
-	-- Who leads a group of the set's own, which a group the selected gob leads has not.
-	local canChooseLeader = not run and frame.Grouped:GetChecked() and grouped() ~= "attach"
-	frame.NoPivot:SetEnabled(canChooseLeader)
-	checkText(frame.NoPivot, canChooseLeader)
-	checkText(frame.Grouped, not run)
-	frame.Warning:SetShown(grouped() == "attach" and (spot.groupLeader or 0) ~= 0)
+	updateLeader()
 end
 
 --- The doodad panel, there while a doodad is selected; a doodad imported once is not again.
@@ -540,7 +610,7 @@ local function spawn()
 	if not enabled then
 		return Chat.Say(text)
 	end
-	if grouped() == "attach" and (spot.groupLeader or 0) ~= 0 then
+	if joinsGroup() then
 		local _, count = chosenSets()
 		local dialog = _G.StaticPopup_Show("FURNISH_JOIN_GROUP", spot.name, objects(count))
 		if dialog then
@@ -1247,6 +1317,83 @@ local function buildSource()
 	end
 end
 
+--- What a leader's tooltip says: what choosing it makes of the objects, and why it cannot lead
+-- where it cannot.
+local function leadLines(choice)
+	local turns = { text = "A group moves, turns and scales about its leader.", colour = GREY }
+	if choice.group == "nogroup" then
+		return { { text = "Each object stands alone, in no group." } }
+	elseif choice.group == "pivot" then
+		return {
+			{
+				text = "An invisible object at the destination leads the group, so the set turns about that point. One extra object spawns.",
+			},
+			turns,
+		}
+	elseif choice.group == "first" then
+		return {
+			{ text = "The first object spawned leads the group. No extra object spawns." },
+			turns,
+		}
+	end
+	local lines
+	if spot and spot.group then
+		lines = {
+			{
+				text = "The objects join the selected group, so moving the group moves them too. No pivot spawns.",
+			},
+		}
+	else
+		lines = {
+			{
+				text = "The selected gob leads the group, so moving it moves everything. No pivot spawns.",
+			},
+		}
+		if spot and (spot.groupLeader or 0) ~= 0 then
+			lines[#lines + 1] = {
+				text = spot.name
+					.. " is in a group already, so the objects join that group; Spawn asks first.",
+				colour = WARN,
+			}
+		end
+	end
+	local why = cannotLead()
+	if why then
+		lines[#lines + 1] = { text = why, colour = RED }
+	end
+	return lines
+end
+
+--- The leader's bar and its segments, one a choice, a click making it the one in force.
+local function buildLeader()
+	frame.LeaderLabel:SetText("Group leader")
+	frame.Leader:SetBackdrop(SEGMENTS)
+	frame.Leader:SetBackdropColor(0, 0, 0, 0.25)
+	frame.Leader:SetBackdropBorderColor(0.75, 0.75, 0.75)
+	for i, choice in ipairs(LEADS) do
+		local segment = _G.CreateFrame("Button", nil, frame.Leader, "FurnishSegmentTemplate")
+		segment.choice = choice
+		-- Greyed, a segment still says why when rested on.
+		segment:SetMotionScriptsWhileDisabled(true)
+		segment.Alert:SetPoint("RIGHT", segment.Label, "LEFT", -3, 0)
+		segment:SetScript(
+			"OnClick",
+			Client.Guarded(function()
+				_G.PlaySound(_G.SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+				lead = choice.group
+				update()
+			end)
+		)
+		hint(segment, function()
+			return choice.label or selectedLabel()
+		end, function()
+			return leadLines(choice)
+		end, choice.words)
+		segments[i] = segment
+	end
+	frame.Leader:HookScript("OnSizeChanged", Client.Guarded(layoutLeader))
+end
+
 local function buildDestination()
 	frame.DestinationLabel:SetText("Destination")
 	frame.DestinationFollow.Label:SetText("Follow selection")
@@ -1312,66 +1459,13 @@ local function buildDestination()
 					text = "Fill the destination with the selected group's position and facing, once.",
 				},
 				{ text = "A group has no roll or pitch of its own, so the destination is level." },
-				{ text = "With Include the selected group, the objects join that group." },
+				{ text = "With Selected group as the group leader, the objects join that group." },
 			}
 		end
 		return { { text = "Fill the destination with the selected gob's position, once." } }
 	end)
 
-	frame.Grouped.text:SetText("Group on spawn")
-	frame.Grouped:SetChecked(true)
-	frame.Include.text:SetText("Include the selected gob")
-	frame.NoPivot.text:SetText("No pivot")
-	frame.Warning:SetPoint("LEFT", frame.Include.text, "RIGHT", 4, 0)
-	for _, box in ipairs({ frame.Grouped, frame.Include, frame.NoPivot }) do
-		box:SetScript("OnClick", Client.Guarded(update))
-	end
-	hint(frame.Grouped, "Group on spawn", function()
-		return {
-			{ text = "The spawned objects form one group, so they move as one." },
-			{
-				text = "Unless the selected gob is included or No pivot is ticked, a pivot leads the group: one extra, invisible object where the WMO stands.",
-			},
-		}
-	end, "<set>")
-	hint(frame.NoPivot, "No pivot", {
-		{ text = "The set's first object leads the group, so no extra object spawns." },
-		{
-			text = "A group turns and scales around its leader, so it then turns around that object rather than around the WMO.",
-		},
-	}, "<set> first")
-	hint(frame.Include, function()
-		return "Include " .. selectedWhat()
-	end, function()
-		local why = cannotInclude()
-		if spot and spot.group then
-			return {
-				{
-					text = "The objects join the selected group, so moving the group moves them too. No pivot spawns.",
-				},
-				why and { text = why, colour = RED },
-			}
-		end
-		return {
-			{
-				text = "The selected gob joins the group and leads it, so moving it moves everything, and no pivot spawns.",
-			},
-			{
-				text = "If the selected gob is in a group already, the objects join that group; Spawn asks first.",
-			},
-			why and { text = why, colour = RED },
-		}
-	end, "<set> attach")
-	frame.Warning:SetScript(
-		"OnEnter",
-		Client.Guarded(function(button)
-			tip(button, "The selected gob is in a group", {
-				{ text = spot.name .. " is in a group already, so the objects join that group." },
-				{ text = "Spawn asks before it starts.", colour = GREY },
-			})
-		end)
-	)
-	frame.Warning:SetScript("OnLeave", _G.GameTooltip_Hide)
+	buildLeader()
 	frame:HookScript("OnSizeChanged", Client.Guarded(layoutNumbers))
 	layoutNumbers()
 end
