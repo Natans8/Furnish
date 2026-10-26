@@ -506,13 +506,11 @@ local function updateLeader()
 end
 
 local function updateDestination()
-	-- A number typed makes a gob's position the player's own; a position typed is no longer where
-	-- anyone stood.
-	local name, detail = spot and spot.name or "", spot and spot.detail or ""
-	if edited and spot.guid then
-		detail = detail .. ", edited"
-	elseif edited then
-		name, detail = "A position", "Typed in"
+	-- A gob, or a group filled from its leader, is named, and a number typed into its position says
+	-- so; a position is its numbers and needs no words, whether read, taken with Here or typed.
+	local name, detail = "", ""
+	if spot and spot.guid then
+		name, detail = spot.name or "", (spot.detail or "") .. (edited and ", edited" or "")
 	end
 	frame.DestinationName:SetText(name)
 	frame.DestinationDetail:SetText(detail)
@@ -704,12 +702,7 @@ local function refresh()
 			-- is empty, and never again while it stays so: it does not follow the player, and Here
 			-- reads it afresh.
 			local here = Pose.Here()
-			spot = here and copy(here, "Where you stood", "")
-		end
-		-- Without a gob to follow, the destination says why: none is selected, or a group is,
-		-- which the destination never follows by itself.
-		if spot and not selected then
-			spot.detail = Console.Group() and "A group is selected" or "No gob selected"
+			spot = here and copy(here, "", "")
 		end
 		edited = false
 	end
@@ -1430,7 +1423,7 @@ local function buildDestination()
 		"OnClick",
 		Client.Guarded(function()
 			local here = Pose.Here()
-			fillDestination(here and copy(here, "Where you stood", "Taken with Here"))
+			fillDestination(here and copy(here, "", ""))
 		end)
 	)
 	frame.UseSelected:SetScript(
