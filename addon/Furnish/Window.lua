@@ -704,7 +704,7 @@ local function refresh()
 			-- is empty, and never again while it stays so: it does not follow the player, and Here
 			-- reads it afresh.
 			local here = Pose.Here()
-			spot = here and copy(here, "Your position", "")
+			spot = here and copy(here, "Where you stood", "")
 		end
 		-- Without a gob to follow, the destination says why: none is selected, or a group is,
 		-- which the destination never follows by itself.
@@ -1400,7 +1400,7 @@ local function buildDestination()
 	frame.DestinationFollow:SetScript("OnClick", Client.Guarded(followDestination))
 	hint(frame.DestinationFollow, "Follow selection", {
 		{
-			text = "Ticked, the destination is the selected gob's position, or where you stand while no gob is selected.",
+			text = "Ticked, the destination is the selected gob's position, or, with none selected, where you stood when it was read. Here reads it again.",
 		},
 		{ text = "Unticked, the destination stays as it is whatever gob is selected." },
 	})
@@ -1430,7 +1430,7 @@ local function buildDestination()
 		"OnClick",
 		Client.Guarded(function()
 			local here = Pose.Here()
-			fillDestination(here and copy(here, "Your position", "Where you stood"))
+			fillDestination(here and copy(here, "Where you stood", "Taken with Here"))
 		end)
 	)
 	frame.UseSelected:SetScript(

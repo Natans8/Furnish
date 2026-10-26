@@ -66,7 +66,8 @@ base set, unless it comes unfurnished. A click chooses one set and a
 ctrl-click adds or removes one, a strip at either end of the list counts the chosen sets
 scrolled out of view, and resting on a set names the models it holds, as the client's own
 catalogue names them once a walk of it, started when the window opens, has ended. Destination is the selected
-gob, or where you stand while nothing is selected, so every number always holds a value: X, Y
+gob, or, while nothing is selected, where you stood when it was read, which Here reads again, so every
+number always holds a value: X, Y
 and Z, then the roll, pitch and turn about each in ObjectMover's colours, then the scale. Here
 and Use selected gob fill it once; typing a number keeps what was typed; Tab moves through the
 boxes. Either block's Follow selection, unticked, keeps what it shows whatever you select. A
