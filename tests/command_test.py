@@ -113,8 +113,8 @@ def spawn(lua: lua51.LuaRuntime, request: str) -> None:
         ("help me", {"action": "help"}),
         ("list", {"action": "list"}),
         (
-            "list 830385 attach base",
-            {"action": "list", "entry": 830385, "group": "attach", "base": True},
+            "list 830385 merge base",
+            {"action": "list", "entry": 830385, "group": "merge", "base": True},
         ),
         ("3", {"action": "spawn", "index": 3}),
         ("3 from 830385 first", {"action": "spawn", "index": 3, "entry": 830385, "group": "first"}),
@@ -168,17 +168,17 @@ def test_the_help_names_every_command_and_word(tmp_path: Path) -> None:
     assert lines[2] == "  |cffffd100/furn list [<entry>]|r: a WMO's sets, as buttons"
     # The words share one line, each a link whose tooltip says what it does.
     words = lines[-1]
-    for word in ("first", "attach", "nogroup", "base", "quiet"):
+    for word in ("first", "merge", "nogroup", "base", "quiet"):
         assert f"|Hgarrmission:furnish:word:{word}|h[{word}]|h" in words
     assert len(lines) == 1 + 6 + 1
     lua.execute(
         "TIP = {}; FAKE = { SetText = function(_, t) TIP[#TIP + 1] = t end,"
         " AddLine = function(_, t) TIP[#TIP + 1] = t end }"
     )
-    lua.eval("Furnish.Command.Hover")("word:attach", lua.eval("FAKE"))
+    lua.eval("Furnish.Command.Hover")("word:merge", lua.eval("FAKE"))
     assert list(lua.eval("TIP").values()) == [
-        "attach",
-        "include the selected gob in the group, so no pivot spawns",
+        "merge",
+        "merge the set into the selected gob's group, so no pivot spawns",
     ]
 
 
@@ -272,7 +272,7 @@ def test_a_set_spawns_at_a_pose_given_with_no_object_behind_it(tmp_path: Path) -
     )
     assert sent(lua)[0] == "gobject spawn -424242 posx 1 posy 2 posz 3 face north"
     # With no object behind the pose there is no group to join, and a pose names no WMO.
-    spawn(lua, "{ index = 1, file = 900, at = Furnish.Pose.At(1, 2, 3), group = 'attach' }")
+    spawn(lua, "{ index = 1, file = 900, at = Furnish.Pose.At(1, 2, 3), group = 'merge' }")
     assert printed(lua)[-1] == (
         PREFIX + "a spawn at your feet has no selected gob to include in the group"
     )
@@ -286,7 +286,7 @@ def test_a_pose_read_off_an_object_joins_that_objects_group(tmp_path: Path) -> N
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 500")
     lua.execute("AT = Furnish.Console.Selected(); SELECTED = 502")
-    spawn(lua, "{ index = 1, file = 900, label = 'house', at = AT, group = 'attach' }")
+    spawn(lua, "{ index = 1, file = 900, label = 'house', at = AT, group = 'merge' }")
     assert printed(lua)[-2] == (PREFIX + "spawning Full (set 1, 2 objects) on house, led by house")
     assert "gobject group add 500" in sent(lua)
 
@@ -342,10 +342,10 @@ def test_a_window_is_told_when_it_may_not_start(tmp_path: Path) -> None:
 def test_a_list_prints_a_menu_of_set_buttons_carrying_the_words(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 500")
-    assert run(lua, "list attach") == [
+    assert run(lua, "list merge") == [
         PREFIX + "house has 2 sets:",
-        "  |cff71d5ff|Hgarrmission:furnish:900:0:attach::house|h[Base]|h|r "
-        "|cff71d5ff|Hgarrmission:furnish:900:1:attach::house|h[Full]|h|r",
+        "  |cff71d5ff|Hgarrmission:furnish:900:0:merge::house|h[Base]|h|r "
+        "|cff71d5ff|Hgarrmission:furnish:900:1:merge::house|h[Full]|h|r",
     ]
     assert run(lua, "list 817579 base")[0] == PREFIX + "object 817579 has 2 sets:"
     assert sent(lua) == []
@@ -390,10 +390,10 @@ def test_an_ungrouped_spawn_selects_nothing(tmp_path: Path) -> None:
     assert shown(lua) == []
 
 
-def test_attach_joins_the_wmos_own_group(tmp_path: Path) -> None:
+def test_merge_joins_the_wmos_own_group(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 501")
-    assert run(lua, "1 attach")[0].endswith("joining the group emptywmo_house is in")
+    assert run(lua, "1 merge")[0].endswith("joining the group emptywmo_house is in")
     assert "gobject group add 333" in sent(lua)
     assert shown(lua) == ["gobject group select 333"]
 

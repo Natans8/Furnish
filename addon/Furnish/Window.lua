@@ -69,7 +69,7 @@ local LEADS = {
 	{ group = "nogroup", label = "No group", words = "<set> nogroup" },
 	{ group = "pivot", label = "Pivot", words = "<set>" },
 	{ group = "first", label = "First spawned", words = "<set> first" },
-	{ group = "attach", words = "<set> attach" },
+	{ group = "merge", words = "<set> merge" },
 }
 
 --- The room either side of a segment's words, and what the alert mark takes beside them.
@@ -278,7 +278,7 @@ end
 --- The request's group: the leader chosen, the selected gob standing down to the pivot while it
 -- cannot lead, and coming back as chosen once it can.
 local function grouped()
-	if lead == "attach" and cannotLead() then
+	if lead == "merge" and cannotLead() then
 		return "pivot"
 	end
 	return lead
@@ -286,7 +286,7 @@ end
 
 --- Whether the objects would join a group that stands already, which Spawn asks about first.
 local function joinsGroup()
-	return grouped() == "attach" and (spot.groupLeader or 0) ~= 0
+	return grouped() == "merge" and (spot.groupLeader or 0) ~= 0
 end
 
 --- Whether the selected gob draws a set already, as part of its model: its base set, unless
@@ -490,7 +490,7 @@ local function updateLeader()
 	frame.LeaderLabel:SetFontObject(run and _G.GameFontDisableSmall or _G.GameFontNormalSmall)
 	for _, segment in ipairs(segments) do
 		local choice = segment.choice
-		local enabled = not run and (choice.group ~= "attach" or not cannotLead())
+		local enabled = not run and (choice.group ~= "merge" or not cannotLead())
 		segment.Label:SetText(choice.label or selectedLabel())
 		segment.Label:SetFontObject(
 			enabled and _G.GameFontHighlightSmall or _G.GameFontDisableSmall

@@ -1,6 +1,6 @@
 -- What the commands do: list a WMO's sets, spawn one, import a doodad, and stop.
 --
--- This is the surface, not the API. It holds the one run, reads `attach` off the selection,
+-- This is the surface, not the API. It holds the one run, reads what a merge joins off the selection,
 -- and closes a grouped run by selecting the group in the player's sight, so the next group
 -- command acts on it; the API selects nothing. That group then stands for the object the run
 -- was anchored on, so the next set needs no reselecting by hand. Every line it prints says
@@ -14,8 +14,8 @@
 --   label   what to call that root in a line, which a list link carries
 --   here    true to spawn at the player rather than on the selected object
 --   at      a pose to spawn at instead, as Pose gives one; with the guid of the object it was
---           read off, that object is the one an attach joins
---   group   "pivot", "first", "attach" or "nogroup"; nil is "pivot"
+--           read off, that object is the one a merge joins
+--   group   "pivot", "first", "merge" or "nogroup"; nil is "pivot"
 --   base    true to lay the root's base set under the sets, unless it is one of them
 --   quiet   true when a window shows the run's progress, so the chat leaves it out
 --
@@ -689,7 +689,7 @@ function Console.Spawn(request)
 	if not loaded then
 		return say(reason)
 	end
-	-- A pose given is the destination, and the object it was read off, if any, is the one an attach
+	-- A pose given is the destination, and the object it was read off, if any, is the one a merge
 	-- joins; its root must be named, since a pose names none.
 	local named = request.entry or request.file
 	if request.at then
@@ -700,14 +700,14 @@ function Console.Spawn(request)
 	end
 	-- The selected object is the destination unless the set goes at the player, and any object
 	-- will do. It must be a WMO only where the set is its own, read off it because
-	-- neither a link nor an entry names one; and it leads the group a set attaches to.
-	if request.here and named and request.group ~= "attach" then
+	-- neither a link nor an entry names one; and it leads the group a set merges into.
+	if request.here and named and request.group ~= "merge" then
 		return spawnOn(request, nil)
 	end
 	local what = not named and "the WMO"
 		or request.here and "the object whose group to join"
 		or "the object to spawn on"
-	local otherwise = request.here and not named and request.group ~= "attach"
+	local otherwise = request.here and not named and request.group ~= "merge"
 	withSelection(
 		what,
 		otherwise and (", or name it, as " .. Chat.Typed("3 here <entry>")) or nil,
@@ -814,7 +814,7 @@ function Console.Import(request)
 		if not rows then
 			return say(what)
 		end
-		local group, lead = groupOf({ group = request.group or "attach" }, pose)
+		local group, lead = groupOf({ group = request.group or "merge" }, pose)
 		start(rows, pose, group, {
 			what = what,
 			where = "on " .. pose.name,

@@ -31,8 +31,8 @@ A set, list or import takes any of these words after it:
 
 | word      | does                                                                             |
 |-----------|----------------------------------------------------------------------------------|
-| `first`   | the set's first object leads the group, so no pivot spawns                       |
-| `attach`  | include the selected gob in the group, so no pivot spawns                        |
+| `first`   | the first object spawned leads the group, so no pivot spawns                     |
+| `merge`   | merge the set into the selected gob's group, so no pivot spawns                  |
 | `nogroup` | spawn every object ungrouped                                                     |
 | `base`    | spawn the base set as well, as a WMO that comes unfurnished always gets          |
 | `quiet`   | leave the progress counts out of chat, saying only how the run began and ended   |
