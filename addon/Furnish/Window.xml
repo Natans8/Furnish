@@ -210,31 +210,31 @@
 				</FontString>
 				<FontString parentKey="SourceName" inherits="GameFontHighlightMedium" justifyH="LEFT" wordwrap="false">
 					<Anchors>
-						<Anchor point="TOPLEFT" x="76" y="-72"/>
+						<Anchor point="TOPLEFT" x="96" y="-72"/>
 						<Anchor point="TOPRIGHT" x="-20" y="-72"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="SourceDetail" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false">
 					<Anchors>
-						<Anchor point="TOPLEFT" x="76" y="-92"/>
+						<Anchor point="TOPLEFT" x="96" y="-92"/>
 						<Anchor point="TOPRIGHT" x="-150" y="-92"/>
 					</Anchors>
 				</FontString>
 				<!-- Where the sets go, the same two lines over the position below them. -->
-				<FontString parentKey="TargetLabel" inherits="GameFontNormal" justifyH="LEFT">
+				<FontString parentKey="DestinationLabel" inherits="GameFontNormal" justifyH="LEFT">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="20" y="210"/>
 					</Anchors>
 				</FontString>
-				<FontString parentKey="TargetName" inherits="GameFontHighlightMedium" justifyH="LEFT" wordwrap="false">
+				<FontString parentKey="DestinationName" inherits="GameFontHighlightMedium" justifyH="LEFT" wordwrap="false">
 					<Anchors>
-						<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="76" y="212"/>
+						<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="96" y="212"/>
 						<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-20" y="212"/>
 					</Anchors>
 				</FontString>
-				<FontString parentKey="TargetDetail" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false">
+				<FontString parentKey="DestinationDetail" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false">
 					<Anchors>
-						<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="76" y="192"/>
+						<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="96" y="192"/>
 						<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-150" y="192"/>
 					</Anchors>
 				</FontString>
@@ -265,7 +265,7 @@
 				</Anchors>
 			</CheckButton>
 
-			<!-- The gob entry the sets come from, as the target's boxes hold its position: a third
+			<!-- The gob entry the sets come from, as the destination's boxes hold its position: a third
 			     of the width, sized by Window.lua with them. -->
 			<EditBox parentKey="SourceID" inherits="FurnishNumberTemplate">
 				<Anchors>
@@ -282,7 +282,7 @@
 				</Anchors>
 			</Frame>
 
-			<CheckButton parentKey="TargetFollow" inherits="FurnishFollowTemplate">
+			<CheckButton parentKey="DestinationFollow" inherits="FurnishFollowTemplate">
 				<Anchors>
 					<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" x="-20" y="200"/>
 				</Anchors>
@@ -312,7 +312,7 @@
 				</Anchors>
 			</Button>
 
-			<!-- Whether the objects form a group, whether the target is in it, and whether a pivot
+			<!-- Whether the objects form a group, whether the selected gob is in it, and whether a pivot
 			     leads a group of their own. -->
 			<CheckButton parentKey="Grouped" inherits="UICheckButtonTemplate">
 				<Size x="22" y="22"/>
@@ -323,7 +323,7 @@
 			<CheckButton parentKey="Include" inherits="UICheckButtonTemplate">
 				<Size x="22" y="22"/>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="150" y="92"/>
+					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="140" y="92"/>
 				</Anchors>
 			</CheckButton>
 			<!-- No pivot: the set's first object leads its group instead of an invisible pivot. -->
@@ -333,7 +333,7 @@
 					<Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" x="300" y="92"/>
 				</Anchors>
 			</CheckButton>
-			<!-- Shown where the target is in a group already; Window.lua stands it after the
+			<!-- Shown where the selected gob is in a group already; Window.lua stands it after the
 			     include box's words. -->
 			<Button parentKey="Warning" hidden="true">
 				<Size x="18" y="18"/>
@@ -425,7 +425,7 @@
 
 			<!-- The doodad `.doodad select` picked, in a panel of its own top-aligned to the window's
 			     right edge, shown while there is one: its name, the sets of the WMO it is, and what it
-			     gives the window, its sets to the source and itself, as a gob, to the target. Its
+			     gives the window, its sets to the source and itself, as a gob, to the destination. Its
 			     height follows its list, set by Window.lua: the list hangs from the top, and the two
 			     buttons stand on the bottom. -->
 			<Frame parentKey="Doodad" enableMouse="true" hidden="true">

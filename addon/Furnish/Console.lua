@@ -19,7 +19,7 @@
 --   base    true to lay the root's base set under the sets, unless it is one of them
 --   quiet   true when a window shows the run's progress, so the chat leaves it out
 --
--- A window reads Source for the sets to show, Target for the object they may spawn on, Busy
+-- A window reads Source for the sets to show, Selected for the object they may spawn on, Busy
 -- for whether it may start, and Watch for the run it started; it spawns and stops through the
 -- same doors as the commands.
 
@@ -287,11 +287,11 @@ end
 local reminded = false
 
 --- Send a run, having said what it is.
--- @param target the pose the rows are placed at
+-- @param destination the pose the rows are placed at
 -- @param about { what, the set as a line names it; where, "on <WMO>" or "at your feet";
 --   lead, how the group is led as groupOf says it; anchor, the selected object the run is
 --   anchored on, or nil; quiet, true when a window shows the progress instead }
-local function start(rows, target, group, about)
+local function start(rows, destination, group, about)
 	local send, reason = Client.Send()
 	if not send then
 		return say(reason)
@@ -309,9 +309,9 @@ local function start(rows, target, group, about)
 	tell("started", #rows, about.what)
 	local handle, refused = Furnish.Spawn(
 		rows,
-		target.position,
-		target.rotation,
-		target.scale,
+		destination.position,
+		destination.rotation,
+		destination.scale,
 		group,
 		send,
 		hooks(about)
@@ -465,12 +465,12 @@ end
 --- What a window's sets may spawn on and whose group they may join: the selected object's
 -- pose, whatever it is, with its name, guid, groupLeader and canEdit beside it; or nil and
 -- why nothing is selected.
-function Console.Target()
+function Console.Selected()
 	return selectedPose()
 end
 
---- The selected group, which neither a source nor a target takes by itself, as a target may be
--- filled from it once: its pose as Pose.OfGroup gives it. Nil when no group is selected, when
+--- The selected group, which neither a source nor a destination takes by itself, as a
+-- destination may be filled from it once: its pose as Pose.OfGroup gives it. Nil when no group is selected, when
 -- the group is the one Furnish's last run made, which stands for the object that run was on,
 -- or when its leader's record has not arrived yet.
 function Console.Group()
@@ -620,10 +620,10 @@ end
 --- Spawn sets; pose is the selected object's, or nil where they go at the player from a named
 -- root and join no object's group.
 local function spawnOn(request, pose)
-	local target, reason = pose, nil
+	local destination, reason = pose, nil
 	if request.here then
-		target, reason = Pose.Here()
-		if not target then
+		destination, reason = Pose.Here()
+		if not destination then
 			return say(reason)
 		end
 	end
@@ -645,7 +645,7 @@ local function spawnOn(request, pose)
 		chosen[#chosen + 1] = set
 		hasBase = hasBase or set.index == 0
 	end
-	-- A WMO Epsilon emptied draws no base set of its own, so one standing as the target gets
+	-- A WMO Epsilon emptied draws no base set of its own, so one standing as the destination gets
 	-- it, under the rest and once.
 	local base = request.base or (not request.here and Sets.IsBlank(pose.file))
 	if base and not hasBase and sets[1].index == 0 then
@@ -663,8 +663,8 @@ local function spawnOn(request, pose)
 	if not group then
 		return say(lead)
 	end
-	local spot = target.position
-	start(rows, target, group, {
+	local spot = destination.position
+	start(rows, destination, group, {
 		what = what,
 		where = request.here and "at your feet"
 			or pose.name and ("on " .. pose.name)
@@ -689,7 +689,7 @@ function Console.Spawn(request)
 	if not loaded then
 		return say(reason)
 	end
-	-- A pose given is the target, and the object it was read off, if any, is the one an attach
+	-- A pose given is the destination, and the object it was read off, if any, is the one an attach
 	-- joins; its root must be named, since a pose names none.
 	local named = request.entry or request.file
 	if request.at then
@@ -698,7 +698,7 @@ function Console.Spawn(request)
 		end
 		return spawnOn(request, request.at)
 	end
-	-- The selected object is the target unless the set goes at the player, and any object
+	-- The selected object is the destination unless the set goes at the player, and any object
 	-- will do. It must be a WMO only where the set is its own, read off it because
 	-- neither a link nor an entry names one; and it leads the group a set attaches to.
 	if request.here and named and request.group ~= "attach" then

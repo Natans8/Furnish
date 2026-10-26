@@ -1,18 +1,18 @@
 -- The window: where a WMO's sets come from, which of them to spawn, and where they go, read top
 -- to bottom, with a run's progress at the foot.
 --
--- A surface over Console, as the commands are: it reads Source for the sets, Target for the
+-- A surface over Console, as the commands are: it reads Source for the sets, Selected for the
 -- selected object's pose, Find for a name searched, Busy for whether it may start and Watch for
 -- the run going on, and spawns, imports and stops through the same doors, so the window and
 -- the commands can never disagree. The layout is Window.xml; this file gives it behaviour and
 -- every word.
 --
--- Source and Target each follow the gob selection until their box is unticked. The source is
--- the WMO a gob entry is, shown in its ID box as the target's numbers are: the selected gob's,
--- one typed, the lowest of a WMO searched, or the doodad's. The target is the selected gob, or
--- where the player stands while no gob is selected, so every number always holds a value. The doodad `.doodad select`
+-- Source and Destination each follow the gob selection until their box is unticked. The source is
+-- the WMO a gob entry is, shown in its ID box as the destination's numbers are: the selected gob's,
+-- one typed, the lowest of a WMO searched, or the doodad's. The destination is the selected gob's
+-- position, or where the player stands while no gob is selected, so every number always holds a value. The doodad `.doodad select`
 -- picks is another selection, held at the same time and shown in a panel of its own beside the
--- window: picking it never changes the source or the target, and selecting a gob never clears
+-- window: picking it never changes the source or the destination, and selecting a gob never clears
 -- it. It is a step before the gob pipeline, giving each side something in advance. Use as source
 -- keeps its WMO as the source with the sets it drew chosen; Import doodad turns it into a gob,
 -- selected like any other, with those sets chosen while the source follows the selection; a
@@ -175,21 +175,21 @@ local function valueOf(pose, number)
 	return pose.scale
 end
 
---- What a gob target is, in a word or two.
+--- What a selected gob is, in a word or two.
 local function gobDetail(pose)
 	return (pose.groupLeader or 0) ~= 0 and "Gob, in a group" or "Gob"
 end
 
---- Whether a run spawns a pivot to lead its group: when grouped without the target, and while
+--- Whether a run spawns a pivot to lead its group: when grouped without the selected gob, and while
 -- a pivot is set at all.
 local function pivots(group)
 	return group == "pivot" and Furnish.Settings.pivot ~= nil
 end
 
---- What Use selected fills the target from: the selected gob, or else a selected group, whose
--- pose says group; nil when neither is selected. The target never follows a group by itself.
-local function selectedForTarget()
-	return Console.Target() or Console.Group()
+--- What Use selected fills the destination from: the selected gob, or else a selected group, whose
+-- pose says group; nil when neither is selected. The destination never follows a group by itself.
+local function selectedForDestination()
+	return Console.Selected() or Console.Group()
 end
 
 --- Show a tooltip: a title, label and value pairs, and lines in a colour of their own.
@@ -232,17 +232,23 @@ local function hint(owner, title, lines, words)
 	owner:SetScript("OnLeave", _G.GameTooltip_Hide)
 end
 
---- Why the target cannot be included in the group, or nil when it can.
+--- What the destination was taken from, as a line names it: the selected group, or the
+-- selected gob.
+local function selectedWhat()
+	return spot and spot.group and "the selected group" or "the selected gob"
+end
+
+--- Why the selected gob cannot be included in the group, or nil when it can.
 local function cannotInclude()
 	if not spot or not spot.guid then
-		return "The target is a position, not a gob."
+		return "The destination is a position, not a selected gob."
 	elseif not Client.CanEdit(spot) then
-		return "You can't edit the target in this phase."
+		return "You can't edit " .. selectedWhat() .. " in this phase."
 	end
 	return nil
 end
 
---- The request's group, from the three boxes: loose, a group the target joins, or a group of
+--- The request's group, from the three boxes: loose, a group the selected gob joins, or a group of
 -- their own that a pivot leads, or the set's first object where No pivot is ticked.
 local function grouped()
 	if not frame.Grouped:GetChecked() then
@@ -404,7 +410,7 @@ local function controls()
 		frame.Search,
 		frame.SourceFollow,
 		frame.SourceID,
-		frame.TargetFollow,
+		frame.DestinationFollow,
 		frame.Here,
 		frame.UseSelected,
 		frame.Grouped,
@@ -420,7 +426,7 @@ local function checkText(box, enabled)
 	box.text:SetFontObject(enabled and _G.GameFontHighlightSmall or _G.GameFontDisableSmall)
 end
 
-local function updateTarget()
+local function updateDestination()
 	-- A number typed makes a gob's position the player's own; a position typed is no longer where
 	-- anyone stood.
 	local name, detail = spot and spot.name or "", spot and spot.detail or ""
@@ -429,9 +435,9 @@ local function updateTarget()
 	elseif edited then
 		name, detail = "A position", "Typed in"
 	end
-	frame.TargetName:SetText(name)
-	frame.TargetDetail:SetText(detail)
-	frame.TargetFollow:SetChecked(not spotPinned)
+	frame.DestinationName:SetText(name)
+	frame.DestinationDetail:SetText(detail)
+	frame.DestinationFollow:SetChecked(not spotPinned)
 	for _, number in ipairs(NUMBERS) do
 		local box = frame[number.box]
 		if not box:HasFocus() then
@@ -442,7 +448,7 @@ local function updateTarget()
 		box:SetTextColor(run and 0.5 or 1, run and 0.5 or 1, run and 0.5 or 1)
 	end
 	-- The button names what it reads, a gob or a group, and is as wide as its words.
-	local from = selectedForTarget()
+	local from = selectedForDestination()
 	local label = from and from.group and "Use selected group" or "Use selected gob"
 	if frame.UseSelected:GetText() ~= label then
 		frame.UseSelected:SetText(label)
@@ -452,9 +458,10 @@ local function updateTarget()
 	end
 	frame.UseSelected:SetEnabled(not run and from ~= nil)
 	local canInclude = not run and frame.Grouped:GetChecked() and not cannotInclude()
+	frame.Include.text:SetText("Include " .. selectedWhat())
 	frame.Include:SetEnabled(canInclude)
 	checkText(frame.Include, canInclude)
-	-- Who leads a group of the set's own, which a group the target leads has not.
+	-- Who leads a group of the set's own, which a group the selected gob leads has not.
 	local canChooseLeader = not run and frame.Grouped:GetChecked() and grouped() ~= "attach"
 	frame.NoPivot:SetEnabled(canChooseLeader)
 	checkText(frame.NoPivot, canChooseLeader)
@@ -487,7 +494,7 @@ local function update()
 	id:SetTextColor(run and 0.5 or 1, run and 0.5 or 1, run and 0.5 or 1)
 	list.ScrollBox:ForEachFrame(mark)
 	updateMore()
-	updateTarget()
+	updateDestination()
 	updateStatus()
 	local text, enabled = action()
 	frame.SpawnButton:SetText(text)
@@ -523,7 +530,7 @@ _G.StaticPopupDialogs.FURNISH_JOIN_GROUP = {
 	preferredIndex = 3,
 }
 
---- Spawn the chosen sets, asking first where they would join a group the target is in already,
+--- Spawn the chosen sets, asking first where they would join a group the selected gob is in already,
 -- and spawning then what was asked about, whatever has been selected since; or stop the run.
 local function spawn()
 	if run then
@@ -593,11 +600,11 @@ local function sourceEntry()
 			or (pinned.file and Reader.Load() and Reader.EntryOfFile(pinned.file))
 			or nil
 	end
-	local selected = Console.Target()
+	local selected = Console.Selected()
 	return selected and selected.entry
 end
 
---- Read the window afresh: the source and the target follow the selection unless unticked.
+--- Read the window afresh: the source and the destination follow the selection unless unticked.
 local function refresh()
 	if run then
 		return
@@ -619,18 +626,18 @@ local function refresh()
 		marks = nil
 	end
 	if not spotPinned then
-		local selected = Console.Target()
+		local selected = Console.Selected()
 		if selected then
 			spot = copy(selected, nil, gobDetail(selected))
 		elseif not spot or spot.guid then
-			-- With nothing selected the target takes where the player stands, read once so no number
+			-- With nothing selected the destination takes where the player stands, read once so no number
 			-- is empty, and never again while it stays so: it does not follow the player, and Here
 			-- reads it afresh.
 			local here = Pose.Here()
 			spot = here and copy(here, "Your position", "")
 		end
-		-- Without a gob to follow, the target says why: none is selected, or a group is, which the
-		-- target never follows by itself.
+		-- Without a gob to follow, the destination says why: none is selected, or a group is,
+		-- which the destination never follows by itself.
 		if spot and not selected then
 			spot.detail = Console.Group() and "A group is selected" or "No gob selected"
 		end
@@ -645,7 +652,7 @@ local function refresh()
 		frame.SourceDetail:SetText(sourceDetail())
 		provider:InsertTable(shown.sets)
 	else
-		local selected = not pinned and Console.Target()
+		local selected = not pinned and Console.Selected()
 		frame.SourceName:SetTextColor(1, 1, 1)
 		if pinned and pinned.empty then
 			frame.SourceName:SetText("Nothing kept")
@@ -920,14 +927,14 @@ local function idChanged(box)
 	update()
 end
 
---- Follow the selection with the target, or keep the position shown whatever is selected.
-local function followTarget(box)
+--- Follow the selection with the destination, or keep the position shown whatever is selected.
+local function followDestination(box)
 	spotPinned = not box:GetChecked()
 	refresh()
 end
 
---- Fill the target once from a pose, and keep it there until Follow selection is ticked.
-local function fillTarget(pose)
+--- Fill the destination once from a pose, and keep it there until Follow selection is ticked.
+local function fillDestination(pose)
 	if pose then
 		spot, spotPinned, edited = pose, true, false
 	end
@@ -1008,7 +1015,7 @@ local function fillDoodad()
 end
 
 --- Keep the doodad's WMO as the source whatever is selected, with the sets the doodad drew
--- chosen; the target stays as it is.
+-- chosen; the destination stays as it is.
 local function useDoodad()
 	pinned = { entry = doodad.entry, placement = doodad, name = doodad.name }
 	frame.Search:SetText("")
@@ -1017,7 +1024,7 @@ local function useDoodad()
 	refresh()
 end
 
---- Import the doodad picked: it becomes a gob, selected like any other, which Source and Target
+--- Import the doodad picked: it becomes a gob, selected like any other, which Source and Destination
 -- each follow while ticked; the sets the doodad drew come chosen when the source shows that gob.
 -- Either kept as it is stays so, the source's chosen sets and all. The doodad is hidden, not
 -- gone, and stays selected, so it stays in its slot.
@@ -1030,7 +1037,7 @@ local function importDoodad()
 	update()
 end
 
---- A number typed: the target is the player's own from here on.
+--- A number typed: the destination is the player's own from here on.
 local function numberChanged(box, typed)
 	if not typed then
 		return
@@ -1051,7 +1058,7 @@ end
 
 --- A doodad `.doodad select` picked takes the doodad slot, whatever it is and whether the window
 -- is open or not, so the panel never shows one the server no longer holds; it is read once the
--- window shows it. The source and the target stay the gob selection's.
+-- window shows it. The source and the destination stay the gob selection's.
 local function doodadSelected(line)
 	local named = Furnish.Commands.SelectedDoodad(line)
 	if not named then
@@ -1098,7 +1105,7 @@ local function layoutNumbers()
 			box:SetTextInsets(box.Axis:GetStringWidth() + 6, 4, 0, 0)
 		end
 	end
-	-- The source's ID box is as wide as one of the three on the target's first row.
+	-- The source's ID box is as wide as one of the three on the destination's first row.
 	local id = frame.SourceID
 	id:SetWidth((width - 2 * NUMBER_GAP) / 3 - NUMBER_ART)
 	id:SetTextInsets(id.Axis:GetStringWidth() + 6, 4, 0, 0)
@@ -1240,15 +1247,15 @@ local function buildSource()
 	end
 end
 
-local function buildTarget()
-	frame.TargetLabel:SetText("Target")
-	frame.TargetFollow.Label:SetText("Follow selection")
-	frame.TargetFollow:SetScript("OnClick", Client.Guarded(followTarget))
-	hint(frame.TargetFollow, "Follow selection", {
+local function buildDestination()
+	frame.DestinationLabel:SetText("Destination")
+	frame.DestinationFollow.Label:SetText("Follow selection")
+	frame.DestinationFollow:SetScript("OnClick", Client.Guarded(followDestination))
+	hint(frame.DestinationFollow, "Follow selection", {
 		{
-			text = "Ticked, the target is the selected gob, or where you stand while no gob is selected.",
+			text = "Ticked, the destination is the selected gob's position, or where you stand while no gob is selected.",
 		},
-		{ text = "Unticked, the target stays as it is whatever gob is selected." },
+		{ text = "Unticked, the destination stays as it is whatever gob is selected." },
 	})
 	for order, number in ipairs(NUMBERS) do
 		local box = frame[number.box]
@@ -1257,7 +1264,7 @@ local function buildTarget()
 		box.Axis:SetText(number.box)
 		box:HookScript("OnTextChanged", Client.Guarded(numberChanged))
 		box:SetScript("OnEnterPressed", box.ClearFocus)
-		-- Leaving a box shows the value the target holds, so text that is no number does not stay.
+		-- Leaving a box shows the value the destination holds, so text that is no number does not stay.
 		box:HookScript("OnEditFocusLost", Client.Guarded(update))
 		-- Typing replaces the number, and Tab moves on through the boxes, as in ObjectMover.
 		box:HookScript("OnEditFocusGained", box.HighlightText)
@@ -1276,42 +1283,44 @@ local function buildTarget()
 		"OnClick",
 		Client.Guarded(function()
 			local here = Pose.Here()
-			fillTarget(here and copy(here, "Your position", "Where you stood"))
+			fillDestination(here and copy(here, "Your position", "Where you stood"))
 		end)
 	)
 	frame.UseSelected:SetScript(
 		"OnClick",
 		Client.Guarded(function()
-			local from = selectedForTarget()
+			local from = selectedForDestination()
 			if from and from.group then
-				return fillTarget(copy(from, "A group", "Led by " .. from.name))
+				return fillDestination(copy(from, "A group", "Led by " .. from.name))
 			end
-			fillTarget(from and copy(from, nil, gobDetail(from)))
+			fillDestination(from and copy(from, nil, gobDetail(from)))
 		end)
 	)
 	hint(
 		frame.Here,
 		"Here",
-		{ { text = "Fill the target with where you stand and the way you face, once." } },
+		{ { text = "Fill the destination with where you stand and the way you face, once." } },
 		"<set> here"
 	)
 	hint(frame.UseSelected, function()
 		return frame.UseSelected:GetText()
 	end, function()
-		local from = selectedForTarget()
+		local from = selectedForDestination()
 		if from and from.group then
 			return {
-				{ text = "Fill the target with the selected group's position and facing, once." },
-				{ text = "A group has no roll or pitch of its own, so the target is level." },
-				{ text = "With Include the target, the objects join that group." },
+				{
+					text = "Fill the destination with the selected group's position and facing, once.",
+				},
+				{ text = "A group has no roll or pitch of its own, so the destination is level." },
+				{ text = "With Include the selected group, the objects join that group." },
 			}
 		end
-		return { { text = "Fill the target with the selected gob's position, once." } }
+		return { { text = "Fill the destination with the selected gob's position, once." } }
 	end)
 
 	frame.Grouped.text:SetText("Group on spawn")
 	frame.Grouped:SetChecked(true)
-	frame.Include.text:SetText("Include the target")
+	frame.Include.text:SetText("Include the selected gob")
 	frame.NoPivot.text:SetText("No pivot")
 	frame.Warning:SetPoint("LEFT", frame.Include.text, "RIGHT", 4, 0)
 	for _, box in ipairs({ frame.Grouped, frame.Include, frame.NoPivot }) do
@@ -1321,7 +1330,7 @@ local function buildTarget()
 		return {
 			{ text = "The spawned objects form one group, so they move as one." },
 			{
-				text = "Unless the target is included or No pivot is ticked, a pivot leads the group: one extra, invisible object where the WMO stands.",
+				text = "Unless the selected gob is included or No pivot is ticked, a pivot leads the group: one extra, invisible object where the WMO stands.",
 			},
 		}
 	end, "<set>")
@@ -1331,14 +1340,24 @@ local function buildTarget()
 			text = "A group turns and scales around its leader, so it then turns around that object rather than around the WMO.",
 		},
 	}, "<set> first")
-	hint(frame.Include, "Include the target", function()
+	hint(frame.Include, function()
+		return "Include " .. selectedWhat()
+	end, function()
 		local why = cannotInclude()
+		if spot and spot.group then
+			return {
+				{
+					text = "The objects join the selected group, so moving the group moves them too. No pivot spawns.",
+				},
+				why and { text = why, colour = RED },
+			}
+		end
 		return {
 			{
-				text = "The target joins the group and leads it, so moving the target moves everything, and no pivot spawns.",
+				text = "The selected gob joins the group and leads it, so moving it moves everything, and no pivot spawns.",
 			},
 			{
-				text = "If the target is in a group already, the objects join that group; Spawn asks first.",
+				text = "If the selected gob is in a group already, the objects join that group; Spawn asks first.",
 			},
 			why and { text = why, colour = RED },
 		}
@@ -1346,7 +1365,7 @@ local function buildTarget()
 	frame.Warning:SetScript(
 		"OnEnter",
 		Client.Guarded(function(button)
-			tip(button, "The target is in a group", {
+			tip(button, "The selected gob is in a group", {
 				{ text = spot.name .. " is in a group already, so the objects join that group." },
 				{ text = "Spawn asks before it starts.", colour = GREY },
 			})
@@ -1378,7 +1397,7 @@ local function buildDoodad()
 		{
 			text = "Show the sets of the doodad's WMO as the source, kept whatever gob is selected, with the sets the doodad drew beyond its base chosen.",
 		},
-		{ text = "The target stays as it is." },
+		{ text = "The destination stays as it is." },
 	})
 	hint(panel.Import, "Import doodad", importLines, "import")
 end
@@ -1448,7 +1467,7 @@ local function build()
 
 	buildSearch()
 	buildSource()
-	buildTarget()
+	buildDestination()
 	buildDoodad()
 	buildFooter()
 	Client.OnSystemLine(doodadSelected)

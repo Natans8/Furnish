@@ -250,15 +250,15 @@ def test_a_selected_map_wmo_names_its_source_and_marks_the_sets_its_map_draws(
     assert [s.placed for s in stray.sets.values()] == [False, False]
 
 
-def test_the_target_is_any_selected_object_with_its_pose(tmp_path: Path) -> None:
+def test_the_selection_is_any_selected_object_with_its_pose(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
-    assert lua.eval("select(2, Furnish.Console.Target())") == "no object is selected"
+    assert lua.eval("select(2, Furnish.Console.Selected())") == "no object is selected"
     lua.execute("SELECTED = 502")
-    assert lua.eval("(Furnish.Console.Target())").name == "chair"
+    assert lua.eval("(Furnish.Console.Selected())").name == "chair"
     lua.execute("SELECTED = 500")
-    target = lua.eval("(Furnish.Console.Target())")
-    assert (target.name, target.guid, target.scale) == ("house", 500, 2)
-    assert (target.position.x, target.rotation.turn, target.groupLeader) == (10, 90, 0)
+    selected = lua.eval("(Furnish.Console.Selected())")
+    assert (selected.name, selected.guid, selected.scale) == ("house", 500, 2)
+    assert (selected.position.x, selected.rotation.turn, selected.groupLeader) == (10, 90, 0)
 
 
 def test_a_set_spawns_at_a_pose_given_with_no_object_behind_it(tmp_path: Path) -> None:
@@ -285,7 +285,7 @@ def test_a_set_spawns_at_a_pose_given_with_no_object_behind_it(tmp_path: Path) -
 def test_a_pose_read_off_an_object_joins_that_objects_group(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 500")
-    lua.execute("AT = Furnish.Console.Target(); SELECTED = 502")
+    lua.execute("AT = Furnish.Console.Selected(); SELECTED = 502")
     spawn(lua, "{ index = 1, file = 900, label = 'house', at = AT, group = 'attach' }")
     assert printed(lua)[-2] == (PREFIX + "spawning Full (set 1, 2 objects) on house, led by house")
     assert "gobject group add 500" in sent(lua)

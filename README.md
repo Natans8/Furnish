@@ -57,7 +57,7 @@ selection line, from `.gob select`, or its spawn line, from `.gob spawn`, which 
 makes, one that lists its sets.
 
 The window reads top to bottom as where the sets come from, which to spawn, and where they go.
-Source is the WMO a gob entry is, held in its ID box as Target's numbers are: the selected gob's, one typed, which
+Source is the WMO a gob entry is, held in its ID box as Destination's numbers are: the selected gob's, one typed, which
 keeps it whatever gob is selected, or the lowest entry of a WMO searched by name, since every entry of one WMO reads
 the same sets. A search lists the WMOs with sets that the client's own catalogue names like it, the first
 lit so Enter takes it and Up and Down moving the light, and those that come unfurnished
@@ -65,25 +65,25 @@ marked. A set the selected WMO draws already, as part of its model, is marked ba
 base set, unless it comes unfurnished. A click chooses one set and a
 ctrl-click adds or removes one, a strip at either end of the list counts the chosen sets
 scrolled out of view, and resting on a set names the models it holds, as the client's own
-catalogue names them once a walk of it, started when the window opens, has ended. Target is the selected
+catalogue names them once a walk of it, started when the window opens, has ended. Destination is the selected
 gob, or where you stand while nothing is selected, so every number always holds a value: X, Y
 and Z, then the roll, pitch and turn about each in ObjectMover's colours, then the scale. Here
 and Use selected gob fill it once; typing a number keeps what was typed; Tab moves through the
 boxes. Either block's Follow selection, unticked, keeps what it shows whatever you select. A
 selected group is used by neither block, as a model is no source: both say a group is selected, and
-Use selected group fills Target once with the group's position and facing, level, since a group
-has no roll or pitch of its own; Include the target then joins that group. The group a run selects
+Use selected group fills Destination once with the group's position and facing, level, since a group
+has no roll or pitch of its own; Include the selected group then joins that group. The group a run selects
 when it ends still stands for the WMO the run was on. The
 doodad `.doodad select` picks is a selection of its own, held beside the gob's: it never changes
-Source or Target, and while there is one a panel stands against the window's right edge with
+Source or Destination, and while there is one a panel stands against the window's right edge with
 its name and the sets of the WMO it is, those it draws already marked baked. Every pick takes
 the panel, the window open or not, and a doodad with no sets Furnish knows of empties it. Use as source keeps
 that WMO as the source, with the sets the doodad drew beyond its base chosen. Import doodad turns
 it into a gob that is selected like any other; while Source follows the selection, the same sets
 come chosen on it, and either block kept as it is stays so. The doodad is
 hidden, not gone, and stays selected; closing the panel lets it go. Group on spawn makes the objects one group,
-led by a pivot the button counts; Include the target makes the target lead it instead, and
-where the target is in a group already a mark warns and Spawn asks first; No pivot makes the
+led by a pivot the button counts; Include the selected gob makes that gob lead it instead,
+and where the selected gob is in a group already a mark warns and Spawn asks first; No pivot makes the
 set's first object lead a group of its own, so no extra object spawns, the group then turning
 around that object. The status row
 holds Highlighting, which toggles the client's outline on selected objects, beside a run's
@@ -208,9 +208,9 @@ lead to the first doodad.
 | `Sets.lua`      | which: `OfFile`, `Pick`, `OfEntry`, `IsBlank`, `OfPlacement`                         |
 | `Rows.lua`      | what: `OfSet`, `Union`, `Without`                                                    |
 | `Chat.lua`      | the prefix, the colours, a menu measured to the chat frame, and Furnish's links      |
-| `Console.lua`   | what the commands and the window do: `List`, `Spawn`, `Import`, `Stop`, `Target`     |
+| `Console.lua`   | what the commands and the window do: `List`, `Spawn`, `Import`, `Stop`, `Selected`   |
 | `Window.xml`    | the window's layout, after ObjectMover's: a dark dialog of bordered panels           |
-| `Window.lua`    | the window: reads `Target`, `Busy` and `Watch`, spawns and stops through `Console`   |
+| `Window.lua`    | the window: reads `Selected`, `Busy` and `Watch`, spawns and stops through `Console`   |
 | `Command.lua`   | `/furnish` and `/furn`: reading what is typed, the help, a link's click              |
 | `Options.lua`   | the settings panel in the game's Options, writing into `Furnish.Settings`            |
 
