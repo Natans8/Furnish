@@ -36,6 +36,20 @@ function Chat.Count(count, noun)
 	return Chat.Thousands(count) .. " " .. noun .. "s"
 end
 
+--- A run past this many objects is counted by tenths rather than quarters, since a quarter of it
+-- would leave over 125 objects between lines.
+local LONG_RUN = 500
+
+--- How far a run goes between the lines chat counts it by: a quarter of it, a tenth past
+-- LONG_RUN, and never under ten objects, so a run says at most three such lines, nine once it
+-- is long, and none at ten objects or fewer.
+function Chat.Stride(total)
+	if total > LONG_RUN then
+		return math.ceil(total / 10)
+	end
+	return math.max(10, math.ceil(total / 4))
+end
+
 --- The risk a player is reminded of before a big spawn. Whether highlighting is on stays the
 -- player's to decide, so Furnish only says this and never turns it off.
 Chat.HIGHLIGHT = "Highlighting too many objects can crash the game"

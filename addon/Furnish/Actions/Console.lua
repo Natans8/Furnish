@@ -333,11 +333,7 @@ local function finish(result, started, anchor)
 	end
 end
 
---- How far a run goes between the lines chat counts it by: a quarter of it, and never under ten,
--- so a run says at most three such lines, and one of ten objects or fewer none.
-local function stride(total)
-	return math.max(10, math.ceil(total / 4))
-end
+local stride = Chat.Stride
 
 local function hooks(about)
 	local told, cleaned, started = 0, 0, Client.Now()

@@ -707,6 +707,23 @@ def test_an_abort_while_deleting_sends_no_more_deletes(tmp_path: Path) -> None:
     assert lua.eval("RESULT.deleted") == 1 and lua.eval("HANDLE.Done()") is True
 
 
+# -- Chat -------------------------------------------------------------------------------
+
+
+def test_chat_counts_a_run_by_quarters_and_a_long_one_by_tenths(tmp_path: Path) -> None:
+    stride = lua_core(tmp_path).eval("Furnish.Chat.Stride")
+    said = {}
+    for total in (10, 11, 40, 100, 500, 501, 9931):
+        # The lines a run says on its way, as the console counts them: one each stride, the
+        # last object left to the line that ends the run.
+        step, told, lines = stride(total), 0, 0
+        for done in range(1, total):
+            if done - told >= step:
+                told, lines = done, lines + 1
+        said[total] = lines
+    assert said == {10: 0, 11: 1, 40: 3, 100: 3, 500: 3, 501: 9, 9931: 9}
+
+
 # -- Settings ---------------------------------------------------------------------------
 
 
