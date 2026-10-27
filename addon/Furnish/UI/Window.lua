@@ -149,8 +149,9 @@ end
 -- doodad `.doodad select` picked, in its own slot, imported or not, with the sets of the WMO it
 -- is; the doodad imported last while the source followed the selection, whose sets come chosen
 -- when the gob it became is shown; the source shown, or nil, and the gob entry its ID box holds;
--- and the sets chosen, by index.
-local pinned, doodad, marks, shown, shownEntry
+-- and the sets chosen, by index. And the doodad the window asked to import, by its unique id,
+-- until the server names the gob it made.
+local pinned, doodad, marks, shown, shownEntry, asked
 local chosen = {}
 
 --- Whether the next source shown has its sets chosen afresh, even where it is the WMO shown
@@ -519,7 +520,8 @@ local function updateDoodad()
 	local count = Chat.Count(#doodad.sets, "set")
 	panel.Detail:SetText(count .. (doodad.imported and ", imported" or ""))
 	panel.UseSource:SetEnabled(not run)
-	panel.Import:SetEnabled(not run and not doodad.imported)
+	-- Held while an import waits for its gob, so a second click sends nothing twice.
+	panel.Import:SetEnabled(not run and not doodad.imported and not Console.Busy())
 end
 
 local function update()
@@ -1144,12 +1146,10 @@ end
 --- Import the doodad picked: it becomes a gob, selected like any other, which Source and Destination
 -- each follow while ticked; the sets the doodad drew come chosen when the source shows that gob.
 -- Either kept as it is stays so, the source's chosen sets and all. The doodad is hidden, not
--- gone, and stays selected, so it stays in its slot.
+-- gone, and stays selected, so it stays in its slot. It counts as imported once the server names
+-- the gob it made, since the gob is selected by the GUID that names it.
 local function importDoodad()
-	doodad.imported = true
-	if not pinned then
-		marks, chosen, rechoose = doodad, {}, true
-	end
+	asked = doodad.uid
 	Console.Import({ uid = doodad.uid, only = true })
 	update()
 end
@@ -1253,17 +1253,32 @@ local function listOf(box, data, template, initializer)
 	box.ScrollBox:SetDataProvider(data)
 end
 
---- An import the player typed marks the doodad in the panel imported where it is the one, since
--- the server refuses a second import. The window sends nothing for it: the server selects the gob
--- it made but sends no record of it, and reading that gob is the player's own `.gob select`.
-local function importHeard(line)
-	local uid = Furnish.Commands.Imported({ line })
-	if uid and doodad and tostring(doodad.uid) == uid and not doodad.imported then
+--- The server named the gob an import made, so the doodad in the panel, where it is the one, is
+-- imported, and the server refuses a second import. The one the window asked to import also has
+-- its sets come chosen when the source shows the gob it became.
+local function importConfirmed(uid)
+	if not (uid and doodad and tostring(doodad.uid) == tostring(uid)) then
+		return
+	end
+	if asked and tostring(asked) == tostring(uid) then
+		asked = nil
+		if not pinned then
+			marks, chosen, rechoose = doodad, {}, true
+		end
+	end
+	if not doodad.imported then
 		doodad.imported = true
 		if frame:IsShown() then
 			update()
 		end
 	end
+end
+
+--- An import typed as the server's own command is heard by its line. The window sends nothing for
+-- it: the server selects the gob it made but sends no record of it, and reading that gob is the
+-- player's own `.gob select`.
+local function importHeard(line)
+	importConfirmed(Furnish.Commands.Imported({ line }))
 end
 
 --- What the window hears only while it is open: the gob selection, the phase, and runs, since
@@ -1659,6 +1674,8 @@ local function build()
 	buildOffer()
 	Client.OnSystemLine(doodadSelected)
 	Client.OnSystemLine(importHeard)
+	-- Heard always, as the doodad slot is: an import is done when the server names its gob.
+	Console.Watch({ imported = Client.Guarded(importConfirmed) })
 
 	frame:SetScript(
 		"OnShow",

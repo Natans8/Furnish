@@ -985,6 +985,41 @@ def test_an_import_hears_its_line_when_the_server_sends_it_apart(tmp_path: Path)
     assert printed(lua)[-2] == (PREFIX + "spawning Full (set 1, 2 objects) on house, led by house")
 
 
+def told_imports(lua: lua51.LuaRuntime) -> None:
+    """Hear every import Console says is done, as uid:guid in TOLD."""
+    lua.execute(
+        "TOLD = {}"
+        " Furnish.Console.Watch({ imported = function(uid, guid)"
+        " TOLD[#TOLD + 1] = uid .. ':' .. guid end })"
+    )
+
+
+def test_an_import_is_done_once_the_server_names_its_gob_and_not_before(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path, deferred=True)
+    told_imports(lua)
+    lua.execute("Furnish.Console.Import({ uid = 4242, only = true })")
+    assert list(lua.eval("TOLD").values()) == []
+    lua.execute("FLUSH()")
+    assert list(lua.eval("TOLD").values()) == ["4242:500"]
+
+
+def test_an_import_named_in_a_later_system_line_is_done_too(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("IMPORT_APART = true")
+    told_imports(lua)
+    lua.execute("Furnish.Console.Import({ uid = 4242, only = true })")
+    assert list(lua.eval("TOLD").values()) == ["4242:500"]
+
+
+def test_an_import_stopped_before_its_gob_is_named_is_never_done(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path, deferred=True)
+    told_imports(lua)
+    lua.execute("Furnish.Console.Import({ uid = 4242, only = true })")
+    run(lua, "stop")
+    lua.execute("FLUSH()")
+    assert list(lua.eval("TOLD").values()) == []
+
+
 def test_any_true_answer_to_the_permission_check_is_permission(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 500; EpsilonLib.GameObject.CanSpawn = function() return 1 end")

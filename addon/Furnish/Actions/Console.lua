@@ -53,8 +53,8 @@ local running, stopping, waiting, anchored
 local current, last
 
 --- Who hears a run besides the chat, as a window registers: { started(total, what),
--- progress(done, total), deleting(done, total), finished(result, seconds), waiting(waits) },
--- each optional.
+-- progress(done, total), deleting(done, total), finished(result, seconds), waiting(waits),
+-- imported(uid, guid) }, each optional.
 local watchers = {}
 
 local function tell(name, ...)
@@ -680,9 +680,10 @@ end
 
 --- Hear every run besides the chat.
 -- @param watcher { started(total, what), progress(done, total), deleting(done, total),
---   finished(result, seconds), waiting(waits) }, each optional; deleting is told as a stopped
---   run's cleanup deletes, finished has no result for a run refused before anything was sent,
---   and waiting is told whenever a wait for the server starts or ends
+--   finished(result, seconds), waiting(waits), imported(uid, guid) }, each optional; deleting
+--   is told as a stopped run's cleanup deletes, finished has no result for a run refused before
+--   anything was sent, waiting is told whenever a wait for the server starts or ends, and
+--   imported once the server names the object an import made
 -- @return a function that stops hearing
 function Console.Watch(watcher)
 	watchers[#watchers + 1] = watcher
@@ -1009,6 +1010,9 @@ function Console.Import(request)
 		end
 		heard = true
 		stopHearing()
+		-- The server's line naming the object is the import done; the selection that follows
+		-- needs the GUID it names.
+		tell("imported", uid, guid)
 		local ids = Sets.OfPlacement(map, tonumber(uid))
 		stopAwaiting, reason = reselect(send, guid, function(record)
 			furnish(record, ids, guid, model)
