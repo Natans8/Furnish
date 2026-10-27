@@ -205,32 +205,33 @@ run, since every join after it goes to the same leader. Who leads is
 read off the replies: the first command that answers a GUID, so a refused pivot hands the
 lead to the first doodad.
 
-The files sit in four folders after `Settings.lua`, each a layer that reads only the ones
+The files sit in six folders after `Settings.lua`, each a layer that reads only the ones
 before it, in the order the toc loads them: `Core`, the engine, which knows neither the game
 nor the data; `Data`, the reader over Furnish_Data and what it answers; `Client`, the doors
-to the game and EpsilonLib; and `UI`, the window, the command and the options panel. Each
-file is handed the addon's table as `local _, Furnish = ...`, and `Settings.lua`, loaded
-first, makes it the one global.
+to the game and EpsilonLib; `Actions`, what the window and the command both do; `UI`, the
+window and the options panel; and `Slash`, the typed command, its chat buttons and links,
+which can open the window. Each file is handed the addon's table as
+`local _, Furnish = ...`, and `Settings.lua`, loaded first, makes it the one global.
 
-| file                 | role                                                                                 |
-|----------------------|--------------------------------------------------------------------------------------|
-| `Settings.lua`       | the defaults: pivot, in-flight width, chat buttons; `FurnishSettings` keeps changes  |
-| `Core/Transform.lua` | the placement maths: `Place(position, rotation, scale, row)` and `Placer`            |
-| `Core/Commands.lua`  | every command spelling and every reply reader                                        |
-| `Core/Run.lua`       | any series of commands through `send`, in order, with needs and a width              |
-| `Core/Kernel.lua`    | `Furnish.Spawn` and `Furnish.Group`                                                  |
-| `Data/Reader.lua`    | the data addon's reader                                                              |
-| `Data/Names.lua`     | a set's name as a player reads it: `Set(name)`                                       |
-| `Data/Sets.lua`      | which: `OfFile`, `Pick`, `OfEntry`, `IsBlank`, `OfPlacement`, `Named`, `Same`        |
-| `Data/Rows.lua`      | what: `OfSet`, `Union`                                                               |
-| `Client/Client.lua`  | the one file naming EpsilonLib and `C_Epsilon`; it reads, and never selects          |
-| `Client/Pose.lua`    | where: `At`, `Copy`, `Here`, `Selected`, `OfRecord`                                  |
-| `Client/Chat.lua`    | the prefix, counts, the colours, every tooltip, a menu measured to chat, the links   |
-| `UI/Console.lua`     | what the commands and the window do: `List`, `Spawn`, `Import`, `Stop`, `Run`        |
-| `UI/Window.xml`      | the window's layout, after ObjectMover's: a dark dialog of bordered panels           |
-| `UI/Window.lua`      | the window: reads `Selected`, `Busy` and `Watch`, spawns and stops through `Console` |
-| `UI/Command.lua`     | `/furnish` and `/furn`: reading what is typed, the help, a link's click              |
-| `UI/Options.lua`     | the settings panel in the game's Options, writing into `Furnish.Settings`            |
+| file                  | role                                                                                 |
+|-----------------------|--------------------------------------------------------------------------------------|
+| `Settings.lua`        | the defaults: pivot, in-flight width, chat buttons; `FurnishSettings` keeps changes  |
+| `Core/Transform.lua`  | the placement maths: `Place(position, rotation, scale, row)` and `Placer`            |
+| `Core/Commands.lua`   | every command spelling and every reply reader                                        |
+| `Core/Run.lua`        | any series of commands through `send`, in order, with needs and a width              |
+| `Core/Kernel.lua`     | `Furnish.Spawn` and `Furnish.Group`                                                  |
+| `Data/Reader.lua`     | the data addon's reader                                                              |
+| `Data/Names.lua`      | a set's name as a player reads it: `Set(name)`                                       |
+| `Data/Sets.lua`       | which: `OfFile`, `Pick`, `OfEntry`, `IsBlank`, `OfPlacement`, `Named`, `Same`        |
+| `Data/Rows.lua`       | what: `OfSet`, `Union`                                                               |
+| `Client/Client.lua`   | the one file naming EpsilonLib and `C_Epsilon`; it reads, and never selects          |
+| `Client/Pose.lua`     | where: `At`, `Copy`, `Here`, `Selected`, `OfRecord`                                  |
+| `Client/Chat.lua`     | the prefix, counts, the colours, every tooltip, a menu measured to chat, the links   |
+| `Actions/Console.lua` | what the commands and the window do: `List`, `Spawn`, `Import`, `Stop`, `Run`        |
+| `UI/Window.xml`       | the window's layout, after ObjectMover's: a dark dialog of bordered panels           |
+| `UI/Window.lua`       | the window: reads `Selected`, `Busy` and `Watch`, spawns and stops through `Console` |
+| `UI/Options.lua`      | the settings panel in the game's Options, writing into `Furnish.Settings`            |
+| `Slash/Command.lua`   | `/furnish` and `/furn`: what is typed, the help, the chat buttons, a link's click    |
 
 ## Develop
 

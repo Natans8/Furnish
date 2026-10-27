@@ -20,8 +20,8 @@ Data\Rows.lua
 Client\Client.lua
 Client\Pose.lua
 Client\Chat.lua
-UI\Console.lua
+Actions\Console.lua
 UI\Window.xml
 UI\Window.lua
-UI\Command.lua
 UI\Options.lua
+Slash\Command.lua

@@ -10,7 +10,7 @@ import pytest
 from tests.core_test import ADDON, LOADED
 
 #: The layers in load order; the top folder holds what every layer reads.
-LAYERS = ("", "Core", "Data", "Client", "UI")
+LAYERS = ("", "Core", "Data", "Client", "Actions", "UI", "Slash")
 #: The line every file opens with: the addon's table, as the client hands it to each file.
 NAMESPACE = "local _, Furnish = ..."
 #: The one file that makes the addon's table a global.

@@ -333,15 +333,21 @@ local function finish(result, started, anchor)
 	end
 end
 
+--- How far a run goes between the lines chat counts it by: a quarter of it, and never under ten,
+-- so a run says at most three such lines, and one of ten objects or fewer none.
+local function stride(total)
+	return math.max(10, math.ceil(total / 4))
+end
+
 local function hooks(about)
-	local told, started = 0, Client.Now()
+	local told, cleaned, started = 0, 0, Client.Now()
 	return {
 		progress = function(done, total)
 			if current then
 				current.done = done
 			end
 			tell("progress", done, total)
-			if not about.quiet and done < total and done - told >= 10 then
+			if not about.quiet and done < total and done - told >= stride(total) then
 				told = done
 				say(("%d of %d"):format(done, total))
 			end
@@ -352,7 +358,8 @@ local function hooks(about)
 				current.deleting.done, current.deleting.total = done, total
 			end
 			tell("deleting", done, total)
-			if not about.quiet and done > 0 and done < total and done % 10 == 0 then
+			if not about.quiet and done < total and done - cleaned >= stride(total) then
+				cleaned = done
 				say(("deleted %d of %d"):format(done, total))
 			end
 		end,
