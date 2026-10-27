@@ -74,6 +74,7 @@ def blueprint(lua: lua51.LuaRuntime, wmo: str, sets: list[tuple[int, str]], apar
     [
         ("goldshireinn", [(2, "Set_C")], True, "goldshireinn_set_c"),
         ("goldshireinn", [(2, "Set_C")], False, "goldshireinn_c"),
+        ("goldshireinn", [(1, "Set_B"), (2, "Set_C")], False, "goldshireinn_b_c"),
         (
             "6dr_draenei_house2",
             [(2, "Set_Restaurant"), (8, "Set_Schoolhouse")],

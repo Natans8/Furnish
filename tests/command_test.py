@@ -382,6 +382,23 @@ def test_a_dismissed_offer_is_gone(tmp_path: Path) -> None:
     assert offer(lua) is None
 
 
+def test_several_sets_merged_into_their_wmo_are_named_in_index_order(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path, layered=True)
+    lua.execute("RECORDS[500].scale = 1; SELECTED = 500")
+    # Chosen Lights first, as a ctrl-click can; the name lists the sets as the WMO does.
+    spawn(lua, "{ indexes = { 2, 1 }, group = 'merge' }")
+    assert offer(lua) == "house_full_lights"
+
+
+def test_an_import_of_a_placement_drawing_several_sets_offers_the_wmo_furnished(
+    tmp_path: Path,
+) -> None:
+    lua = command_lua(tmp_path, layered=True)
+    lua.execute("RECORDS[500].scale = 1; IMPORT_UID = 4343")
+    run(lua, "import")
+    assert offer(lua) == "house_full_lights"
+
+
 def test_numbers_given_merge_into_whatever_is_selected_not_what_they_were_read_off(
     tmp_path: Path,
 ) -> None:
