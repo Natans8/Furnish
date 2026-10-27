@@ -22,25 +22,32 @@ local Reader = {}
 Furnish.Reader = Reader
 local Data
 
+--- The data addon's name, which the client loads it by.
+local DATA = "Furnish_Data"
+
 --- Load Furnish_Data and check its format. Answers true, or false and a reason.
 function Reader.Load()
 	if Data then
 		return true
 	end
-	local loaded, reason = _G.LoadAddOn("Furnish_Data")
+	local loaded, reason = _G.LoadAddOn(DATA)
 	if not loaded then
 		return false,
-			("Furnish_Data could not load (%s): install it beside Furnish and enable it in the addon list"):format(
-				tostring(reason):lower()
+			("%s could not load (%s): install it beside %s and enable it in the addon list"):format(
+				DATA,
+				tostring(reason):lower(),
+				Furnish.NAME
 			)
 	end
 	if type(_G.FurnishData) ~= "table" then
-		return false, "Furnish_Data loaded but declared no data"
+		return false, DATA .. " loaded but declared no data"
 	end
 	if _G.FurnishData.format ~= FORMAT then
 		return false,
-			("Furnish_Data is format %s and this Furnish reads format %d: update the one that is behind"):format(
+			("%s is format %s and this %s reads format %d: update the one that is behind"):format(
+				DATA,
 				tostring(_G.FurnishData.format),
+				Furnish.NAME,
 				FORMAT
 			)
 	end
@@ -60,7 +67,7 @@ end
 local function deflate()
 	local lib = _G.LibStub and _G.LibStub:GetLibrary("LibDeflate", true)
 	if not lib then
-		error("Furnish_Data: LibDeflate is not loaded")
+		error(DATA .. ": LibDeflate is not loaded")
 	end
 	return lib
 end
@@ -71,7 +78,7 @@ local function decodeBlob(text)
 	-- break in its alphabet, so the breaks go before it is decoded.
 	local printable = lib:DecodeForPrint((text:gsub("\n", "")))
 	if not printable then
-		error("Furnish_Data: a set's string does not decode; reinstall Furnish_Data")
+		error(DATA .. ": a set's string does not decode; reinstall " .. DATA)
 	end
 	local bytes = lib:DecompressDeflate(printable)
 	local at = 1
@@ -110,7 +117,7 @@ local function decodeBlob(text)
 	end
 
 	if u8() ~= VERSION then
-		error("Furnish_Data: unknown set blob version")
+		error(DATA .. ": unknown set blob version")
 	end
 	local count = varint()
 	local models, previous = {}, 0

@@ -282,7 +282,7 @@ def test_a_set_spawns_at_a_pose_given_with_no_object_behind_it(tmp_path: Path) -
 
 
 MERGE_REFUSED = (
-    "no object is selected; select the object whose group to join first, as with .gob select"
+    "no object is selected; select the object whose group to join first, as with .gobject select"
 )
 
 
@@ -501,7 +501,7 @@ def test_a_list_prints_a_menu_of_set_buttons_carrying_the_words(tmp_path: Path) 
 def test_a_list_refuses_without_a_wmo(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     assert run(lua, "list") == [
-        PREFIX + "no object is selected; select the WMO first, as with .gob select"
+        PREFIX + "no object is selected; select the WMO first, as with .gobject select"
     ]
     lua.execute("SELECTED = 502")
     assert run(lua, "list") == [
@@ -565,11 +565,11 @@ def test_several_sets_spawn_together_and_the_base_set_comes_once(tmp_path: Path)
     assert [s.split()[2] for s in sent(lua)] == ["-21", "-20", "-21"]
 
 
-def test_another_objects_set_is_named_by_its_entry(tmp_path: Path) -> None:
+def test_a_set_named_by_its_entry_onto_its_own_wmo_is_not_named_again(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 500")
     assert run(lua, "1 from 817579 nogroup")[0] == (
-        PREFIX + "spawning object 817579's Full (set 1, 2 objects) on house, ungrouped"
+        PREFIX + "spawning Full (set 1, 2 objects) on house, ungrouped"
     )
 
 
@@ -586,11 +586,11 @@ def test_a_set_at_the_players_feet_needs_no_selection(tmp_path: Path) -> None:
 def test_a_spawn_refuses_with_the_way_out(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     assert run(lua, "1")[0].endswith(
-        "no object is selected; select the WMO first, as with .gob select"
+        "no object is selected; select the WMO first, as with .gobject select"
     )
     lua.execute("SELECTED = 'group'")
     assert run(lua, "1")[0].endswith(
-        "a group is selected, not one object; select the WMO first, as with .gob select"
+        "a group is selected, not one object; select the WMO first, as with .gobject select"
     )
     lua.execute("SELECTED = 500")
     assert run(lua, "7") == [PREFIX + "house has no set 7; /furn list shows its 2"]
@@ -600,7 +600,7 @@ def test_a_spawn_refuses_with_the_way_out(tmp_path: Path) -> None:
     assert sent(lua) == []
 
 
-GROUP_REFUSED = "a group is selected, not one object; select the WMO first, as with .gob select"
+GROUP_REFUSED = "a group is selected, not one object; select the WMO first, as with .gobject select"
 
 
 def test_the_group_a_run_selected_stands_for_its_wmo_read_fresh(tmp_path: Path) -> None:
@@ -799,7 +799,7 @@ def test_a_second_stop_gives_up_on_the_reply_and_still_deletes(tmp_path: Path) -
 def test_a_set_at_the_feet_with_nothing_selected_offers_naming_it(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     assert run(lua, "1 here") == [
-        PREFIX + "no object is selected; select the WMO first, as with .gob select, "
+        PREFIX + "no object is selected; select the WMO first, as with .gobject select, "
         "or name it, as /furn 3 here <entry>"
     ]
 
@@ -858,7 +858,7 @@ def test_an_import_waiting_for_its_object_says_so_to_another_command(tmp_path: P
     lua = command_lua(tmp_path, deferred=True)
     run(lua, "import")
     assert run(lua, "list") == [
-        PREFIX + "no object is selected; select the WMO first, as with .gob select"
+        PREFIX + "no object is selected; select the WMO first, as with .gobject select"
     ]
     assert run(lua, "1") == [
         PREFIX + "Furnish is waiting for the imported object; /furn stop ends it"
@@ -888,7 +888,8 @@ def test_a_set_read_off_the_selection_needs_a_wmo(tmp_path: Path) -> None:
     ]
     lua.execute("SELECTED = nil")
     assert run(lua, "1 from 817579") == [
-        PREFIX + "no object is selected; select the object to spawn on first, as with .gob select"
+        PREFIX
+        + "no object is selected; select the object to spawn on first, as with .gobject select"
     ]
 
 

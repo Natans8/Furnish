@@ -1,5 +1,5 @@
--- The command: what a player types, read into a request for the console, the help that says what can be typed, and the clicks on a list's links. The
--- command alone is the window's.
+-- The command: what a player types, read into a request for the console, the help that says
+-- what can be typed, and the clicks on a list's links. The command alone is the window's.
 --
 -- The commands and the words are declared once, below, and the help is read off them.
 
@@ -22,21 +22,16 @@ Command.USAGE = {
 }
 
 --- The words that may follow a set, a list or an import, in the order the help says them.
--- Each sets one field of the request; the three that say who leads the group share one.
-Command.WORDS = {
-	{
-		word = "first",
-		field = "group",
-		value = "first",
-		hint = "the first object spawned leads the group, so no pivot spawns",
-	},
-	{
-		word = "merge",
-		field = "group",
-		value = "merge",
-		hint = "merge the set into the selected gob's group, so no pivot spawns",
-	},
-	{ word = "nogroup", field = "group", value = "nogroup", hint = "spawn every object ungrouped" },
+-- Each sets one field of the request: first the groupings Console declares, which share one,
+-- all but the one a request gets by naming none, then the rest.
+Command.WORDS = {}
+for _, grouping in ipairs(Console.GROUPS) do
+	if grouping.word ~= Console.GROUPED then
+		Command.WORDS[#Command.WORDS + 1] =
+			{ word = grouping.word, field = "group", value = grouping.word, hint = grouping.hint }
+	end
+end
+for _, each in ipairs({
 	{ word = "base", field = "base", value = true, hint = "spawn the base set as well" },
 	{
 		word = "quiet",
@@ -44,11 +39,25 @@ Command.WORDS = {
 		value = true,
 		hint = "leave the progress counts out of chat, saying only how the run began and ended",
 	},
-}
+}) do
+	Command.WORDS[#Command.WORDS + 1] = each
+end
 
 local WORD = {}
 for _, each in ipairs(Command.WORDS) do
 	WORD[each.word] = each
+end
+
+--- One of the links this file writes: a doodad line's button, "import", carrying the doodad's
+-- unique id; a gob line's, "list", carrying the gob's entry; or a word in the help, "word".
+-- A list's buttons for its sets carry words of Console's own.
+local function link(kind, value, label)
+	return Chat.Link(kind .. ":" .. value, label)
+end
+
+--- What kind of link this file wrote words for, and what it carries; nil for words it did not.
+local function linked(words)
+	return words:match("^(%a+):(.+)$")
 end
 
 local function number(token)
@@ -131,7 +140,7 @@ end
 local function helpLines()
 	local lines = {
 		Chat.GOLD
-			.. "Furnish"
+			.. Furnish.NAME
 			.. Chat.END
 			.. Chat.GREY
 			.. " spawns a WMO's doodad sets as objects"
@@ -142,7 +151,7 @@ local function helpLines()
 	end
 	local words = {}
 	for _, each in ipairs(Command.WORDS) do
-		words[#words + 1] = Chat.Link("word:" .. each.word, each.word)
+		words[#words + 1] = link("word", each.word, each.word)
 	end
 	lines[#lines + 1] = "  "
 		.. Chat.GREY
@@ -176,22 +185,7 @@ function Command.Run(text)
 	end
 end
 
---- A list link's words as the request a click makes, or nil for words it did not write.
-local function fromLink(words)
-	local file, index, group, base, label = words:match("^(%d+):(%d+):(%a+):(%a*):(.*)$")
-	if not file then
-		return nil
-	end
-	return {
-		file = tonumber(file),
-		index = tonumber(index),
-		group = group,
-		base = base == "base",
-		label = label,
-	}
-end
-
---- A click on a list link spawns its set: plainly on the selected object, with ctrl at
+--- A click on a list's button spawns its set: plainly on the selected object, with ctrl at
 -- the player's feet. A click on a doodad line's button imports that WMO and furnishes it,
 -- and one on a gob line's lists the gob's sets.
 function Command.Click(words, modifier)
@@ -199,35 +193,31 @@ function Command.Click(words, modifier)
 	if modifier == "share" then
 		return
 	end
-	local uid = words:match("^import:(%d+)$")
-	if uid then
-		return Console.Import({ uid = uid })
+	local kind, value = linked(words)
+	if kind == "import" then
+		return Console.Import({ uid = value })
+	elseif kind == "list" then
+		return Console.List({ entry = tonumber(value) })
 	end
-	local entry = words:match("^list:(%d+)$")
-	if entry then
-		return Console.List({ entry = tonumber(entry) })
-	end
-	local request = fromLink(words)
+	local request = Console.LinkRequest(words)
 	if request then
 		request.here = modifier == "ctrl"
 		Console.Spawn(request)
 	end
 end
 
---- What resting on one of Furnish's links shows: a set and its clicks, or what a doodad or
--- gob line's button does.
+--- What resting on one of Furnish's links shows: a set and its clicks, what a doodad or gob
+-- line's button does, or what a word in the help does.
 function Command.Hover(words, tooltip)
-	if words:match("^import:%d+$") then
+	local kind, value = linked(words)
+	if kind == "import" then
 		return Console.DescribeImport(tooltip)
+	elseif kind == "list" then
+		return Chat.Tip(tooltip, Furnish.NAME, { { text = "List this WMO's doodad sets" } })
+	elseif kind == "word" and WORD[value] then
+		return Chat.Tip(tooltip, value, { { text = WORD[value].hint } })
 	end
-	local word = WORD[words:match("^word:(%a+)$") or ""]
-	if word then
-		return Chat.Tip(tooltip, word.word, { { text = word.hint } })
-	end
-	if words:match("^list:%d+$") then
-		return Chat.Tip(tooltip, "Furnish", { { text = "List this WMO's doodad sets" } })
-	end
-	local request = fromLink(words)
+	local request = Console.LinkRequest(words)
 	if request then
 		Console.Describe(request, tooltip)
 	end
@@ -252,7 +242,7 @@ function Command.PlacedWmo(line)
 	if not file then
 		return nil
 	end
-	if Furnish.Sets.DrawsBeyondBase(file, map or select(4, Client.Position()), uid) then
+	if Furnish.Sets.DrawsBeyondBase(file, map or Client.Map(), uid) then
 		return uid
 	end
 	return nil
@@ -278,8 +268,8 @@ Chat.OnServerLines(function(line)
 	end
 	local uid = Command.PlacedWmo(line)
 	if uid then
-		return " - " .. Chat.Link("import:" .. uid, "Furnish")
+		return " - " .. link("import", uid, Furnish.NAME)
 	end
 	local entry = Command.SelectedWmo(line)
-	return entry and " - " .. Chat.Link("list:" .. entry, "Furnish") or nil
+	return entry and " - " .. link("list", entry, Furnish.NAME) or nil
 end)

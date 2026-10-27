@@ -5,6 +5,8 @@
 
 local _, Furnish = ...
 local Client = Furnish.Client
+local Chat = Furnish.Chat
+local Commands = Furnish.Commands
 local Settings = Furnish.Settings
 
 --- The values the addon ships with: every setting, copied as this file loads, before the saved
@@ -15,16 +17,16 @@ for key, value in pairs(Settings) do
 end
 
 --- How many commands a run may have unanswered, at least and at most.
-local FEWEST, MOST = 1, 16
+local FEWEST, MOST = Furnish.Bounds.inFlight.least, Furnish.Bounds.inFlight.most
 
 -- Made hidden, so the Options window's Show fires OnShow, which reads the settings in.
 local panel = _G.CreateFrame("Frame")
-panel.name = "Furnish"
+panel.name = Furnish.NAME
 panel:Hide()
 
 local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title:SetPoint("TOPLEFT", 16, -16)
-title:SetText("Furnish")
+title:SetText(Furnish.NAME)
 
 local about = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 about:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
@@ -36,7 +38,7 @@ about:SetText("Changes take effect at once and are kept between sessions.")
 -- a console variable behind it and errors on a click without one.
 local buttons = _G.CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
 buttons:SetPoint("TOPLEFT", about, "BOTTOMLEFT", -2, -20)
-buttons.text:SetText("Furnish buttons in chat")
+buttons.text:SetText(Furnish.NAME .. " buttons in chat")
 buttons:SetScript(
 	"OnClick",
 	Client.Guarded(function(box)
@@ -44,17 +46,20 @@ buttons:SetScript(
 		Settings.chatButtons = box:GetChecked() and true or false
 	end)
 )
-buttons:SetScript("OnEnter", function(self)
-	_G.GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	_G.GameTooltip:SetText(
-		"A [Furnish] button after a WMO's doodad, selection and spawn lines.",
-		nil,
-		nil,
-		nil,
-		nil,
-		true
-	)
-end)
+buttons:SetScript(
+	"OnEnter",
+	Client.Guarded(function(self)
+		_G.GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		Chat.Tip(_G.GameTooltip, self.text:GetText(), {
+			{
+				text = ("A [%s] button after a WMO's doodad, selection and spawn lines."):format(
+					Furnish.NAME
+				),
+			},
+		})
+		_G.GameTooltip:Show()
+	end)
+)
 buttons:SetScript("OnLeave", _G.GameTooltip_Hide)
 
 -- How far ahead of the server's replies a run sends.
@@ -80,7 +85,7 @@ pace:SetScript(
 	end)
 )
 
--- What a pivot spawns as, in the words `.gob spawn` takes.
+-- What a pivot spawns as, in the words a spawn command takes.
 local pivotLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 pivotLabel:SetPoint("TOPLEFT", pace, "BOTTOMLEFT", -4, -36)
 pivotLabel:SetText("Pivot")
@@ -97,16 +102,15 @@ pivotNote:SetPoint("RIGHT", panel, "RIGHT", -16, 0)
 pivotNote:SetJustifyH("LEFT")
 pivotNote:SetText(
 	(
-		"The object that leads a set's group where no other does, as .gob spawn takes it: a gob"
-		.. " entry, or a display as a negative number. Furnish's own, %d, is invisible and silent."
-	):format(DEFAULTS.pivot)
+		"The object that leads a set's group where no other does, as %s takes it: a gob entry,"
+		.. " or a display as a negative number. %s's own, %d, is invisible and silent."
+	):format(Commands.Typed(Commands.SPAWN), Furnish.NAME, DEFAULTS.pivot)
 )
 
---- Take the id typed, or put back the one kept where what was typed is not a whole number
--- other than nought.
+--- Take the id typed, or put back the one kept where Settings does not allow what was typed.
 local function pivotEntered(box)
 	local value = tonumber(box:GetText())
-	if value and value ~= 0 and value == math.floor(value) then
+	if Furnish.Allowed("pivot", value) then
 		Settings.pivot = value
 	end
 	box:SetText(tostring(Settings.pivot))

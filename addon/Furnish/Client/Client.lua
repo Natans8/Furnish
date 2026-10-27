@@ -8,6 +8,8 @@ local _, Furnish = ...
 local Client = {}
 Furnish.Client = Client
 
+local Chat = Furnish.Chat
+
 local send
 
 local reported = {}
@@ -20,7 +22,7 @@ function Client.Fault(message)
 	local text = tostring(message)
 	if not reported[text] then
 		reported[text] = true
-		print("|cff66ccffFurnish:|r |cffff2020error: " .. text .. "|r")
+		Chat.Say(Chat.RED .. "error: " .. text .. Chat.END)
 	end
 	local handler = _G.geterrorhandler and _G.geterrorhandler()
 	if handler then
@@ -61,13 +63,13 @@ function Client.Send()
 	if not (lib and lib.AddonCommands) then
 		return nil, "EpsilonLib is not loaded, and Furnish sends every command through it"
 	end
-	local ok, registered = pcall(lib.AddonCommands.Register, "Furnish", false)
+	local ok, registered = pcall(lib.AddonCommands.Register, Furnish.NAME, false)
 	local raw
 	if ok and registered then
 		raw = registered
 	else
 		raw = function(text, callback, shown)
-			lib.AddonCommands.Send("Furnish", text, callback, shown)
+			lib.AddonCommands.Send(Furnish.NAME, text, callback, shown)
 		end
 	end
 	send = function(text, callback, shown)
@@ -247,16 +249,17 @@ end
 
 --- Restore the saved copy of a settings table over its defaults, then make the live table
 -- the saved one, so the client writes whatever a surface changes at logout. A saved value
--- is taken only for a key the defaults declare and only when its type agrees, so a stale
--- or hand-edited file cannot put a string where a number goes.
+-- is taken only for a key the defaults declare and only where allowed takes it, so a stale
+-- or hand-edited file cannot put a string where a number goes, or a number out of bounds.
 -- @param settings the defaults, which become the live values
 -- @param name the saved variable's global name, as the toc declares it
-function Client.Restore(settings, name)
+-- @param allowed function(key, value), whether a saved value may stand
+function Client.Restore(settings, name, allowed)
 	local saved = _G[name]
 	if type(saved) == "table" then
-		for key, default in pairs(settings) do
+		for key in pairs(settings) do
 			local value = saved[key]
-			if type(value) == type(default) then
+			if value ~= nil and allowed(key, value) then
 				settings[key] = value
 			end
 		end
@@ -269,7 +272,7 @@ function Client.OnLoaded(fn)
 	local frame = _G.CreateFrame("Frame")
 	frame:RegisterEvent("ADDON_LOADED")
 	frame:SetScript("OnEvent", function(_, _, addon)
-		if addon == "Furnish" then
+		if addon == Furnish.NAME then
 			frame:UnregisterEvent("ADDON_LOADED")
 			Client.Guarded(fn)()
 		end
@@ -277,7 +280,7 @@ function Client.OnLoaded(fn)
 end
 
 Client.OnLoaded(function()
-	Client.Restore(Furnish.Settings, "FurnishSettings")
+	Client.Restore(Furnish.Settings, "FurnishSettings", Furnish.Allowed)
 end)
 
 --- The player's position as the server places by, and the map: x, y, z, map. Blizzard's
@@ -288,6 +291,11 @@ function Client.Position()
 		return nil
 	end
 	return epsilon.GetPosition()
+end
+
+--- The map the player stands on, as Position gives it.
+function Client.Map()
+	return (select(4, Client.Position()))
 end
 
 --- The client's clock, in seconds.

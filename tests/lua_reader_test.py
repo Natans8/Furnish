@@ -40,6 +40,8 @@ def lua_with(data: Path, format_override: str = "") -> lua51.LuaRuntime:
         + format_override
         + " return true end return false, 'MISSING' end"
     )
+    # The reader reads the layer under it, as the toc loads it first.
+    run_file(lua, ADDON / "Settings.lua")
     run_file(lua, READER)
     return lua
 

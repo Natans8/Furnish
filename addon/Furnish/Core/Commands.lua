@@ -24,9 +24,19 @@ function Commands.Number(value)
 	return text
 end
 
---- Whether an angle in degrees is zero for the server's purposes.
-local function level(angle)
-	return angle < 0.0005 or angle > 359.9995
+--- The command that spawns an object, before what it spawns.
+Commands.SPAWN = "gobject spawn"
+
+--- Whether an angle in degrees is zero for the server's purposes, so a spawn need not say it;
+-- any angle, a record's as readily as one Transform.Place answers.
+function Commands.IsLevel(angle)
+	local turned = angle % 360
+	return turned < 0.0005 or turned > 359.9995
+end
+
+--- Whether a scale is 1 for the server's purposes, so a spawn need not say it.
+function Commands.IsUnit(scale)
+	return math.abs(scale - 1) < 0.0005
 end
 
 --- The spawn command for a display at a world pose, saying only what differs from a plain
@@ -41,22 +51,22 @@ end
 -- @param id a gameobject entry, or a display as a negative number
 -- @param pose { x, y, z, roll, pitch, turn, scale }, what Transform.Place answers
 function Commands.SpawnObject(id, pose)
-	local words = { ("gobject spawn %d"):format(id) }
-	if math.abs(pose.scale - 1) >= 0.0005 then
+	local words = { ("%s %d"):format(Commands.SPAWN, id) }
+	if not Commands.IsUnit(pose.scale) then
 		words[#words + 1] = "scale " .. Commands.Number(pose.scale)
 	end
 	words[#words + 1] = "posx " .. Commands.Number(pose.x)
 	words[#words + 1] = "posy " .. Commands.Number(pose.y)
 	words[#words + 1] = "posz " .. Commands.Number(pose.z)
-	if not level(pose.pitch) then
+	if not Commands.IsLevel(pose.pitch) then
 		words[#words + 1] = "pitch " .. Commands.Number(pose.pitch)
 	end
-	if not level(pose.roll) then
+	if not Commands.IsLevel(pose.roll) then
 		words[#words + 1] = "roll " .. Commands.Number(pose.roll)
 	end
 	-- A spawn takes the player's facing, so the turn is always said; north is how zero is said,
 	-- since the server reads a bare zero as nothing.
-	if level(pose.turn) then
+	if Commands.IsLevel(pose.turn) then
 		words[#words + 1] = "face north"
 	else
 		words[#words + 1] = "face north turn " .. Commands.Number(pose.turn)
@@ -73,13 +83,21 @@ function Commands.Delete(guid)
 	return "gobject delete " .. guid
 end
 
---- Select an object by its GUID, which also has the server push the object's record.
+--- Select an object by its GUID, which also has the server push the object's record; without
+-- one, the object nearest the player, as a player selects one by hand.
 function Commands.Select(guid)
-	return "gobject select " .. guid
+	if guid then
+		return "gobject select " .. guid
+	end
+	return "gobject select"
 end
 
---- Turn the client's highlighting of the selection on if it is off, or off if it is on.
-function Commands.Highlight()
+--- Turn the client's highlighting of the selection on or off as state says, "on" or "off";
+-- without one, on if it is off and off if it is on.
+function Commands.Highlight(state)
+	if state then
+		return "toggle highlight " .. state
+	end
 	return "toggle highlight"
 end
 
@@ -124,13 +142,14 @@ end
 
 --- What a doodad link in a server line names: the doodad's unique id, the gameobject entry the
 -- number after its name is, and the map the line says it stands on, nil for a line that names
--- none, as a near line does; or nil for a line with no doodad link.
+-- none, as a near line does; or nil for a line with no doodad link. The server colours the map's
+-- number, so it is read off the line scrubbed.
 function Commands.DoodadLink(line)
 	local uid, entry = line:match("|Hdoodad_uid:(%d+):[^|]*|h%[.- %- (%d+)%]|h")
 	if not uid then
 		return nil
 	end
-	return tonumber(uid), tonumber(entry), tonumber(line:match(" on map (%d+)"))
+	return tonumber(uid), tonumber(entry), tonumber(Commands.Plain(line):match(" on map (%d+)"))
 end
 
 --- The gameobject entry a gob's selection or spawn line names, a spawn selecting what it makes;
@@ -145,17 +164,15 @@ end
 -- carries: { uid, entry, name, map }, the doodad's unique id, the entry after its name, its name
 -- as the line spells it and the map it stands on; or nil for any other line.
 function Commands.SelectedDoodad(line)
-	-- Every system line comes here, so one that cannot be a selection is passed over unscrubbed.
 	if not line:find("Selected doodad", 1, true) then
 		return nil
 	end
-	local plain = Commands.Plain(line)
-	local name, entry, uid = plain:match("Selected doodad %[(.-) %- (%d+)%] %(UID: (%d+)%)")
-	local map = plain:match(" on map (%d+)")
-	if not (name and map) then
+	local uid, entry, map = Commands.DoodadLink(line)
+	if not (uid and map) then
 		return nil
 	end
-	return { uid = tonumber(uid), entry = tonumber(entry), name = name, map = tonumber(map) }
+	local name = line:match("|Hdoodad_uid:[^|]*|h%[(.-) %- %d+%]|h")
+	return { uid = uid, entry = entry, name = name, map = map }
 end
 
 --- A reply with its colour codes and link wrappers removed, for quoting in a message.

@@ -13,10 +13,10 @@ local Chat = {}
 Furnish.Chat = Chat
 
 --- The colours lines are drawn in: gold for a command and a number, white for a name, the
--- client's link blue for what a click acts on, grey for what is said in passing, and the
--- blue of the prefix.
-Chat.GOLD, Chat.WHITE, Chat.BLUE, Chat.GREY, Chat.PREFIX =
-	"|cffffd100", "|cffffffff", "|cff71d5ff", "|cff9d9d9d", "|cff66ccff"
+-- client's link blue for what a click acts on, grey for what is said in passing, red for a
+-- fault, and the blue of the prefix.
+Chat.GOLD, Chat.WHITE, Chat.BLUE, Chat.GREY, Chat.RED, Chat.PREFIX =
+	"|cffffd100", "|cffffffff", "|cff71d5ff", "|cff9d9d9d", "|cffff2020", "|cff66ccff"
 Chat.END = "|r"
 
 --- A count with its thousands set apart.
@@ -34,6 +34,11 @@ function Chat.Count(count, noun)
 		return "1 " .. noun
 	end
 	return Chat.Thousands(count) .. " " .. noun .. "s"
+end
+
+--- A count of objects: "1 object", "1,204 objects".
+function Chat.Objects(count)
+	return Chat.Count(count, "object")
 end
 
 --- A run past this many objects is counted by tenths rather than quarters, since a quarter of it
@@ -102,7 +107,7 @@ end
 
 --- Print one line, with the prefix that says who wrote it.
 function Chat.Say(text)
-	print(Chat.PREFIX .. "Furnish:" .. Chat.END .. " " .. text)
+	print(Chat.PREFIX .. Furnish.NAME .. ":" .. Chat.END .. " " .. text)
 end
 
 --- Print one line without the prefix, for the lines under a heading.

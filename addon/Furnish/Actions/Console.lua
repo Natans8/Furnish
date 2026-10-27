@@ -18,7 +18,7 @@
 --   here    true to spawn at the player rather than on the selected object
 --   at      a pose to spawn at instead, as Pose gives one, its numbers alone: a merge joins the
 --           group of whatever is selected when the spawn runs, gob or group
---   group   "pivot", "first", "merge" or "nogroup"; nil is "pivot"
+--   group   a word from Console.GROUPS; nil is Console.GROUPED
 --   base    true to lay the root's base set under the sets, unless it is one of them
 --   quiet   true when a window shows the run's progress, so the chat leaves it out
 --
@@ -41,6 +41,40 @@ local Commands = Furnish.Commands
 local Chat = Furnish.Chat
 
 local say = Chat.Say
+local objects = Chat.Objects
+
+--- How a run's objects may be grouped, in the order a window offers them: the word a request
+-- says it by, the kernel's group, how a line says the run is led, and what the help says the
+-- word does. A merge has no group of its own: it joins the selected gob's or group's.
+Console.GROUPS = {
+	{
+		word = "nogroup",
+		group = Group.None,
+		lead = "ungrouped",
+		hint = "spawn every object ungrouped",
+	},
+	{ word = "pivot", group = Group.Pivot, lead = "led by a pivot, one extra invisible object" },
+	{
+		word = "first",
+		group = Group.First,
+		lead = "led by the set's first object",
+		hint = "the first object spawned leads the group, so no pivot spawns",
+	},
+	{ word = "merge", hint = "merge the set into the selected gob's group, so no pivot spawns" },
+}
+
+--- The grouping a request that names none gets, which is why the help gives it no word.
+Console.GROUPED = "pivot"
+
+local GROUPING = {}
+for _, grouping in ipairs(Console.GROUPS) do
+	GROUPING[grouping.word] = grouping
+end
+
+--- A grouping by its word, as Console.GROUPS declares it; nil is Console.GROUPED.
+function Console.Grouping(word)
+	return GROUPING[word or Console.GROUPED]
+end
 
 --- The run going on, if any, and whether it was asked to stop. A wait for an object's record:
 -- { what it waits for, what a stop leaves standing or nil, stop }. The group the last run
@@ -75,7 +109,7 @@ end
 
 --- A set's name as a line shows it; the base set has none of its own.
 local function setName(set)
-	return set.name == "" and "Base" or Names.Set(set.name)
+	return Sets.IsBase(set) and "Base" or Names.Set(set.name)
 end
 
 --- The server's reply lines as one quotable string, colour codes and links stripped.
@@ -95,41 +129,50 @@ local function since(moment)
 	return ("%.1f s"):format(Client.Now() - moment)
 end
 
-local function objects(count)
-	return Chat.Count(count, "object")
-end
-
 --- Why nothing new can start, or nil.
 local function busy()
 	if waiting then
-		return ("Furnish is waiting for %s; %s ends it"):format(waiting.what, Chat.Typed("stop"))
+		return ("%s is waiting for %s; %s ends it"):format(
+			Furnish.NAME,
+			waiting.what,
+			Chat.Typed("stop")
+		)
 	elseif running and not running.Done() then
 		local doing = current and current.deleting and "deleting what it spawned" or "spawning"
-		return ("Furnish is still %s; %s ends it"):format(doing, Chat.Typed("stop"))
+		return ("%s is still %s; %s ends it"):format(Furnish.NAME, doing, Chat.Typed("stop"))
 	end
 	return nil
+end
+
+--- Whether nothing is under way; says what is, where something is.
+local function idle()
+	local blocked = busy()
+	if blocked then
+		say(blocked)
+	end
+	return not blocked
+end
+
+--- The server's door, or nil having said why it is shut.
+local function sender()
+	local send, reason = Client.Send()
+	if not send then
+		say(reason)
+	end
+	return send
 end
 
 --- Whether a spawn or an import may begin: nothing else under way, the player allowed to spawn
 -- here, the data loaded and the server's door open. Says why not; answers the door when it may.
 local function ready()
-	local blocked = busy()
-	if blocked then
-		return say(blocked)
-	end
-	if not Client.CanSpawn() then
+	if not (idle() and Client.CanSpawn()) then
 		return nil
 	end
 	local loaded, reason = Reader.Load()
 	if not loaded then
 		return say(reason)
 	end
-	local send
-	send, reason = Client.Send()
-	if not send then
-		return say(reason)
-	end
-	return send
+	return sender()
 end
 
 --- Whether the group the last run selected is still selected, standing for the object that run
@@ -170,7 +213,12 @@ local function selection(what, otherwise)
 	local pose, reason = Pose.Selected()
 	if not pose then
 		return nil,
-			("%s; select %s first, as with .gob select%s"):format(reason, what, otherwise or "")
+			("%s; select %s first, as with %s%s"):format(
+				reason,
+				what,
+				Commands.Typed(Commands.Select()),
+				otherwise or ""
+			)
 	end
 	return pose
 end
@@ -186,14 +234,9 @@ local function withSelection(what, otherwise, fn)
 	if not anchorHeld() then
 		return say(reason)
 	end
-	local blocked = busy()
-	if blocked then
-		return say(blocked)
-	end
-	local send
-	send, reason = Client.Send()
+	local send = idle() and sender()
 	if not send then
-		return say(reason)
+		return
 	end
 	local guid = anchored.guid
 	local stopAwaiting
@@ -253,13 +296,9 @@ end
 
 --- The kernel's group for a request, and how a line says it; or nil and the way out.
 local function groupOf(request, pose)
-	local word = request.group or "pivot"
-	if word == "pivot" then
-		return Group.Pivot, "led by a pivot, one extra invisible object"
-	elseif word == "first" then
-		return Group.First, "led by the set's first object"
-	elseif word == "nogroup" then
-		return Group.None, "ungrouped"
+	local grouping = Console.Grouping(request.group)
+	if grouping.group then
+		return grouping.group, grouping.lead
 	end
 	if not (pose and pose.guid) then
 		return nil, "no gob is selected whose group to merge into"
@@ -277,23 +316,20 @@ local function groupOf(request, pose)
 	return pose.guid, "led by " .. pose.name
 end
 
---- Whether a number off a record is the one wanted, within what its float carries; none given is
--- the one wanted.
-local function near(value, wanted)
-	return math.abs((value or wanted) - wanted) < 1e-3
-end
-
 --- The blueprint name a run is to offer once it ends whole, or nil: at scale 1 with no roll or
--- pitch, either led by its pivot, named after the source as a set apart, or merged into a gob
--- that stood alone and owns every set spawned, named after that gob.
--- @param word the request's group word, nil being "pivot"
+-- pitch, as the server reads them, either led by its pivot, named after the source as a set
+-- apart, or merged into a gob that stood alone and owns every set spawned, named after that gob.
+-- @param word the request's group word, nil being Console.GROUPED
 -- @param destination the pose the rows are placed at
 -- @param owner the gob a merge joins, as groupOf reads it
 -- @param label the source as a line names it
 -- @param chosen the sets spawned, each { index, id, name }
 local function offered(word, destination, owner, label, chosen)
 	local rotation = destination.rotation or {}
-	if not (near(destination.scale, 1) and near(rotation.roll, 0) and near(rotation.pitch, 0)) then
+	local plain = Commands.IsUnit(destination.scale or 1)
+		and Commands.IsLevel(rotation.roll or 0)
+		and Commands.IsLevel(rotation.pitch or 0)
+	if not plain then
 		return nil
 	end
 	local sets, ids = {}, {}
@@ -306,7 +342,7 @@ local function offered(word, destination, owner, label, chosen)
 	for i, set in ipairs(sets) do
 		ids[i] = set.id
 	end
-	if (word or "pivot") == "pivot" then
+	if Console.Grouping(word).group == Group.Pivot then
 		return Names.Blueprint(label, sets, true)
 	end
 	if word ~= "merge" or not owner or owner.group or owner.groupLeader ~= 0 or not owner.file then
@@ -333,40 +369,46 @@ local function modelOf(display)
 	return Console.ModelName(display) or "a model the client's catalogue does not name"
 end
 
+--- How a run ended, as one word every surface says it by: "deleted" where a stop deleted all it
+-- spawned, "part deleted" where it deleted some, "refused" where the server would not add an
+-- object to the group, "stopped", or "done".
+-- @param result what Furnish.Spawn's finished hook is handed
+function Console.Ending(result)
+	if result.deleted then
+		return result.deleted == #result.spawned and "deleted" or "part deleted"
+	elseif result.joinRefused then
+		return "refused"
+	elseif result.aborted then
+		return "stopped"
+	end
+	return "done"
+end
+
 --- Report a finished run, how long it took, and select its group so the next group
 -- command acts on it, the group standing for the object the run was anchored on, if any.
 local function finish(result, started, anchor)
-	local doodads = result.placed
-	local pivot = result.pivot and ", and the pivot," or ""
-	if result.deleted == #result.spawned then
+	local ending = Console.Ending(result)
+	local spawned = ("%d of %d spawned%s in %s"):format(
+		result.placed,
+		result.total,
+		result.pivot and ", and the pivot," or "",
+		since(started)
+	)
+	if ending == "deleted" then
 		say(("stopped, and deleted the %s spawned"):format(objects(result.deleted)))
-	elseif result.deleted then
+	elseif ending == "part deleted" then
 		say(
 			("stopped, and deleted %d of the %s spawned"):format(
 				result.deleted,
 				objects(#result.spawned)
 			)
 		)
-	elseif result.joinRefused then
-		say(
-			("stopped, as the server would not add an object to the group: %d of %d spawned%s in %s"):format(
-				doodads,
-				result.total,
-				pivot,
-				since(started)
-			)
-		)
-	elseif result.aborted then
-		say(
-			("stopped: %d of %d spawned%s in %s"):format(
-				doodads,
-				result.total,
-				pivot,
-				since(started)
-			)
-		)
+	elseif ending == "refused" then
+		say("stopped, as the server would not add an object to the group: " .. spawned)
+	elseif ending == "stopped" then
+		say("stopped: " .. spawned)
 	else
-		say(("done: %d of %d spawned%s in %s"):format(doodads, result.total, pivot, since(started)))
+		say("done: " .. spawned)
 	end
 	for _, refusal in ipairs(result.refused) do
 		local what = refusal.pivot and "the pivot" or modelOf(refusal.display)
@@ -438,16 +480,21 @@ local reminded = false
 --   anchored on, or nil; quiet, true when a window shows the progress instead; blueprint, the
 --   name to offer if the run ends whole, or nil }
 local function start(rows, destination, group, about)
-	local send, reason = Client.Send()
+	local send = sender()
 	if not send then
-		return say(reason)
+		return
 	end
 	say(("spawning %s %s, %s"):format(about.what, about.where, about.lead))
 	-- A run ends by selecting its group, and highlighting too many objects can crash the client.
 	-- Whether it is on is the player's to decide, so the first run of a session only reminds them.
 	if not reminded then
 		reminded = true
-		say(Chat.HIGHLIGHT:lower() .. "; .toggle highlight off turns it off")
+		say(
+			("%s; %s turns it off"):format(
+				Chat.HIGHLIGHT:lower(),
+				Commands.Typed(Commands.Highlight("off"))
+			)
+		)
 	end
 	-- Started now, so a refusal at the end of the run can name its model.
 	Console.NameModels(function() end)
@@ -671,11 +718,10 @@ end
 
 --- Turn the client's highlighting of the selection on or off, as Tiler and ObjectMover do.
 function Console.ToggleHighlight()
-	local send, reason = Client.Send()
-	if not send then
-		return say(reason)
+	local send = sender()
+	if send then
+		send(Commands.Highlight(), nil, true)
 	end
-	send(Commands.Highlight(), nil, true)
 end
 
 --- Hear every run besides the chat.
@@ -697,6 +743,29 @@ function Console.Watch(watcher)
 	end
 end
 
+--- The words a list's button for a set carries, which Console.LinkRequest reads back: the
+-- root's file, the set's index, the group and base words the list was asked with, and what to
+-- call the root.
+local function linkWords(file, set, request, label)
+	local base = request.base and "base" or ""
+	return table.concat({ file, set.index, request.group or Console.GROUPED, base, label }, ":")
+end
+
+--- The request a list's button carries, as a click spawns it, or nil for words no list wrote.
+function Console.LinkRequest(words)
+	local file, index, group, base, label = words:match("^(%d+):(%d+):(%a+):(%a*):(.*)$")
+	if not file then
+		return nil
+	end
+	return {
+		file = tonumber(file),
+		index = tonumber(index),
+		group = group,
+		base = base == "base",
+		label = label,
+	}
+end
+
 --- Print a root's sets, each a link that spawns it; pose is the selected WMO's, or nil
 -- where the request names an entry.
 local function list(request, pose)
@@ -708,11 +777,10 @@ local function list(request, pose)
 	if not sets then
 		return say(reason)
 	end
-	local carried = table.concat({ request.group or "pivot", request.base and "base" or "" }, ":")
 	-- A menu of buttons, one a set; its index and its objects are in its tooltip.
 	local buttons = {}
 	for i, set in ipairs(sets) do
-		buttons[i] = Chat.Link(table.concat({ file, set.index, carried, label }, ":"), setName(set))
+		buttons[i] = Chat.Link(linkWords(file, set, request, label), setName(set))
 	end
 	say(("%s has %s:"):format(label, Chat.Count(#sets, "set")))
 	for _, line in ipairs(Chat.Menu(buttons)) do
@@ -749,11 +817,11 @@ function Console.Describe(request, tooltip)
 		return
 	end
 	local about = ("set %d of %s, %s"):format(set.index, request.label, objects(set.count))
-	if set.name ~= "" then
+	if not Sets.IsBase(set) then
 		about = set.name .. ", " .. about
 	end
 	local said = {}
-	if request.group ~= "pivot" then
+	if request.group ~= Console.GROUPED then
 		said[#said + 1] = request.group
 	end
 	if request.base then
@@ -771,7 +839,7 @@ end
 --- Fill a tooltip for the button on a WMO's doodad line.
 -- @param tooltip a tooltip owned and empty
 function Console.DescribeImport(tooltip)
-	Chat.Tip(tooltip, "Furnish", {
+	Chat.Tip(tooltip, Furnish.NAME, {
 		{ text = "Import this WMO and spawn the sets it shows now, grouped on it" },
 	})
 end
@@ -827,20 +895,20 @@ local function spawnOn(request, destination, selected)
 			return say(("%s has no set %d; %s shows its %d"):format(label, index, listing, #sets))
 		end
 		chosen[#chosen + 1] = set
-		hasBase = hasBase or set.index == 0
+		hasBase = hasBase or Sets.IsBase(set)
 	end
 	-- A WMO Epsilon emptied draws no base set of its own, so one the sets go onto gets it, under
 	-- the rest and once.
 	local base = request.base or (onto and Sets.IsBlank(onto.file))
-	if base and not hasBase and sets[1].index == 0 then
+	if base and not hasBase and Sets.IsBase(sets[1]) then
 		table.insert(chosen, 1, sets[1])
 	end
 	local rows, what = gather(chosen)
 	if not rows then
 		return say(what)
 	end
-	-- The set is named by its WMO wherever it is not going onto that WMO.
-	if not onto or label ~= onto.name then
+	-- The set is named by its WMO wherever it is not going onto that WMO, or a copy of it.
+	if not (onto and Sets.Same(onto.file, file)) then
 		what = label .. "'s " .. what
 	end
 	local group, lead = groupOf(request, selected)
@@ -911,11 +979,11 @@ end
 local function placed(pose, ids, base)
 	local chosen = {}
 	local first = base and (Sets.OfFile(pose.file) or {})[1]
-	if first and first.index == 0 then
+	if first and Sets.IsBase(first) then
 		chosen[1] = first
 	end
 	for _, set in ipairs(Sets.Named(pose.file, ids)) do
-		if set.index ~= 0 then
+		if not Sets.IsBase(set) then
 			chosen[#chosen + 1] = set
 		end
 	end
@@ -934,7 +1002,7 @@ function Console.Import(request)
 		return
 	end
 	local reason
-	local _, _, _, map = Client.Position()
+	local map = Client.Map()
 
 	-- What may still answer: the import's line and the record of the object it made. A stop
 	-- silences both.
@@ -1056,6 +1124,10 @@ function Console.Import(request)
 	end)
 end
 
+--- What a second stop does, said by the first, and said by the second as it does it.
+local AGAIN, GIVING_UP =
+	" again gives up on a reply that never comes", "giving up on the replies still owed"
+
 --- Stop spawning. With delete, also delete what the run spawned.
 function Console.Stop(delete)
 	if waiting then
@@ -1067,31 +1139,20 @@ function Console.Stop(delete)
 	if not (running and not running.Done()) then
 		return say("nothing is spawning")
 	end
+	local again = Chat.Typed("stop") .. AGAIN
 	-- Once the run is deleting, a stop ends the deleting the way it ends a run.
 	local deleting = current and current.deleting
 	if deleting then
-		if deleting.stopping then
-			say("giving up on the replies still owed")
-		else
-			say(
-				"no more deletes; "
-					.. Chat.Typed("stop")
-					.. " again gives up on a reply that never comes"
-			)
-		end
+		say(deleting.stopping and GIVING_UP or "no more deletes; " .. again)
 		deleting.stopping = true
 		return running.Abort()
 	end
 	if stopping then
-		say("giving up on the replies still owed")
+		say(GIVING_UP)
 	elseif delete then
-		say(
-			"stopping, then deleting what was spawned; "
-				.. Chat.Typed("stop")
-				.. " again gives up on a reply that never comes"
-		)
+		say("stopping, then deleting what was spawned; " .. again)
 	else
-		say("stopping; " .. Chat.Typed("stop") .. " again gives up on a reply that never comes")
+		say("stopping; " .. again)
 	end
 	stopping = true
 	running.Abort(delete)

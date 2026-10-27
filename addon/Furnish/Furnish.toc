@@ -17,9 +17,9 @@ Data\Reader.lua
 Data\Names.lua
 Data\Sets.lua
 Data\Rows.lua
+Client\Chat.lua
 Client\Client.lua
 Client\Pose.lua
-Client\Chat.lua
 Actions\Console.lua
 UI\Window.xml
 UI\Window.lua

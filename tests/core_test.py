@@ -271,16 +271,48 @@ def test_replies_are_read_and_stripped_plain(tmp_path: Path) -> None:
     assert commands.Plain(guid) == "Spawned 7001"
 
 
+#: A doodad's selection line as the server printed it, captured whole.
+SELECTED_DOODAD = (
+    "Selected doodad |cff00CCFF|Hdoodad_uid:10059564:0|h[draenei jug - 326022]|h|r"
+    " (UID: |cff00CCFF10059564|r) at X: |cff00CCFF2984.496745|r Y: |cff00CCFF3273.661784|r"
+    " Z: |cff00CCFF45.630093|r on map |cff00CCFF1116|r with scale: |cff00CCFF1.000000|r."
+)
+
+
+def test_a_doodad_link_names_the_map_its_line_colours(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    assert lua.eval("Furnish.Commands.DoodadLink")(SELECTED_DOODAD) == (10059564, 326022, 1116)
+    # A near line names no map; its doodads stand on the player's.
+    near = "|Hdoodad_uid:4242:0|h[house.wmo - 817579]|h (UID: 4242)"
+    assert lua.eval("Furnish.Commands.DoodadLink")(near) == (4242, 817579, None)
+
+
+def test_an_angle_is_level_on_either_side_of_nought(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    level = lua.eval("Furnish.Commands.IsLevel")
+    assert [level(angle) for angle in (0, -0.0001, 359.9999, 360, -5, 5, 180)] == [
+        True,
+        True,
+        True,
+        True,
+        False,
+        False,
+        False,
+    ]
+    unit = lua.eval("Furnish.Commands.IsUnit")
+    assert [unit(scale) for scale in (1, 1.0001, 0.9999, 1.001, 2)] == [
+        True,
+        True,
+        True,
+        False,
+        False,
+    ]
+
+
 def test_a_doodad_selection_line_is_read_and_nothing_else(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     read = lua.eval("Furnish.Commands.SelectedDoodad")
-    # As the server printed it, captured whole.
-    line = (
-        "Selected doodad |cff00CCFF|Hdoodad_uid:10059564:0|h[draenei jug - 326022]|h|r"
-        " (UID: |cff00CCFF10059564|r) at X: |cff00CCFF2984.496745|r Y: |cff00CCFF3273.661784|r"
-        " Z: |cff00CCFF45.630093|r on map |cff00CCFF1116|r with scale: |cff00CCFF1.000000|r."
-    )
-    doodad = read(line)
+    doodad = read(SELECTED_DOODAD)
     assert (doodad.uid, doodad.entry, doodad.name, doodad.map) == (
         10059564,
         326022,
@@ -738,6 +770,26 @@ def test_settings_are_restored_from_the_saved_copy_and_then_are_it(tmp_path: Pat
     assert lua.eval("FurnishSettings == Furnish.Settings") is True
     lua.execute("Furnish.Settings.inFlight = 2")
     assert lua.eval("FurnishSettings.inFlight") == 2
+
+
+@pytest.mark.parametrize(
+    ("saved", "kept"),
+    [
+        ("pivot = 0", "pivot = -424242"),
+        ("pivot = 2.5", "pivot = -424242"),
+        ("inFlight = 0", "inFlight = 4"),
+        ("inFlight = 99", "inFlight = 4"),
+        ("inFlight = 16", "inFlight = 16"),
+    ],
+)
+def test_a_saved_number_out_of_its_bounds_is_not_restored(
+    tmp_path: Path, saved: str, kept: str
+) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute(f"FurnishSettings = {{ {saved} }}")
+    lua.execute('FIRE("ADDON_LOADED", "Furnish")')
+    key, value = kept.split(" = ")
+    assert lua.eval(f"Furnish.Settings.{key}") == float(value)
 
 
 def test_settings_stand_on_their_defaults_with_nothing_saved(tmp_path: Path) -> None:

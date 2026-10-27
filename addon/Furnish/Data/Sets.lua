@@ -13,8 +13,21 @@ Furnish.Sets = Sets
 local Reader = Furnish.Reader
 local Names = Furnish.Names
 
+--- Whether a set is its root's base set, which comes first and is the one a WMO's file leaves
+-- unnamed.
+-- @param set any set with its index, as these functions or a window list it
+function Sets.IsBase(set)
+	return set.index == 0
+end
+
+--- Whether a root draws a set itself, as part of its model: its base set, unless Epsilon
+-- emptied the root.
+function Sets.DrawnByRoot(file, set)
+	return Sets.IsBase(set) and not Sets.IsBlank(file)
+end
+
 --- The sets a root file offers, in index order, or nil and the reason.
--- @return a list of { index, id, name, count }; the default set's name is ""
+-- @return a list of { index, id, name, count }; the base set's name is ""
 function Sets.OfFile(file)
 	local loaded, reason = Reader.Load()
 	if not loaded then
@@ -44,8 +57,8 @@ function Sets.Pick(file, index)
 	end
 	local offered = {}
 	for i, set in ipairs(sets) do
-		offered[i] = set.name ~= "" and ("%d %s"):format(set.index, Names.Set(set.name))
-			or tostring(set.index)
+		offered[i] = Sets.IsBase(set) and tostring(set.index)
+			or ("%d %s"):format(set.index, Names.Set(set.name))
 	end
 	return nil,
 		("root file %s has no set %s; it has %s"):format(
@@ -116,7 +129,7 @@ end
 -- @param file the root's file id
 function Sets.DrawsBeyondBase(file, map, uid)
 	for _, set in ipairs(Sets.Named(file, Sets.OfPlacement(map, uid))) do
-		if set.index ~= 0 then
+		if not Sets.IsBase(set) then
 			return true
 		end
 	end
