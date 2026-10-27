@@ -162,12 +162,30 @@ local function helpLines()
 	return lines
 end
 
+--- How the console's lines name a way out to a player at the command line or in chat: as the
+-- command is typed, read when said, since the command's name is set further down.
+Command.WAYS = {
+	stop = function()
+		return Chat.Typed("stop")
+	end,
+	list = function(entry)
+		return Chat.Typed(entry and "list " .. entry or "list")
+	end,
+	from = function()
+		return Chat.Typed("3 from <entry>")
+	end,
+	here = function()
+		return Chat.Typed("3 here <entry>")
+	end,
+}
+
 --- Act on what a player typed after the command.
 function Command.Run(text)
 	local request, reason = Command.Parse(text)
 	if not request then
 		return Chat.Say(reason)
 	end
+	request.ways = Command.WAYS
 	if request.action == "window" then
 		Furnish.Window.Toggle()
 	elseif request.action == "help" then
@@ -181,7 +199,7 @@ function Command.Run(text)
 	elseif request.action == "import" then
 		Console.Import(request)
 	else
-		Console.Stop(request.delete)
+		Console.Stop(request.delete, Command.WAYS)
 	end
 end
 
@@ -195,13 +213,14 @@ function Command.Click(words, modifier)
 	end
 	local kind, value = linked(words)
 	if kind == "import" then
-		return Console.Import({ uid = value })
+		return Console.Import({ uid = value, ways = Command.WAYS })
 	elseif kind == "list" then
-		return Console.List({ entry = tonumber(value) })
+		return Console.List({ entry = tonumber(value), ways = Command.WAYS })
 	end
 	local request = Console.LinkRequest(words)
 	if request then
 		request.here = modifier == "ctrl"
+		request.ways = Command.WAYS
 		Console.Spawn(request)
 	end
 end

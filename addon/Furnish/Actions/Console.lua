@@ -21,10 +21,14 @@
 --   group   a word from Console.GROUPS; nil is Console.GROUPED
 --   base    true to lay the root's base set under the sets, unless it is one of them
 --   quiet   true when a window shows the run's progress, so the chat leaves it out
+--   ways    how the door the request came through names a way out, as a line suggests one:
+--           { stop(), list(entry), from(), here() }, each a function answering the words, list's
+--           entry nil for the selected WMO's; a way the door does not offer goes unsaid
 --
 -- A window reads Source for the sets to show, Selected for the object they may spawn on, Busy
 -- for whether it may start, and Watch for the run it started; it spawns and stops through the
--- same doors as the commands.
+-- same doors as the commands. Each door says its own ways out, so a line never teaches a
+-- command to a player using the window.
 
 local _, Furnish = ...
 local Console = {}
@@ -129,24 +133,37 @@ local function since(moment)
 	return ("%.1f s"):format(Client.Now() - moment)
 end
 
---- Why nothing new can start, or nil.
-local function busy()
+--- A way out as a door words it, or nil where the door offers none.
+-- @param ways a request's ways, or nil
+-- @param name which way: "stop", "list", "from" or "here"
+local function way(ways, name, ...)
+	local words = ways and ways[name]
+	return words and words(...) or nil
+end
+
+--- A line, with a way out after it where the door offers one.
+local function offering(text, wayOut)
+	return wayOut and text .. "; " .. wayOut or text
+end
+
+--- Why nothing new can start, or nil; with the way that ends it, where the door offers one.
+local function busy(ways)
+	local doing
 	if waiting then
-		return ("%s is waiting for %s; %s ends it"):format(
-			Furnish.NAME,
-			waiting.what,
-			Chat.Typed("stop")
-		)
+		doing = "waiting for " .. waiting.what
 	elseif running and not running.Done() then
-		local doing = current and current.deleting and "deleting what it spawned" or "spawning"
-		return ("%s is still %s; %s ends it"):format(Furnish.NAME, doing, Chat.Typed("stop"))
+		doing = current and current.deleting and "still deleting what it spawned"
+			or "still spawning"
+	else
+		return nil
 	end
-	return nil
+	local stop = way(ways, "stop")
+	return offering(Furnish.NAME .. " is " .. doing, stop and stop .. " ends it")
 end
 
 --- Whether nothing is under way; says what is, where something is.
-local function idle()
-	local blocked = busy()
+local function idle(ways)
+	local blocked = busy(ways)
 	if blocked then
 		say(blocked)
 	end
@@ -164,8 +181,8 @@ end
 
 --- Whether a spawn or an import may begin: nothing else under way, the player allowed to spawn
 -- here, the data loaded and the server's door open. Says why not; answers the door when it may.
-local function ready()
-	if not (idle() and Client.CanSpawn()) then
+local function ready(ways)
+	if not (idle(ways) and Client.CanSpawn()) then
 		return nil
 	end
 	local loaded, reason = Reader.Load()
@@ -226,7 +243,8 @@ end
 --- Call fn with the selected object's pose, or say the way out. The group the last run
 -- selected stands for the object that run was anchored on: Furnish selects that object again
 -- and reads its record fresh, since moving the group may have moved it.
-local function withSelection(what, otherwise, fn)
+-- @param ways the request's ways out
+local function withSelection(ways, what, otherwise, fn)
 	local pose, reason = selection(what, otherwise)
 	if pose then
 		return fn(pose)
@@ -234,7 +252,7 @@ local function withSelection(what, otherwise, fn)
 	if not anchorHeld() then
 		return say(reason)
 	end
-	local send = idle() and sender()
+	local send = idle(ways) and sender()
 	if not send then
 		return
 	end
@@ -266,11 +284,12 @@ local function notWmo(pose, instead)
 	return pose.name .. " is not a WMO, so it has no sets" .. (instead and "; " .. instead or "")
 end
 
---- The root a request names, what to call it, and the list command that shows its sets;
--- or nil and the way out. Without an entry or a file it is the selected WMO's own.
+--- The root a request names, what to call it, and the way to list its sets, where the request's
+-- door offers one; or nil and the way out. Without an entry or a file it is the selected WMO's
+-- own.
 local function rootOf(request, pose)
 	if request.file then
-		return request.file, request.label, Chat.Typed("list")
+		return request.file, request.label, way(request.ways, "list")
 	end
 	if request.entry then
 		local file = Sets.OfEntry(request.entry)
@@ -280,9 +299,9 @@ local function rootOf(request, pose)
 					request.entry
 				)
 		end
-		return file, "object " .. request.entry, Chat.Typed("list " .. request.entry)
+		return file, "object " .. request.entry, way(request.ways, "list", request.entry)
 	end
-	return pose.file, pose.name, Chat.Typed("list")
+	return pose.file, pose.name, way(request.ways, "list")
 end
 
 --- A root's sets, or nil and the way out.
@@ -711,9 +730,10 @@ function Console.DismissOffer()
 	end
 end
 
---- Why nothing new can start, or nil.
-function Console.Busy()
-	return busy()
+--- Why nothing new can start, or nil; with ways, as a request carries them, the way that ends
+-- it too.
+function Console.Busy(ways)
+	return busy(ways)
 end
 
 --- Turn the client's highlighting of the selection on or off, as Tiler and ObjectMover do.
@@ -799,8 +819,9 @@ function Console.List(request)
 	if request.entry then
 		return list(request, nil)
 	end
-	withSelection("the WMO", nil, function(pose)
-		local wrong = notWmo(pose, Chat.Typed("list <entry>") .. " lists another object's")
+	local listing = way(request.ways, "list", "<entry>")
+	withSelection(request.ways, "the WMO", nil, function(pose)
+		local wrong = notWmo(pose, listing and listing .. " lists another object's")
 		if wrong then
 			return say(wrong)
 		end
@@ -892,7 +913,8 @@ local function spawnOn(request, destination, selected)
 	for _, index in ipairs(request.indexes or { request.index }) do
 		local set = Sets.Pick(file, index)
 		if not set then
-			return say(("%s has no set %d; %s shows its %d"):format(label, index, listing, #sets))
+			local shows = listing and ("%s shows its %d"):format(listing, #sets)
+			return say(offering(("%s has no set %d"):format(label, index), shows))
 		end
 		chosen[#chosen + 1] = set
 		hasBase = hasBase or Sets.IsBase(set)
@@ -931,7 +953,7 @@ end
 --- Spawn a set on the selected object, or at the player.
 -- @param request as the head of this file describes it
 function Console.Spawn(request)
-	if not ready() then
+	if not ready(request.ways) then
 		return
 	end
 	-- A pose given is the destination, its numbers alone, and its root must be named, since a pose
@@ -946,7 +968,7 @@ function Console.Spawn(request)
 		if group or request.group ~= "merge" then
 			return spawnOn(request, request.at, group or (selectedPose()))
 		end
-		return withSelection("the object whose group to join", nil, function(selected)
+		return withSelection(request.ways, "the object whose group to join", nil, function(selected)
 			spawnOn(request, request.at, selected)
 		end)
 	end
@@ -959,19 +981,18 @@ function Console.Spawn(request)
 	local what = not named and "the WMO"
 		or request.here and "the object whose group to join"
 		or "the object to spawn on"
-	local otherwise = request.here and not named and request.group ~= "merge"
-	withSelection(
-		what,
-		otherwise and (", or name it, as " .. Chat.Typed("3 here <entry>")) or nil,
-		function(pose)
-			local wrong = not named
-				and notWmo(pose, "name one, as " .. Chat.Typed("3 from <entry>"))
-			if wrong then
-				return say(wrong)
-			end
-			spawnOn(request, pose, pose)
+	local here = request.here
+		and not named
+		and request.group ~= "merge"
+		and way(request.ways, "here")
+	local from = way(request.ways, "from")
+	withSelection(request.ways, what, here and (", or name it, as " .. here) or nil, function(pose)
+		local wrong = not named and notWmo(pose, from and "name one, as " .. from)
+		if wrong then
+			return say(wrong)
 		end
-	)
+		spawnOn(request, pose, pose)
+	end)
 end
 
 --- The sets an imported WMO showed as a doodad, beyond the base set it shows
@@ -997,7 +1018,7 @@ end
 --   spawn in place of the ones it showed, the base among them only with base; group and base,
 --   as for a spawn
 function Console.Import(request)
-	local send = ready()
+	local send = ready(request.ways)
 	if not send then
 		return
 	end
@@ -1043,11 +1064,15 @@ function Console.Import(request)
 		if #chosen == 0 then
 			-- The data keeps no placement that draws only its base set, which the gob draws
 			-- itself, so this is said alike of one that drew only that and one the data lacks.
+			local listing = way(request.ways, "list")
 			return say(
-				("imported %s as object %s; the doodad drew no set beyond its base that Furnish knows of; %s lists the WMO's own"):format(
-					model,
-					guid,
-					Chat.Typed("list")
+				offering(
+					("imported %s as object %s; the doodad drew no set beyond its base that %s knows of"):format(
+						model,
+						guid,
+						Furnish.NAME
+					),
+					listing and listing .. " lists the WMO's own"
 				)
 			)
 		end
@@ -1129,7 +1154,8 @@ local AGAIN, GIVING_UP =
 	" again gives up on a reply that never comes", "giving up on the replies still owed"
 
 --- Stop spawning. With delete, also delete what the run spawned.
-function Console.Stop(delete)
+-- @param ways the ways out of the door the stop came through, as a request carries them
+function Console.Stop(delete, ways)
 	if waiting then
 		local left = waiting.left
 		waiting.stop()
@@ -1139,20 +1165,21 @@ function Console.Stop(delete)
 	if not (running and not running.Done()) then
 		return say("nothing is spawning")
 	end
-	local again = Chat.Typed("stop") .. AGAIN
+	local stop = way(ways, "stop")
+	local again = stop and stop .. AGAIN
 	-- Once the run is deleting, a stop ends the deleting the way it ends a run.
 	local deleting = current and current.deleting
 	if deleting then
-		say(deleting.stopping and GIVING_UP or "no more deletes; " .. again)
+		say(deleting.stopping and GIVING_UP or offering("no more deletes", again))
 		deleting.stopping = true
 		return running.Abort()
 	end
 	if stopping then
 		say(GIVING_UP)
 	elseif delete then
-		say("stopping, then deleting what was spawned; " .. again)
+		say(offering("stopping, then deleting what was spawned", again))
 	else
-		say("stopping; " .. again)
+		say(offering("stopping", again))
 	end
 	stopping = true
 	running.Abort(delete)

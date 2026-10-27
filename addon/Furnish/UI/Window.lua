@@ -91,6 +91,14 @@ local CHOOSE = _G.SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON
 --- The pop-up that asks before a set joins a group the selected gob is in already.
 local JOIN = "FURNISH_JOIN_GROUP"
 
+--- How the console's lines name a way out to a player at the window: its Stop is the one a line
+-- the window starts can need, since the window offers nothing a command alone can do.
+local WAYS = {
+	stop = function()
+		return "the window's Stop"
+	end,
+}
+
 local ROW = 22
 
 --- How far a list's rows stand in from its box, as FurnishListTemplate sets them, and the room
@@ -595,6 +603,7 @@ local function request()
 		at = Pose.Copy(spot),
 		group = grouped(),
 		quiet = true,
+		ways = WAYS,
 	}
 end
 
@@ -615,7 +624,7 @@ _G.StaticPopupDialogs[JOIN] = {
 -- already, the merge reading the selection when the answer comes; or stop the run.
 local function spawn()
 	if run then
-		return Console.Stop(false)
+		return Console.Stop(false, WAYS)
 	end
 	local text, enabled = action()
 	if not enabled then
@@ -1200,7 +1209,7 @@ end
 -- the gob it made, since the gob is selected by the GUID that names it.
 local function importDoodad()
 	asked = doodad.uid
-	Console.Import({ uid = doodad.uid, only = true })
+	Console.Import({ uid = doodad.uid, only = true, ways = WAYS })
 	update()
 end
 
@@ -1680,7 +1689,7 @@ local function buildFooter()
 	frame.DeleteButton:SetScript(
 		"OnClick",
 		Client.Guarded(function()
-			Console.Stop(true)
+			Console.Stop(true, WAYS)
 		end)
 	)
 	hint(frame.DeleteButton, nil, { { text = "Stop, then delete everything this run spawned." } })

@@ -480,7 +480,28 @@ def test_a_window_is_told_when_it_may_not_start(tmp_path: Path) -> None:
     assert lua.eval("Furnish.Console.Busy()") is None
     lua.execute("SELECTED = 500")
     run(lua, "1")
-    assert lua.eval("Furnish.Console.Busy()") == "Furnish is still spawning; /furn stop ends it"
+    assert lua.eval("Furnish.Console.Busy()") == "Furnish is still spawning"
+    assert lua.eval("Furnish.Console.Busy(Furnish.Command.WAYS)") == (
+        "Furnish is still spawning; /furn stop ends it"
+    )
+
+
+#: A door that is not the command line, offering only its own stop, as the window does.
+OTHER_DOOR = "{ stop = function() return 'the Stop' end }"
+
+
+def test_a_door_that_is_not_the_command_line_is_taught_no_command(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path, deferred=True)
+    lua.execute("SELECTED = 500")
+    before = len(printed(lua))
+    spawn(lua, "{ index = 7, file = 900, label = 'house', at = Furnish.Pose.At(1, 2, 3) }")
+    assert printed(lua)[before:] == [PREFIX + "house has no set 7"]
+    spawn(lua, f"{{ index = 1, file = 900, label = 'house', ways = {OTHER_DOOR} }}")
+    lua.execute(f"Furnish.Console.Stop(false, {OTHER_DOOR})")
+    assert printed(lua)[-1] == (
+        PREFIX + "stopping; the Stop again gives up on a reply that never comes"
+    )
+    assert not [line for line in printed(lua)[before:] if "/furn" in line]
 
 
 # -- Listing -----------------------------------------------------------------------------
