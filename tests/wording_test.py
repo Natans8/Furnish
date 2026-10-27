@@ -16,8 +16,8 @@ UNIT_PICK = re.compile(r"(?<![\\/])" + "tar" + "get", re.IGNORECASE)
 WRITTEN = [
     "README.md",
     "pyproject.toml",
-    "addon/Furnish/*.lua",
-    "addon/Furnish/*.xml",
+    "addon/Furnish/**/*.lua",
+    "addon/Furnish/**/*.xml",
     "addon/Furnish/*.toc",
     "src/furnish/*.py",
     "src/furnish/*.sql",

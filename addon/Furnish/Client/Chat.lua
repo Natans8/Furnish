@@ -8,8 +8,7 @@
 -- A link is the client's garrison-mission link carrying Furnish's own words. The client
 -- ignores one it cannot read as a mission, and Furnish acts on the ones it wrote.
 
-_G.Furnish = _G.Furnish or {}
-local Furnish = _G.Furnish
+local _, Furnish = ...
 local Chat = {}
 Furnish.Chat = Chat
 

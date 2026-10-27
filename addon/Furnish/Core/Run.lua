@@ -14,8 +14,7 @@
 -- `send(text, callback(success, messages))` is the one door to the server, handed in rather
 -- than reached for, so the whole file runs against a stand-in outside the client.
 
-_G.Furnish = _G.Furnish or {}
-local Furnish = _G.Furnish
+local _, Furnish = ...
 local Run = {}
 Furnish.Run = Run
 

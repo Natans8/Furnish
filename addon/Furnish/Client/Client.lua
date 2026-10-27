@@ -4,8 +4,7 @@
 -- runs in a plain Lua with this file's globals stood in. Nothing here decides anything about
 -- furnishing; it only sends, reads and reshapes.
 
-_G.Furnish = _G.Furnish or {}
-local Furnish = _G.Furnish
+local _, Furnish = ...
 local Client = {}
 Furnish.Client = Client
 

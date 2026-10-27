@@ -14,11 +14,10 @@
 -- flag 1, and the scale as a float32 under flag 2. Nothing is rounded: the numbers are the
 -- WMO file's own. The Python side of this is furnish/codec.py.
 
+local _, Furnish = ...
 local FORMAT = 7
 local decoded = {}
 
-_G.Furnish = _G.Furnish or {}
-local Furnish = _G.Furnish
 local Reader = {}
 Furnish.Reader = Reader
 local Data

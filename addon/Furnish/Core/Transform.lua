@@ -10,8 +10,7 @@
 -- convention the paste tool spawned correctly under, and it is kept here unchanged. Every
 -- function is pure, so the whole file runs outside the client.
 
-_G.Furnish = _G.Furnish or {}
-local Furnish = _G.Furnish
+local _, Furnish = ...
 local Transform = {}
 Furnish.Transform = Transform
 

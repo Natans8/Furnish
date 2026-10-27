@@ -16,14 +16,17 @@ from furnish.wmo import Placement
 
 LIBDEFLATE = Path(__file__).parent / "lua" / "LibDeflate.lua"
 ADDON = Path(__file__).parents[1] / "addon" / "Furnish"
-#: The files that draw frames, which need a client and are tried in the simulator instead.
-DRAWN = {"Window.lua", "Options.lua"}
-#: The addon's files in the toc's own order, read off it, so a file the toc gains loads here too.
-FILES = tuple(
-    line.strip()
+#: Every file the toc loads, in its order, as a path under the addon, read off the toc so a
+#: file it gains loads here too.
+LOADED = tuple(
+    line.strip().replace("\\", "/")
     for line in (ADDON / "Furnish.toc").read_text(encoding="utf-8").splitlines()
-    if line.strip().endswith(".lua") and line.strip() not in DRAWN
+    if line.strip() and not line.startswith("#")
 )
+#: The files that draw frames, which need a client and are tried in the simulator instead.
+DRAWN = {"UI/Window.lua", "UI/Options.lua"}
+#: The Lua files the core is tested with, in load order.
+FILES = tuple(name for name in LOADED if name.endswith(".lua") and name not in DRAWN)
 
 HOUSE = 900
 EMPTY_HOUSE = 777
@@ -74,6 +77,16 @@ def bare_lua() -> lua51.LuaRuntime:
     return lua
 
 
+def run_file(lua: lua51.LuaRuntime, path: Path) -> None:
+    """Run one of the addon's files as the client does, handed the addon's name and its table;
+    the table is the global Furnish here, so a test reaches every part of it."""
+    lua.globals().SOURCE = path.read_text(encoding="utf-8")
+    lua.globals().NAME = path.relative_to(ADDON).as_posix()
+    lua.execute(
+        'Furnish = Furnish or {} assert(loadstring(SOURCE, "@" .. NAME))("Furnish", Furnish)'
+    )
+
+
 def lua_core(tmp_path: Path, layered: bool = False) -> lua51.LuaRuntime:
     write_database(tmp_path / "f.sqlite", layered)
     export(tmp_path / "f.sqlite", tmp_path / "Data.lua")
@@ -107,7 +120,7 @@ def lua_core(tmp_path: Path, layered: bool = False) -> lua51.LuaRuntime:
     lua.globals().DATA_PATH = (tmp_path / "Data.lua").as_posix()
     lua.execute("function LoadAddOn(name) dofile(DATA_PATH) return true end")
     for name in FILES:
-        lua.execute((ADDON / name).read_text(encoding="utf-8"))
+        run_file(lua, ADDON / name)
     lua.execute("Furnish.Settings.pivot = -424242")
     return lua
 

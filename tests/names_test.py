@@ -1,17 +1,17 @@
 """A set's name as a player reads it: the prefix dropped, the words split and cased."""
 
-from pathlib import Path
-
 import pytest
 from lupa import lua51
 
-NAMES = Path(__file__).parents[1] / "addon" / "Furnish" / "Names.lua"
+from tests.core_test import ADDON, run_file
+
+NAMES = ADDON / "Data" / "Names.lua"
 
 
 @pytest.fixture(scope="module")
 def pretty() -> lua51.LuaFunction:
     lua = lua51.LuaRuntime(unpack_returned_tuples=True)
-    lua.execute(NAMES.read_text(encoding="utf-8"))
+    run_file(lua, NAMES)
     return lua.eval("Furnish.Names.Set")
 
 

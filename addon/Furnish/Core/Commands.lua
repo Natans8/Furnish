@@ -4,8 +4,7 @@
 --
 -- Every function is pure: a value in, a string out, or a reply in, a value out.
 
-_G.Furnish = _G.Furnish or {}
-local Furnish = _G.Furnish
+local _, Furnish = ...
 local Commands = {}
 Furnish.Commands = Commands
 

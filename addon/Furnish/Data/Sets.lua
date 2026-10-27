@@ -6,8 +6,7 @@
 -- of its own copies, carries in the data the sets of the WMO it was emptied from. A map
 -- placement gives the sets the zone chose.
 
-_G.Furnish = _G.Furnish or {}
-local Furnish = _G.Furnish
+local _, Furnish = ...
 local Sets = {}
 Furnish.Sets = Sets
 

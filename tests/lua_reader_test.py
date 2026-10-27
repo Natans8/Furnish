@@ -11,10 +11,10 @@ from furnish.database import Database
 from furnish.export import LINE_WIDTH, export
 from furnish.order import trail
 from furnish.wmo import Placement
-from tests.core_test import bare_lua
+from tests.core_test import ADDON, bare_lua, run_file
 from tests.files import varied_placements
 
-READER = Path(__file__).parents[1] / "addon" / "Furnish" / "Reader.lua"
+READER = ADDON / "Data" / "Reader.lua"
 
 CHAIR = Placement(1001, (1.5, -2.0, 0.25), (0.0, 0.0, 0.5, 0.75), 1.0)
 LAMP = Placement(1002, (0.0, 0.0, 3.0), (0.0, 0.0, 0.0, 1.0), 0.5)
@@ -40,7 +40,7 @@ def lua_with(data: Path, format_override: str = "") -> lua51.LuaRuntime:
         + format_override
         + " return true end return false, 'MISSING' end"
     )
-    lua.execute(READER.read_text(encoding="utf-8"))
+    run_file(lua, READER)
     return lua
 
 

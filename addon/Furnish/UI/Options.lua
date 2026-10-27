@@ -3,8 +3,7 @@
 -- sessions. A change takes effect at once; Cancel puts back what the panel showed when it
 -- opened, and Defaults what the addon ships with.
 
-_G.Furnish = _G.Furnish or {}
-local Furnish = _G.Furnish
+local _, Furnish = ...
 local Client = Furnish.Client
 local Settings = Furnish.Settings
 

@@ -6,8 +6,7 @@
 -- record is read off the selection the player made, never one the addon makes for them. A
 -- doodad is reached the same way, since `.doodad import` selects what it imports.
 
-_G.Furnish = _G.Furnish or {}
-local Furnish = _G.Furnish
+local _, Furnish = ...
 local Pose = {}
 Furnish.Pose = Pose
 

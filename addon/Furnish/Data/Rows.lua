@@ -4,8 +4,7 @@
 -- follow the furnishing with their eyes; after that they are only rows, to be put together
 -- before the kernel sees them.
 
-_G.Furnish = _G.Furnish or {}
-local Furnish = _G.Furnish
+local _, Furnish = ...
 local Rows = {}
 Furnish.Rows = Rows
 

@@ -18,8 +18,7 @@
 -- would leave the join acting on the leader. A pair waits for the two that may lead and for
 -- nothing else, so a spawn never waits on the reply to the one before it.
 
-_G.Furnish = _G.Furnish or {}
-local Furnish = _G.Furnish
+local _, Furnish = ...
 
 local Transform = Furnish.Transform
 local Commands = Furnish.Commands

@@ -3,8 +3,10 @@
 -- defaults; what a player changed is kept across sessions in FurnishSettings, which the
 -- client restores at load, and only a key declared here is taken from it.
 
-_G.Furnish = _G.Furnish or {}
-local Furnish = _G.Furnish
+local _, Furnish = ...
+-- Every file is handed the addon's table; this one, loaded first, also makes it the addon's
+-- one global, for another addon or a /run to reach.
+_G.Furnish = Furnish
 
 Furnish.Settings = {
 	--- What a set's invisible leader at the anchor is, as `.gob spawn` takes it: a gameobject

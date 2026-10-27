@@ -22,8 +22,7 @@
 -- block kept as it is stays so. Importing hides the doodad, which stays selected, so the panel
 -- keeps it. While a run goes nothing changes, since every spawn moves the selection.
 
-_G.Furnish = _G.Furnish or {}
-local Furnish = _G.Furnish
+local _, Furnish = ...
 local Window = {}
 Furnish.Window = Window
 

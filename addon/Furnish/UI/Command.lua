@@ -3,8 +3,7 @@
 --
 -- The commands and the words are declared once, below, and the help is read off them.
 
-_G.Furnish = _G.Furnish or {}
-local Furnish = _G.Furnish
+local _, Furnish = ...
 local Command = {}
 Furnish.Command = Command
 

@@ -23,8 +23,7 @@
 -- for whether it may start, and Watch for the run it started; it spawns and stops through the
 -- same doors as the commands.
 
-_G.Furnish = _G.Furnish or {}
-local Furnish = _G.Furnish
+local _, Furnish = ...
 local Console = {}
 Furnish.Console = Console
 

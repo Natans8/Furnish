@@ -7,8 +7,7 @@
 --
 -- Every function is pure, so the whole file runs outside the client.
 
-_G.Furnish = _G.Furnish or {}
-local Furnish = _G.Furnish
+local _, Furnish = ...
 local Names = {}
 Furnish.Names = Names
 
