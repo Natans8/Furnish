@@ -21,7 +21,9 @@ from furnish.sources import path_key
 
 _SET = struct.Struct("<20sII4x")
 _PLACEMENT = struct.Struct("<I3f4ff4B")
-_HEADER_WMO_ID_OFFSET = 36
+#: Where ``MOHD`` keeps the root's id: after seven counts and the ambient colour, before the
+#: bounding box, which starts at 36.
+_HEADER_WMO_ID_OFFSET = 32
 
 MODEL_INDEX_MASK = 0xFFFFFF
 """The low 24 bits of a placement's first word are the model reference; the high 8 are flags."""
@@ -62,7 +64,9 @@ class Root:
     """What a WMO root file says about its doodads.
 
     Attributes:
-        wmo_id: The root's own id from its header, shared by a model family's variants.
+        wmo_id: The root's own id from its header, the RootId the client's WMO area tables and
+            ``.lookup wmodata`` know it by. Epsilon's emptied and edited copies of a WMO keep
+            their original's, and a few roots carry 0.
         sets: Every set in ``MODS`` order, index 0 the default set.
     """
 

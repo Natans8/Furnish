@@ -44,8 +44,11 @@ def wmo_root(
                 "<I3f4ff4B", reference, *p.position, *p.rotation, p.scale, 0, 0, 0, 0
             )
             start += 1
+    # The header as a root lays it out: the id at 32, then a bounding box whose first float
+    # would be read as the id by a reader one field late.
     header = bytearray(64)
-    struct.pack_into("<I", header, 36, wmo_id)
+    struct.pack_into("<I", header, 32, wmo_id)
+    struct.pack_into("<6f", header, 36, -10.0, -10.0, 0.0, 10.0, 10.0, 8.0)
     model_chunk = (
         chunk("MODN", names)
         if model_names is not None
