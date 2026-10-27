@@ -491,7 +491,7 @@ def test_a_refused_doodad_is_counted_with_the_servers_words(tmp_path: Path) -> N
     assert result.refused[1].messages[1] == "the gameobject with displayid -20 doesn't exist"
 
 
-def test_a_refused_join_is_reported_as_unjoined(tmp_path: Path) -> None:
+def test_a_refused_join_stops_the_run_and_is_reported_as_unjoined(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     lua.execute(
         """
@@ -509,8 +509,15 @@ def test_a_refused_join_is_reported_as_unjoined(tmp_path: Path) -> None:
         """
     )
     result = spawn(lua, rows(lua, 2), "333")
-    assert len(result.spawned) == 2 and len(result.refused) == 0
-    assert [(u.display, u.guid) for u in result.unjoined.values()] == [(20, "7001"), (21, "7002")]
+    # Every join after goes to the same group, so the lamp is not spawned outside it.
+    assert list(lua.eval("SENT").values()) == [
+        "gobject spawn -20 posx 11.5 posy 18 posz 30.25 face north",
+        "gobject group add 333",
+    ]
+    assert result.joinRefused is True and result.aborted is True
+    assert len(result.spawned) == 1 and len(result.refused) == 0
+    assert [(u.display, u.guid) for u in result.unjoined.values()] == [(20, "7001")]
+    assert list(lua.eval("PROGRESS").values()) == ["1/2"]
     assert result.unjoined[1].messages[1] == "You cannot edit this group."
 
 
@@ -654,6 +661,50 @@ def test_an_abort_with_cleanup_deletes_what_was_spawned(tmp_path: Path) -> None:
     lua.execute("ANSWER(4, true, {}); ANSWER(5, true, {})")
     result = lua.eval("RESULT")
     assert result.aborted is True and result.deleted == 2 and lua.eval("HANDLE.Done()") is True
+
+
+def cleanup_after_two(lua: lua51.LuaRuntime) -> None:
+    """A run one command wide, stopped with a cleanup once the pivot and the chair stand."""
+    held_server(lua)
+    lua.execute(
+        f"""
+        Furnish.Settings.inFlight = 1
+        RESULT, DELETING = nil, {{}}
+        HANDLE = Furnish.Spawn({rows(lua, 2)}, {ANCHOR}, nil, nil, Furnish.Group.Pivot, SEND, {{
+          deleting = function(done, total) DELETING[#DELETING + 1] = done .. "/" .. total end,
+          finished = function(result) RESULT = result end,
+        }})
+        ANSWER(1)
+        ANSWER(2)
+        HANDLE.Abort(true)
+        ANSWER(3)
+        """
+    )
+
+
+def test_a_cleanup_deletes_at_the_runs_width_and_the_run_is_done_when_it_ends(
+    tmp_path: Path,
+) -> None:
+    lua = lua_core(tmp_path)
+    cleanup_after_two(lua)
+    # One wide, as the run was: the chair waits for the pivot's delete to answer.
+    assert list(lua.eval("SENT").values())[3:] == ["gobject delete 7001"]
+    assert lua.eval("HANDLE.Done()") is False and lua.eval("RESULT") is None
+    lua.execute("ANSWER(4)")
+    assert list(lua.eval("SENT").values())[3:] == ["gobject delete 7001", "gobject delete 7002"]
+    assert lua.eval("HANDLE.Done()") is False
+    lua.execute("ANSWER(5)")
+    assert list(lua.eval("DELETING").values()) == ["0/2", "1/2", "2/2"]
+    assert lua.eval("RESULT.deleted") == 2 and lua.eval("HANDLE.Done()") is True
+
+
+def test_an_abort_while_deleting_sends_no_more_deletes(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    cleanup_after_two(lua)
+    lua.execute("HANDLE.Abort()")
+    lua.execute("ANSWER(4)")
+    assert list(lua.eval("SENT").values())[3:] == ["gobject delete 7001"]
+    assert lua.eval("RESULT.deleted") == 1 and lua.eval("HANDLE.Done()") is True
 
 
 # -- Settings ---------------------------------------------------------------------------

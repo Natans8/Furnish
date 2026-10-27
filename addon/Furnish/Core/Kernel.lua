@@ -93,13 +93,15 @@ end
 -- @param scale the anchor's scale, or nil for 1
 -- @param group a Furnish.Group value, or the GUID of the object whose group to join
 -- @param send function(text, callback(success, messages)), the door to the server
--- @param hooks { progress = function(done, total), finished = function(outcome) }, optional.
+-- @param hooks { progress = function(done, total), deleting = function(done, total),
+--   finished = function(outcome) }, optional; deleting is told as a cleanup deletes.
 --   The outcome carries total, spawned (GUIDs), refused ({ display, pivot, messages }, the
 --   pivot's display being the setting as `.gob spawn` takes it), unjoined
 --   ({ display, guid, messages }: spawned, but the join was refused), leader, joined (how
 --   many objects joined the leader's group), pivot, placed (how many of the rows stood, the
---   pivot left out), aborted and, after a cleanup, deleted; a messages list is the server's
---   reply lines as sent.
+--   pivot left out), aborted (stopped before the end), joinRefused (stopped by a refused join,
+--   the rest skipped) and, after a cleanup, deleted; a messages list is the server's reply
+--   lines as sent.
 -- @return a handle with Abort(cleanup), Done() and total, or nil and the reason
 function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 	local wrong = check(rows, position, rotation, scale, group, send)
@@ -115,6 +117,9 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 	-- lead, the first two under a word.
 	local commands, spawns, joined, leads = {}, {}, {}, {}
 	local leader
+	-- A refused join stops the run: every join after it goes to the same leader, so what is not
+	-- sent yet is skipped rather than spawned outside the group.
+	local joinRefused = false
 	local function spawn(display, line)
 		if #line > Commands.LIMIT then
 			return ("a spawn line is %d characters, over the %d the server takes: %s"):format(
@@ -125,7 +130,11 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 		end
 		local index = #commands + 1
 		spawns[index] = display
-		commands[index] = { text = line }
+		commands[index] = {
+			text = function()
+				return not joinRefused and line or nil
+			end,
+		}
 		if not joins then
 			return nil
 		end
@@ -149,7 +158,7 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 			text = function(results)
 				-- Once one answers, it leads every join after, so its reply is read once.
 				leader = leader or leaderOf(group, results, needs)
-				if not leader then
+				if joinRefused or not leader then
 					return nil
 				end
 				return Commands.Join(leader)
@@ -173,7 +182,10 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 		end
 	end
 
-	local cleanup = false
+	-- Whether a cleanup is asked for, and whether the outcome has been handed over, which is
+	-- when the run is done, a cleanup included.
+	local cleanup, over = false, false
+	local cleaning
 
 	local function outcome(ended)
 		local results = ended.results
@@ -214,41 +226,75 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 			joined = members,
 			pivot = pivot,
 			placed = #spawned - (pivot and 1 or 0),
-			aborted = ended.aborted,
+			aborted = ended.aborted or joinRefused,
+			joinRefused = joinRefused,
 		}
 	end
 
-	local function finished(ended)
-		local result = outcome(ended)
-		local pending = #result.spawned
-		if not cleanup or pending == 0 then
-			if hooks and hooks.finished then
-				hooks.finished(result)
-			end
-			return
-		end
-		result.deleted = 0
-		for _, guid in ipairs(result.spawned) do
-			send(Commands.Delete(guid), function(success)
-				pending = pending - 1
-				if success then
-					result.deleted = result.deleted + 1
-				end
-				if pending == 0 and hooks and hooks.finished then
-					hooks.finished(result)
-				end
-			end)
+	local function handOver(result)
+		over = true
+		if hooks and hooks.finished then
+			hooks.finished(result)
 		end
 	end
 
-	-- The run counts joins too; the surface is told in doodads, the pivot left out.
+	-- A cleanup deletes one object at a time, as a run without a group must, at the run's own
+	-- width, so it paces as the spawning did; the run is done when the last delete answers.
+	local function finished(ended)
+		local result = outcome(ended)
+		if not cleanup or #result.spawned == 0 then
+			return handOver(result)
+		end
+		local deletes = {}
+		for i, guid in ipairs(result.spawned) do
+			deletes[i] = { text = Commands.Delete(guid) }
+		end
+		local deleting = hooks and hooks.deleting
+		if deleting then
+			deleting(0, #deletes)
+		end
+		cleaning = Run.Start(deletes, send, {
+			progress = deleting and function(done, total)
+				deleting(done, total)
+			end,
+			finished = function(cleaned)
+				result.deleted = 0
+				for i = 1, #deletes do
+					local answer = cleaned.results[i]
+					if answer and answer.success then
+						result.deleted = result.deleted + 1
+					end
+				end
+				handOver(result)
+			end,
+		}, settings.inFlight)
+	end
+
+	-- Whether the server refused a join for an object that stood, asked of the join or its spawn,
+	-- whichever index is given.
+	local answers = {}
+	local function refusedJoin(index)
+		local at = joined[index] and index or nil
+		if not at and joined[index + 1] == index then
+			at = index + 1
+		end
+		local own, join = at and answers[joined[at]], at and answers[at]
+		return own and join and own.success and not join.success and not join.skipped
+	end
+
+	-- The run counts joins too; the surface is told in the doodads sent, the pivot left out. A
+	-- join and its spawn may answer in either order, so either asks whether the join was refused.
 	local progress, settled = hooks and hooks.progress, 0
 	local run, reason = Run.Start(commands, send, {
-		progress = progress and function(_, _, index)
-			if spawns[index] and not (marker and index == 1) then
+		progress = function(_, _, index, result)
+			answers[index] = result
+			if spawns[index] and not (marker and index == 1) and not result.skipped then
 				settled = settled + 1
-				progress(settled, #rows)
+				if progress then
+					progress(settled, #rows)
+				end
 			end
+			joinRefused = joinRefused or refusedJoin(index) == true
 		end,
 		finished = finished,
 	}, settings.inFlight)
@@ -260,14 +306,20 @@ function Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
 
 	--- Stop sending. With cleanup, delete what was spawned once the commands in flight have
 	-- answered; the outcome then carries `deleted`. A cleanup once asked for stays asked
-	-- for, so a second abort that gives up on a reply still deletes.
+	-- for, so a second abort that gives up on a reply still deletes. Once the cleanup is
+	-- deleting, an abort stops it the way it stops a run: no more deletes, and a second gives
+	-- up on the replies still owed.
 	function handle.Abort(withCleanup)
+		if cleaning then
+			return cleaning.Abort()
+		end
 		cleanup = cleanup or withCleanup == true
 		run.Abort()
 	end
 
+	--- Whether the run is over, its cleanup included.
 	function handle.Done()
-		return run.Done()
+		return over
 	end
 
 	return handle

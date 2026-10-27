@@ -286,6 +286,29 @@ MERGE_REFUSED = (
 )
 
 
+def test_a_merge_into_a_gob_the_player_cannot_edit_is_refused_before_anything_is_sent(
+    tmp_path: Path,
+) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute(
+        """
+        C_Epsilon.IsOfficer = function() return false end
+        C_Epsilon.IsOwner = function() return false end
+        C_Epsilon.IsMember = function() return true end
+        SELECTED = 502
+        """
+    )
+    spawn(
+        lua,
+        "{ index = 1, file = 900, label = 'house', at = Furnish.Pose.At(1, 2, 3),"
+        " group = 'merge' }",
+    )
+    assert printed(lua)[-1] == (
+        PREFIX + "you can't edit chair in this phase, so the set can't merge into its group"
+    )
+    assert not [line for line in sent(lua) if line.startswith("gobject spawn")]
+
+
 def test_numbers_given_merge_into_whatever_is_selected_not_what_they_were_read_off(
     tmp_path: Path,
 ) -> None:

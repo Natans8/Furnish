@@ -99,7 +99,8 @@ local function busy()
 	if waiting then
 		return ("Furnish is waiting for %s; %s ends it"):format(waiting.what, Chat.Typed("stop"))
 	elseif running and not running.Done() then
-		return "Furnish is still spawning; " .. Chat.Typed("stop") .. " ends it"
+		local doing = current and current.deleting and "deleting what it spawned" or "spawning"
+		return ("Furnish is still %s; %s ends it"):format(doing, Chat.Typed("stop"))
 	end
 	return nil
 end
@@ -258,6 +259,13 @@ local function groupOf(request, pose)
 	if not (pose and pose.guid) then
 		return nil, "no gob is selected whose group to merge into"
 	end
+	-- Refused before anything spawns; the run still stops if the server refuses a join.
+	if not Client.CanEdit(pose) then
+		return nil,
+			("you can't edit %s in this phase, so the set can't merge into its group"):format(
+				pose.name
+			)
+	end
 	if pose.groupLeader ~= 0 then
 		return pose.groupLeader, "joining the group " .. pose.name .. " is in"
 	end
@@ -281,6 +289,15 @@ local function finish(result, started, anchor)
 			("stopped, and deleted %d of the %s spawned"):format(
 				result.deleted,
 				objects(#result.spawned)
+			)
+		)
+	elseif result.joinRefused then
+		say(
+			("stopped, as the server would not add an object to the group: %d of %d spawned%s in %s"):format(
+				doodads,
+				result.total,
+				pivot,
+				since(started)
 			)
 		)
 	elseif result.aborted then
@@ -327,6 +344,16 @@ local function hooks(about)
 			if not about.quiet and done < total and done - told >= 10 then
 				told = done
 				say(("%d of %d"):format(done, total))
+			end
+		end,
+		deleting = function(done, total)
+			if current then
+				current.deleting = current.deleting or { stopping = false }
+				current.deleting.done, current.deleting.total = done, total
+			end
+			tell("deleting", done, total)
+			if not about.quiet and done > 0 and done < total and done % 10 == 0 then
+				say(("deleted %d of %d"):format(done, total))
 			end
 		end,
 		finished = function(result)
@@ -561,9 +588,10 @@ function Console.ToggleHighlight()
 end
 
 --- Hear every run besides the chat.
--- @param watcher { started(total, what), progress(done, total), finished(result, seconds),
---   waiting(waits) }, each optional; finished has no result for a run refused before anything
---   was sent, and waiting is told whenever a wait for the server starts or ends
+-- @param watcher { started(total, what), progress(done, total), deleting(done, total),
+--   finished(result, seconds), waiting(waits) }, each optional; deleting is told as a stopped
+--   run's cleanup deletes, finished has no result for a run refused before anything was sent,
+--   and waiting is told whenever a wait for the server starts or ends
 -- @return a function that stops hearing
 function Console.Watch(watcher)
 	watchers[#watchers + 1] = watcher
@@ -867,6 +895,9 @@ function Console.Import(request)
 			return say(what)
 		end
 		local group, lead = groupOf({ group = request.group or "merge" }, pose)
+		if not group then
+			return say(("imported %s as object %s, but %s"):format(model, guid, lead))
+		end
 		start(rows, pose, group, {
 			what = what,
 			where = "on " .. pose.name,
@@ -937,6 +968,21 @@ function Console.Stop(delete)
 	end
 	if not (running and not running.Done()) then
 		return say("nothing is spawning")
+	end
+	-- Once the run is deleting, a stop ends the deleting the way it ends a run.
+	local deleting = current and current.deleting
+	if deleting then
+		if deleting.stopping then
+			say("giving up on the replies still owed")
+		else
+			say(
+				"no more deletes; "
+					.. Chat.Typed("stop")
+					.. " again gives up on a reply that never comes"
+			)
+		end
+		deleting.stopping = true
+		return running.Abort()
 	end
 	if stopping then
 		say("giving up on the replies still owed")

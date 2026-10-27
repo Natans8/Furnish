@@ -733,8 +733,15 @@ local function refresh()
 	update()
 end
 
---- The bar's words during a run: how far it is, and once its pace is known, how long is left.
+--- The bar's words during a run: how far it is, and once its pace is known, how long is left;
+-- once a stopped run deletes what it spawned, how far the deleting is.
 local function progressText()
+	local cleanup = run.deleting
+	if cleanup then
+		return frame.Progress.Text:SetText(
+			("Deleting %s of %s"):format(thousands(cleanup.done), thousands(cleanup.total))
+		)
+	end
 	local line = ("%s of %s"):format(thousands(run.done), thousands(run.total))
 	local elapsed = Client.Now() - run.started
 	if run.done >= PACED and run.done < run.total then
@@ -771,6 +778,17 @@ local function progressed(done)
 	end
 	run.done = done
 	frame.Progress:SetValue(done)
+	progressText()
+end
+
+--- A stopped run's cleanup on the bar, which empties as the objects it spawned go.
+local function deleting(done, total)
+	if not run then
+		return
+	end
+	run.deleting = { done = done, total = total }
+	frame.Progress:SetMinMaxValues(0, math.max(total, 1))
+	frame.Progress:SetValue(total - done)
 	progressText()
 end
 
@@ -1223,6 +1241,7 @@ local function listen()
 		Console.Watch({
 			started = Client.Guarded(started),
 			progress = Client.Guarded(progressed),
+			deleting = Client.Guarded(deleting),
 			finished = Client.Guarded(finished),
 			-- A wait ends on the record of the object it waited for, which reaches the window's own
 			-- listener while the wait still stands, so the button is redrawn when the wait ends too.
@@ -1239,6 +1258,9 @@ local function catchUp()
 		started(going.total)
 		run.started = going.started
 		progressed(going.done)
+		if going.deleting then
+			deleting(going.deleting.done, going.deleting.total)
+		end
 	elseif run then
 		run = nil
 		frame.Progress:SetScript("OnUpdate", nil)
