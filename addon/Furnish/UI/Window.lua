@@ -33,6 +33,8 @@ local Rows = Furnish.Rows
 local Reader = Furnish.Reader
 local Sets = Furnish.Sets
 local Chat = Furnish.Chat
+local Names = Furnish.Names
+local Commands = Furnish.Commands
 
 --- The border a list wears, ObjectMover's: a tooltip's edge over a dark shade.
 local PANEL = {
@@ -126,6 +128,7 @@ local DOODAD_ROWS = 10
 local frame = _G.FurnishFrame
 local list = frame.Sets
 local panel = frame.Doodad
+local offer = frame.Blueprint
 local provider, found, drawn =
 	_G.CreateDataProvider(), _G.CreateDataProvider(), _G.CreateDataProvider()
 
@@ -761,6 +764,34 @@ local function tick(_, elapsed)
 	end
 end
 
+--- The blueprint the last run offers, shown while Console says it stands. A new offer starts
+-- from its suggested name; the one already up keeps whatever has been typed into it.
+local function showOffer()
+	local name = Console.Offer()
+	if not name then
+		offer:Hide()
+		offer.made = nil
+		return
+	end
+	if offer.made ~= name then
+		offer.made = name
+		offer.Name:SetText(name)
+		offer.Name:SetCursorPosition(0)
+	end
+	offer:Show()
+end
+
+--- Put the blueprint command in the chat box, the name as the box holds it. Sending it is the
+-- player's, and so is whatever the server answers.
+local function pasteOffer()
+	local name = offer.Name:GetText()
+	if name == "" then
+		return
+	end
+	offer.Name:ClearFocus()
+	_G.ChatFrame_OpenChat(Commands.Typed(Commands.BlueprintNew(name)))
+end
+
 local function started(total)
 	run = { total = total, done = 0, started = Client.Now() }
 	frame.Results:Hide()
@@ -769,6 +800,8 @@ local function started(total)
 	frame.Progress.ended = false
 	frame.Progress:SetScript("OnUpdate", tick)
 	progressText()
+	-- The next run takes the last one's offer with it.
+	showOffer()
 	update()
 end
 
@@ -819,6 +852,8 @@ local function finished(result, seconds)
 	frame.Progress.Text:SetText(line)
 	frame.Progress.ended = true
 	refresh()
+	-- Most often up only once the run's group is selected, a selection event later.
+	showOffer()
 end
 
 --- A click chooses the one set, and a ctrl-click adds or removes it.
@@ -1186,7 +1221,7 @@ end
 
 --- Size each button to its words and its caps.
 local function fitButtons()
-	for _, button in ipairs({ frame.Here, frame.UseSelected, frame.Highlight }) do
+	for _, button in ipairs({ frame.Here, frame.UseSelected, frame.Highlight, offer.Paste }) do
 		fit(button)
 	end
 end
@@ -1237,6 +1272,8 @@ end
 local function listen()
 	stops = {
 		Client.OnSelection(refresh),
+		-- The blueprint offer comes up once the run's group is selected and lapses with it.
+		Client.OnSelection(Client.Guarded(showOffer)),
 		Client.OnPhaseChange(update),
 		Console.Watch({
 			started = Client.Guarded(started),
@@ -1268,6 +1305,7 @@ local function catchUp()
 	if not going and ended and ended.result ~= told then
 		finished(ended.result, ended.seconds)
 	end
+	showOffer()
 end
 
 local function stopListening()
@@ -1524,6 +1562,44 @@ local function buildDoodad()
 	hint(panel.Import, "Import doodad", importLines, "import")
 end
 
+local function buildOffer()
+	offer.Title:SetText("Save as a blueprint?")
+	offer.Why:SetText("Spawn it again instantly with one command.")
+	offer.Paste:SetText("Paste to chat")
+	offer.Name:SetMaxLetters(Names.BLUEPRINT)
+	offer.Name:SetMaxBytes(Names.BLUEPRINT)
+	-- Closed, the offer goes for good; the next whole run makes the next one.
+	offer.CloseButton:SetScript(
+		"OnClick",
+		Client.Guarded(function()
+			Console.DismissOffer()
+			showOffer()
+		end)
+	)
+	offer.Paste:SetScript("OnClick", Client.Guarded(pasteOffer))
+	offer.Name:SetScript("OnEnterPressed", Client.Guarded(pasteOffer))
+	offer.Name:HookScript(
+		"OnTextChanged",
+		Client.Guarded(function(box, typed)
+			-- A blueprint name with a space can only be used by its id, so a space typed is an
+			-- underscore.
+			local text = box:GetText()
+			if typed and text:find(" ") then
+				local at = box:GetCursorPosition()
+				box:SetText((text:gsub(" ", "_")))
+				box:SetCursorPosition(at)
+			end
+			offer.Paste:SetEnabled(box:GetText() ~= "")
+		end)
+	)
+	hint(offer.Paste, "Paste to chat", function()
+		return {
+			{ text = Commands.Typed(Commands.BlueprintNew(offer.Name:GetText())) },
+			{ text = "Click: put it in the chat box; Enter sends it", colour = GREEN },
+		}
+	end)
+end
+
 local function buildFooter()
 	frame.Highlight:SetText("Highlighting")
 	frame.Highlight:SetScript("OnClick", Client.Guarded(Console.ToggleHighlight))
@@ -1580,6 +1656,7 @@ local function build()
 	buildDestination()
 	buildDoodad()
 	buildFooter()
+	buildOffer()
 	Client.OnSystemLine(doodadSelected)
 	Client.OnSystemLine(importHeard)
 

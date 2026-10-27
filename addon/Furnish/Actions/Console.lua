@@ -4,7 +4,10 @@
 -- and closes a grouped run by selecting the group in the player's sight, so the next group
 -- command acts on it; the API selects nothing. That group then stands for the object the run
 -- was anchored on, so the next set needs no reselecting by hand. Every line it prints says
--- what was asked and what was found, and a refusal says the way out.
+-- what was asked and what was found, and a refusal says the way out. A run that ends whole, at
+-- scale 1 with no roll or pitch, led by its pivot or merged into a WMO that stood alone and owns
+-- its sets, leaves a blueprint name on offer while its group stays selected; saving it is the
+-- player's, and nothing here sends it.
 --
 -- A request is plain data, as the command line and a list link both give it:
 --   index   the set's index, as a list prints it
@@ -44,12 +47,14 @@ local say = Chat.Say
 -- selected and the object that run was anchored on: { leader, guid, pose }.
 local running, stopping, waiting, anchored
 
---- The run as a window draws it: { total, done, started } while one goes, and { result, seconds }
--- for the one that ended last, so a window opened in the middle of either can catch up.
+--- The run as a window draws it: { total, done, started } while one goes, and { result, seconds,
+-- offer } for the one that ended last, so a window opened in the middle of either can catch up.
+-- The offer is { name, leader, seen }, or nil where the run offers no blueprint.
 local current, last
 
 --- Who hears a run besides the chat, as a window registers: { started(total, what),
--- progress(done, total), finished(result, seconds), waiting(waits) }, each optional.
+-- progress(done, total), deleting(done, total), finished(result, seconds), waiting(waits) },
+-- each optional.
 local watchers = {}
 
 local function tell(name, ...)
@@ -272,6 +277,57 @@ local function groupOf(request, pose)
 	return pose.guid, "led by " .. pose.name
 end
 
+--- Whether a number off a record is the one wanted, within what its float carries; none given is
+-- the one wanted.
+local function near(value, wanted)
+	return math.abs((value or wanted) - wanted) < 1e-3
+end
+
+--- The blueprint name a run is to offer once it ends whole, or nil: at scale 1 with no roll or
+-- pitch, either led by its pivot, named after the source as a set apart, or merged into a gob
+-- that stood alone and owns every set spawned, named after that gob.
+-- @param word the request's group word, nil being "pivot"
+-- @param destination the pose the rows are placed at
+-- @param owner the gob a merge joins, as groupOf reads it
+-- @param label the source as a line names it
+-- @param chosen the sets spawned, each { index, id, name }
+local function offered(word, destination, owner, label, chosen)
+	local rotation = destination.rotation or {}
+	if not (near(destination.scale, 1) and near(rotation.roll, 0) and near(rotation.pitch, 0)) then
+		return nil
+	end
+	local sets, ids = {}, {}
+	for i, set in ipairs(chosen) do
+		sets[i] = set
+	end
+	table.sort(sets, function(a, b)
+		return a.index < b.index
+	end)
+	for i, set in ipairs(sets) do
+		ids[i] = set.id
+	end
+	if (word or "pivot") == "pivot" then
+		return Names.Blueprint(label, sets, true)
+	end
+	if word ~= "merge" or not owner or owner.group or owner.groupLeader ~= 0 or not owner.file then
+		return nil
+	end
+	if #Sets.Named(owner.file, ids) < #ids then
+		return nil
+	end
+	return Names.Blueprint(owner.name, sets, false)
+end
+
+--- Whether a run ended whole: nothing stopped, refused, left out of the group or deleted.
+local function whole(result)
+	return not result.aborted
+		and not result.deleted
+		and #result.refused == 0
+		and #result.unjoined == 0
+		and result.leader ~= nil
+		and result.joined > 0
+end
+
 --- What a line calls the model a display draws: its name, or what it is not.
 local function modelOf(display)
 	return Console.ModelName(display) or "a model the client's catalogue does not name"
@@ -361,7 +417,12 @@ local function hooks(about)
 		end,
 		finished = function(result)
 			finish(result, started, about.anchor)
-			current, last = nil, { result = result, seconds = Client.Now() - started }
+			local offer = about.blueprint
+					and whole(result)
+					and { name = about.blueprint, leader = tostring(result.leader), seen = false }
+				or nil
+			current, last =
+				nil, { result = result, seconds = Client.Now() - started, offer = offer }
 			tell("finished", result, last.seconds)
 		end,
 	}
@@ -374,7 +435,8 @@ local reminded = false
 -- @param destination the pose the rows are placed at
 -- @param about { what, the set as a line names it; where, "on <WMO>" or "at your feet";
 --   lead, how the group is led as groupOf says it; anchor, the selected object the run is
---   anchored on, or nil; quiet, true when a window shows the progress instead }
+--   anchored on, or nil; quiet, true when a window shows the progress instead; blueprint, the
+--   name to offer if the run ends whole, or nil }
 local function start(rows, destination, group, about)
 	local send, reason = Client.Send()
 	if not send then
@@ -570,10 +632,36 @@ function Console.Group()
 end
 
 --- The run going on, { total, done, started }, or nil; and the one that ended last,
--- { result, seconds }, or nil. A window that hears runs only while it shows reads these as it
--- opens.
+-- { result, seconds, offer }, or nil. A window that hears runs only while it shows reads these
+-- as it opens.
 function Console.Run()
 	return current, last
+end
+
+--- The blueprint name the last run offers, while that run's group is what is selected, since the
+-- command that saves it saves the selection; or nil.
+-- The offer waits for the group's selection to land and lapses for good once anything else is
+-- selected after it, or when the next run starts.
+function Console.Offer()
+	local offer = last and last.offer
+	if not offer then
+		return nil
+	end
+	if Client.SelectedGroup() == offer.leader then
+		offer.seen = true
+		return offer.name
+	end
+	if offer.seen then
+		last.offer = nil
+	end
+	return nil
+end
+
+--- Let the last run's blueprint offer go.
+function Console.DismissOffer()
+	if last then
+		last.offer = nil
+	end
 end
 
 --- Why nothing new can start, or nil.
@@ -767,6 +855,7 @@ local function spawnOn(request, destination, selected)
 		lead = lead,
 		anchor = selected and selected.guid and selected or nil,
 		quiet = request.quiet,
+		blueprint = offered(request.group, destination, selected, label, chosen),
 	})
 end
 
@@ -897,7 +986,8 @@ function Console.Import(request)
 		if not rows then
 			return say(what)
 		end
-		local group, lead = groupOf({ group = request.group or "merge" }, pose)
+		local word = request.group or "merge"
+		local group, lead = groupOf({ group = word }, pose)
 		if not group then
 			return say(("imported %s as object %s, but %s"):format(model, guid, lead))
 		end
@@ -907,6 +997,7 @@ function Console.Import(request)
 			lead = lead,
 			anchor = pose,
 			quiet = request.quiet,
+			blueprint = offered(word, pose, pose, pose.name, chosen),
 		})
 	end
 

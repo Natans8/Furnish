@@ -309,6 +309,79 @@ def test_a_merge_into_a_gob_the_player_cannot_edit_is_refused_before_anything_is
     assert not [line for line in sent(lua) if line.startswith("gobject spawn")]
 
 
+# -- The blueprint offer ------------------------------------------------------------------
+
+
+def on_the_house_at_scale_one(tmp_path: Path) -> lua51.LuaRuntime:
+    """The house selected, level and at scale 1, so a whole run on it may offer a blueprint."""
+    lua = command_lua(tmp_path)
+    lua.execute("RECORDS[500].scale = 1; SELECTED = 500")
+    return lua
+
+
+def offer(lua: lua51.LuaRuntime) -> str | None:
+    named: str | None = lua.eval("Furnish.Console.Offer()")
+    return named
+
+
+def test_a_whole_run_led_by_its_pivot_offers_the_set_as_a_blueprint(tmp_path: Path) -> None:
+    lua = on_the_house_at_scale_one(tmp_path)
+    run(lua, "1")
+    assert offer(lua) == "house_set_full"
+
+
+def test_a_whole_run_merged_into_its_wmo_offers_the_wmo_furnished(tmp_path: Path) -> None:
+    lua = on_the_house_at_scale_one(tmp_path)
+    run(lua, "1 merge")
+    assert offer(lua) == "house_full"
+
+
+@pytest.mark.parametrize(
+    ("change", "typed"),
+    [
+        ("RECORDS[500].scale = 2", "1"),
+        ("RECORDS[500].transform.rotation.x = 15", "1"),
+        ("RECORDS[500].transform.rotation.y = -5", "1 merge"),
+        ("", "1 first"),
+        ("", "1 nogroup"),
+        # Selected, the twin is in a group already, so a merge would save that group's objects too.
+        ("RECORDS[501].scale = 1; SELECTED = 501", "1 merge"),
+    ],
+)
+def test_no_blueprint_is_offered_off_scale_tilted_or_otherwise_grouped(
+    tmp_path: Path, change: str, typed: str
+) -> None:
+    lua = on_the_house_at_scale_one(tmp_path)
+    lua.execute(change)
+    run(lua, typed)
+    assert offer(lua) is None
+
+
+def test_the_offer_waits_for_its_group_and_lapses_once_anything_else_is_selected(
+    tmp_path: Path,
+) -> None:
+    lua = on_the_house_at_scale_one(tmp_path)
+    run(lua, "1")
+    leader = lua.eval("GROUP_LEADER")
+    # Something else selected before the group's selection is seen: the offer waits.
+    lua.execute("SELECTED = 502")
+    assert offer(lua) is None
+    lua.execute(f'SELECTED, GROUP_LEADER = "group", {leader}')
+    assert offer(lua) == "house_set_full"
+    # Seen, it lapses once anything else is selected, and stays lapsed.
+    lua.execute("SELECTED = 502")
+    assert offer(lua) is None
+    lua.execute(f'SELECTED, GROUP_LEADER = "group", {leader}')
+    assert offer(lua) is None
+
+
+def test_a_dismissed_offer_is_gone(tmp_path: Path) -> None:
+    lua = on_the_house_at_scale_one(tmp_path)
+    run(lua, "1")
+    lua.execute("Furnish.Console.DismissOffer()")
+    assert offer(lua) is None
+
+
 def test_numbers_given_merge_into_whatever_is_selected_not_what_they_were_read_off(
     tmp_path: Path,
 ) -> None:

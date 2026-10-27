@@ -507,6 +507,52 @@
 				</Frames>
 			</Frame>
 
+			<!-- The blueprint a whole run offers, a passing offer rather than part of the window, so it
+			     wears the tooltip's backdrop, bottom-aligned to the window's right edge as the doodad
+			     panel is top-aligned: why it is worth a click, a name box, and a button that puts the
+			     command in the chat box. -->
+			<Frame parentKey="Blueprint" inherits="TooltipBackdropTemplate" enableMouse="true" hidden="true">
+				<Size x="300" y="76"/>
+				<Anchors>
+					<Anchor point="BOTTOMLEFT" relativePoint="BOTTOMRIGHT" x="5" y="0"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<FontString parentKey="Title" inherits="GameFontNormalSmall" justifyH="LEFT">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="10" y="-9"/>
+							</Anchors>
+						</FontString>
+						<FontString parentKey="Why" inherits="GameFontDisableSmall" justifyH="LEFT">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="10" y="-25"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Button parentKey="CloseButton" inherits="UIPanelCloseButton">
+						<Size x="20" y="20"/>
+						<Anchors>
+							<Anchor point="TOPRIGHT" x="-3" y="-3"/>
+						</Anchors>
+					</Button>
+					<Button parentKey="Paste" inherits="UIPanelButtonTemplate">
+						<Size y="22"/>
+						<Anchors>
+							<Anchor point="BOTTOMRIGHT" x="-10" y="9"/>
+						</Anchors>
+					</Button>
+					<EditBox parentKey="Name" inherits="InputBoxTemplate" autoFocus="false">
+						<Size y="20"/>
+						<Anchors>
+							<Anchor point="BOTTOMLEFT" x="15" y="10"/>
+							<Anchor point="BOTTOMRIGHT" relativeKey="$parent.Paste" relativePoint="BOTTOMLEFT" x="-6" y="1"/>
+						</Anchors>
+					</EditBox>
+				</Frames>
+			</Frame>
+
 			<!-- Drags the window's corner; the list takes whatever height it gains. -->
 			<Button parentKey="Grip">
 				<Size x="16" y="16"/>

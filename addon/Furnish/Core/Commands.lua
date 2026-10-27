@@ -88,6 +88,16 @@ function Commands.SelectGroup(leader)
 	return "gobject group select " .. leader
 end
 
+--- Save the selected group as a blueprint of the name given.
+function Commands.BlueprintNew(name)
+	return "gobject blueprint new " .. name
+end
+
+--- A command as a player types it into chat, behind its dot.
+function Commands.Typed(command)
+	return "." .. command
+end
+
 --- Turn a doodad into a gameobject: the one a unique id names, or the selected one.
 function Commands.Import(uid)
 	if uid then

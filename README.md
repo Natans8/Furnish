@@ -98,7 +98,12 @@ progress with its time left, a warning while Destination follows a WMO the sets 
 or the reminder that highlighting too many objects can crash the game. During a run every
 control holds still and Stop and delete stands beside Stop. It deletes what the run spawned one
 object at a time, at the pace the run spawned, while the bar empties; Stop while it deletes sends
-no more. Once the run ends, its group is yours to manage. The window resizes from its corner, and the game keeps its size and place.
+no more. Once the run ends, its group is yours to manage. A run that ends whole, at scale 1 with
+no roll or pitch, led by its pivot or merged into a WMO that stood alone and owns its sets, offers
+a blueprint at the window's bottom right while its group stays selected: a suggested name, held to
+225 bytes, and Paste to chat, which puts `.gobject blueprint new <name>` in the chat box for you to
+send. Closed, overtaken by the next run or left behind by another selection, the offer goes. The
+window resizes from its corner, and the game keeps its size and place.
 
 ## Build
 
@@ -213,25 +218,25 @@ window and the options panel; and `Slash`, the typed command, its chat buttons a
 which can open the window. Each file is handed the addon's table as
 `local _, Furnish = ...`, and `Settings.lua`, loaded first, makes it the one global.
 
-| file                  | role                                                                                 |
-|-----------------------|--------------------------------------------------------------------------------------|
-| `Settings.lua`        | the defaults: pivot, in-flight width, chat buttons; `FurnishSettings` keeps changes  |
-| `Core/Transform.lua`  | the placement maths: `Place(position, rotation, scale, row)` and `Placer`            |
-| `Core/Commands.lua`   | every command spelling and every reply reader                                        |
-| `Core/Run.lua`        | any series of commands through `send`, in order, with needs and a width              |
-| `Core/Kernel.lua`     | `Furnish.Spawn` and `Furnish.Group`                                                  |
-| `Data/Reader.lua`     | the data addon's reader                                                              |
-| `Data/Names.lua`      | a set's name as a player reads it: `Set(name)`                                       |
-| `Data/Sets.lua`       | which: `OfFile`, `Pick`, `OfEntry`, `IsBlank`, `OfPlacement`, `Named`, `Same`        |
-| `Data/Rows.lua`       | what: `OfSet`, `Union`                                                               |
-| `Client/Client.lua`   | the one file naming EpsilonLib and `C_Epsilon`; it reads, and never selects          |
-| `Client/Pose.lua`     | where: `At`, `Copy`, `Here`, `Selected`, `OfRecord`                                  |
-| `Client/Chat.lua`     | the prefix, counts, the colours, every tooltip, a menu measured to chat, the links   |
-| `Actions/Console.lua` | what the commands and the window do: `List`, `Spawn`, `Import`, `Stop`, `Run`        |
-| `UI/Window.xml`       | the window's layout, after ObjectMover's: a dark dialog of bordered panels           |
-| `UI/Window.lua`       | the window: reads `Selected`, `Busy` and `Watch`, spawns and stops through `Console` |
-| `UI/Options.lua`      | the settings panel in the game's Options, writing into `Furnish.Settings`            |
-| `Slash/Command.lua`   | `/furnish` and `/furn`: what is typed, the help, the chat buttons, a link's click    |
+| file                  | role                                                                                   |
+|-----------------------|----------------------------------------------------------------------------------------|
+| `Settings.lua`        | the defaults: pivot, in-flight width, chat buttons; `FurnishSettings` keeps changes    |
+| `Core/Transform.lua`  | the placement maths: `Place(position, rotation, scale, row)` and `Placer`              |
+| `Core/Commands.lua`   | every command spelling and every reply reader                                          |
+| `Core/Run.lua`        | any series of commands through `send`, in order, with needs and a width                |
+| `Core/Kernel.lua`     | `Furnish.Spawn` and `Furnish.Group`                                                    |
+| `Data/Reader.lua`     | the data addon's reader                                                                |
+| `Data/Names.lua`      | a set's name as a player reads it: `Set(name)`, and a blueprint's: `Blueprint`         |
+| `Data/Sets.lua`       | which: `OfFile`, `Pick`, `OfEntry`, `IsBlank`, `OfPlacement`, `Named`, `Same`          |
+| `Data/Rows.lua`       | what: `OfSet`, `Union`                                                                 |
+| `Client/Client.lua`   | the one file naming EpsilonLib and `C_Epsilon`; it reads, and never selects            |
+| `Client/Pose.lua`     | where: `At`, `Copy`, `Here`, `Selected`, `OfRecord`                                    |
+| `Client/Chat.lua`     | the prefix, counts, the colours, every tooltip, a menu measured to chat, the links     |
+| `Actions/Console.lua` | what the commands and the window do: `List`, `Spawn`, `Import`, `Stop`, `Run`, `Offer` |
+| `UI/Window.xml`       | the window's layout, after ObjectMover's: a dark dialog of bordered panels             |
+| `UI/Window.lua`       | the window: reads `Selected`, `Busy` and `Watch`, spawns and stops through `Console`   |
+| `UI/Options.lua`      | the settings panel in the game's Options, writing into `Furnish.Settings`              |
+| `Slash/Command.lua`   | `/furnish` and `/furn`: what is typed, the help, the chat buttons, a link's click      |
 
 ## Develop
 

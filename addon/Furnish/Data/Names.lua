@@ -3,7 +3,8 @@
 -- into words wherever it is drawn: a leading "Set_" dropped, underscores, hyphens and case
 -- humps split, and every word title-cased. A word in capitals is an acronym and kept as it is,
 -- but only in a name that also holds lower case: a name written wholly in capitals says
--- nothing through its case, so every word of it is title-cased.
+-- nothing through its case, so every word of it is title-cased. It also names a blueprint after
+-- the WMO and the sets a run spawned.
 --
 -- Every function is pure, so the whole file runs outside the client.
 
@@ -81,4 +82,38 @@ function Names.Set(name)
 	local drawn = #words == 0 and name or table.concat(words, " ")
 	spelled[name] = drawn
 	return drawn
+end
+
+--- The most bytes a blueprint name may take. The chat box sends 255 at most, a longer line goes
+-- out in pieces, and this keeps the command and some room back; a longer name is the player's.
+Names.BLUEPRINT = 225
+
+--- A piece of a blueprint name: lower case, a run of spaces an underscore, since a name with a
+-- space can only be used by its id.
+local function piece(text)
+	return (text:lower():gsub("%s+", "_"))
+end
+
+--- The name a blueprint of a run is offered under: the WMO's name, "set" or "sets" where the sets
+-- went without their WMO, then each set's name as a player reads it, the base set's as "base". A
+-- name longer than Names.BLUEPRINT gives the sets by index instead, which always fits.
+-- @param wmo the WMO's name as Furnish shows it
+-- @param sets a list of { index, name }, each name as the WMO spells it, in index order
+-- @param apart true where the sets went without their WMO, so the name says set
+function Names.Blueprint(wmo, sets, apart)
+	local head = piece(wmo)
+	if apart then
+		head = head .. (#sets == 1 and "_set" or "_sets")
+	end
+	local named, numbered = { head }, { head }
+	for _, set in ipairs(sets) do
+		local words = Names.Set(set.name)
+		named[#named + 1] = piece(words == "" and "base" or words)
+		numbered[#numbered + 1] = tostring(set.index)
+	end
+	local name = table.concat(named, "_")
+	if #name <= Names.BLUEPRINT then
+		return name
+	end
+	return table.concat(numbered, "_")
 end
