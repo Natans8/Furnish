@@ -25,7 +25,7 @@ reads the first.
 | `/furn <set> here <entry>` | spawn a set of the WMO an entry names at your feet                             |
 | `/furn import`             | turn the selected doodad into a gob, then spawn the doodad's sets onto the gob |
 | `/furn stop`               | stop spawning; a second stop gives up on a reply that never comes              |
-| `/furn stop delete`        | stop spawning, and delete what was spawned                                     |
+| `/furn stop delete`        | stop spawning, then delete what was spawned, one object at a time              |
 
 A set, list or import takes any of these words after it:
 
@@ -89,13 +89,16 @@ the first object lead instead, so nothing extra spawns; Selected gob makes whate
 when the run starts lead, wherever Destination's numbers came from, or joins its group where it is
 in one already, which a mark on the segment warns of and Spawn asks about first; with a group
 selected it reads Selected group and joins that group. A group moves, turns and scales about its
-leader. Selected gob greys while nothing is selected, Pivot standing in until something is. The
+leader. Selected gob greys while nothing is selected or while what is selected is not yours to
+edit in the phase, Pivot standing in until it can lead; typed, such a merge is refused before
+anything spawns, and a join the server refuses during a run stops it there. The
 status row
 holds Highlighting, which toggles the client's outline on selected objects, beside a run's
 progress with its time left, a warning while Destination follows a WMO the sets were not made for,
 or the reminder that highlighting too many objects can crash the game. During a run every
-control holds still and Stop and delete stands beside Stop; once the run ends, its group is
-yours to manage. The window resizes from its corner, and the game keeps its size and place.
+control holds still and Stop and delete stands beside Stop. It deletes what the run spawned one
+object at a time, at the pace the run spawned, while the bar empties; Stop while it deletes sends
+no more. Once the run ends, its group is yours to manage. The window resizes from its corner, and the game keeps its size and place.
 
 ## Build
 
@@ -189,13 +192,16 @@ Furnish.Spawn(rows, position, rotation, scale, group, send, hooks)
   `.gob spawn` takes it), `First` (the
   first doodad leads), `None` (loose), or the GUID of an object whose group to join.
 - `send`: `function(text, callback(success, messages))`, the door to the server.
-- `hooks`: `progress(done, total)` and `finished(outcome)`, where the outcome carries
-  `spawned`, `refused` with each refusal's display, whether it was the pivot and the server's
-  words, `unjoined`,
-  `leader`, `joined` (how many besides the leader are in its group), `pivot` and `aborted`.
+- `hooks`: `progress(done, total)`, `deleting(done, total)` and `finished(outcome)`, where the
+  outcome carries `spawned`, `refused` with each refusal's display, whether it was the pivot and
+  the server's words, `unjoined`, `leader`, `joined` (how many besides the leader are in its
+  group), `pivot`, `aborted`, `joinRefused` and, after a cleanup, `deleted`.
 
 It answers a handle with `Abort(cleanup)` and `Done()`, or nil and the reason; a second
-`Abort` while a reply is owed gives up on it, and a cleanup once asked for stays asked for. Who leads is
+`Abort` while a reply is owed gives up on it, and a cleanup once asked for stays asked for. A
+cleanup deletes one object at a time at the run's width, and the run is `Done()` when the last
+delete answers; an `Abort` while it deletes sends no more. A join the server refuses stops the
+run, since every join after it goes to the same leader. Who leads is
 read off the replies: the first command that answers a GUID, so a refused pivot hands the
 lead to the first doodad.
 
