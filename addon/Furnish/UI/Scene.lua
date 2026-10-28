@@ -663,9 +663,10 @@ local function footprint(box)
 	return (box.outerHigh[1] - box.outerLow[1]) * (box.outerHigh[2] - box.outerLow[2])
 end
 
---- Which chosen piece leads the group they form: the lowest-standing piece's box, bottom to top,
--- is the ground they stand on, and of the pieces whose bottom lies within it the one covering
--- most ground leads, the one drawn first among those alike. Level is read off the boxes rather
+--- Which chosen piece leads the group they form: the lowest-standing piece's box, from its bottom
+-- to its middle, is the ground they stand on, a piece whose bottom lies higher resting on it
+-- rather than beside it, and of the pieces whose bottom lies within that the one covering most
+-- ground leads, the one drawn first among those alike. Level is read off the boxes rather
 -- than as one height, since a chair's lowest vertex and a carpet's are never the same to the
 -- last digit. So a table leads what is on it, a carpet leads the chairs on it, a floor piece
 -- leads what hangs above it, and a group led from the ground sits on the ground when it is moved
@@ -677,7 +678,7 @@ local function leader(actors)
 			lowest = actor
 		end
 	end
-	local ground = lowest.box.outerHigh[3]
+	local ground = (lowest.box.outerLow[3] + lowest.box.outerHigh[3]) / 2
 	local leads
 	for _, actor in ipairs(actors) do
 		if

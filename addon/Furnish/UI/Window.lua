@@ -1954,10 +1954,10 @@ local function spawnPieces(pieces, here)
 	update()
 end
 
---- Spawn the pieces chosen, the one that leads first, at Destination or, with ctrl, with the
--- leader at the player's feet; and let them go, so a second click spawns nothing twice.
-local function spawnChosen()
-	spawnPieces(stage:Chosen(), _G.IsControlKeyDown())
+--- Spawn the pieces chosen, the one that leads first, at Destination or, on a right-click, with
+-- the leader at the player's feet; and let them go, so a second click spawns nothing twice.
+local function spawnChosen(_, button)
+	spawnPieces(stage:Chosen(), button == "RightButton")
 	stage:Choose(nil)
 end
 
@@ -1973,7 +1973,7 @@ local function spawnChosenLines()
 		lines[1] = { label = "Leads", value = pieceName(stage:Leader()) }
 	end
 	lines[#lines + 1] = { text = "Click: at Destination.", colour = GREEN }
-	lines[#lines + 1] = { text = "Ctrl-click: the leader at your feet.", colour = GREEN }
+	lines[#lines + 1] = { text = "Right-click: the leader at your feet.", colour = GREEN }
 	return lines
 end
 
@@ -1983,6 +1983,7 @@ local function buildPreview()
 	preview.Scene:HookScript("OnUpdate", Client.Guarded(followPointer))
 	buildControls()
 	buildPreviewGrip()
+	preview.Spawn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	preview.Spawn:SetScript("OnClick", Client.Guarded(spawnChosen))
 	preview.Spawn:SetText("Spawn")
 	preview.Spawn:Disable()

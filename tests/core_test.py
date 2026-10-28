@@ -1587,6 +1587,19 @@ def test_pose_selected_reads_the_record_and_never_selects(tmp_path: Path) -> Non
     assert list(lua.eval("SENT").values()) == []
 
 
+def test_a_piece_resting_on_top_of_the_lowest_does_not_lead_it(tmp_path: Path) -> None:
+    # A tall frame on the floor, and a wide canopy whose bottom lies in the frame's upper half:
+    # the canopy rests on the frame, so the frame leads though the canopy covers more ground.
+    lua = core_scene_choosing(
+        tmp_path,
+        "{ file = 8, display = 8, x = 0, y = 6, z = 0.6, qx = 0, qy = 0, qz = 0, qw = 1,"
+        " scale = 1, flat = true },",
+        floor=(0, 0, 0),
+    )
+    lua.execute("SCENE:Choose(SCENE.boxes[2].actor, true) SCENE:Choose(SCENE.boxes[1].actor, true)")
+    assert chosen(lua) == [7, 8]
+
+
 def test_a_pose_leading_a_placement_sets_it_down_where_the_pose_stands(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     lua.execute(
