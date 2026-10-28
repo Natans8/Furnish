@@ -997,7 +997,7 @@ def test_without_a_picture_none_is_given(tmp_path: Path, pictures: str, name: st
 WINDOW = """
 OPENED = {}
 Furnish.Window = {
-  ShowDoodad = function(uid, entry) OPENED[#OPENED + 1] = { "doodad", uid, entry } end,
+  ShowDoodad = function(uid, entry, map) OPENED[#OPENED + 1] = { "doodad", uid, entry, map } end,
   ShowSource = function(entry) OPENED[#OPENED + 1] = { "source", entry } end,
   ShowSet = function(file, index, name) OPENED[#OPENED + 1] = { "set", file, index, name } end,
 }
@@ -1012,12 +1012,12 @@ def test_a_right_click_on_a_chat_button_opens_the_window_on_it(tmp_path: Path) -
     click = lua.globals().HOOKS.SetItemRef
     click("garrmission:furnish:" + words, None, "RightButton")
     click("garrmission:furnish:list:817579", None, "RightButton")
-    click("garrmission:furnish:import:4242:817579", None, "RightButton")
+    click("garrmission:furnish:import:4242:817579:1116", None, "RightButton")
     opened = [list(each.values()) for each in lua.eval("OPENED").values()]
     assert opened == [
         ["set", 900, 1, "house"],
         ["source", 817579],
-        ["doodad", "4242", 817579],
+        ["doodad", 4242, 817579, 1116],
     ]
     # Nothing was spawned, listed or imported by them.
     assert not [command for command in sent(lua) if "spawn" in command or "import" in command]
@@ -1209,9 +1209,9 @@ def test_a_wmos_doodad_line_carries_a_button_that_imports_and_furnishes_it(
 ) -> None:
     lua = command_lua(tmp_path)
     line = shown_line(lua, WMO_LINE)
-    button = "|cff71d5ff|Hgarrmission:furnish:import:4242:817579|h[Furnish]|h|r"
+    button = "|cff71d5ff|Hgarrmission:furnish:import:4242:817579:1116|h[Furnish]|h|r"
     assert line == WMO_LINE + " - " + button
-    lua.globals().HOOKS.SetItemRef("garrmission:furnish:import:4242:817579")
+    lua.globals().HOOKS.SetItemRef("garrmission:furnish:import:4242:817579:1116")
     assert sent(lua)[:2] == ["doodad import 4242", "gobject select 500"]
     assert printed(lua)[-2] == (PREFIX + "spawning Full (set 1, 2 objects) on house, led by house")
 
@@ -1261,7 +1261,7 @@ def test_a_doodad_off_the_map_gets_no_button(tmp_path: Path) -> None:
 def test_a_near_line_takes_the_map_the_player_stands_on(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     near = "|Hdoodad_uid:4242:0|h[6dr_draenei_house2 - 817579]|h"
-    button = "|cff71d5ff|Hgarrmission:furnish:import:4242:817579|h[Furnish]|h|r"
+    button = "|cff71d5ff|Hgarrmission:furnish:import:4242:817579:1116|h[Furnish]|h|r"
     assert shown_line(lua, near) == near + " - " + button
 
 
@@ -1276,7 +1276,7 @@ def test_a_line_whose_entry_is_no_furnished_wmo_is_left_as_it_came(tmp_path: Pat
 def test_an_import_hears_its_line_when_the_server_sends_it_apart(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("IMPORT_APART = true")
-    lua.globals().HOOKS.SetItemRef("garrmission:furnish:import:4242:817579")
+    lua.globals().HOOKS.SetItemRef("garrmission:furnish:import:4242:817579:1116")
     assert sent(lua)[:2] == ["doodad import 4242", "gobject select 500"]
     assert printed(lua)[-2] == (PREFIX + "spawning Full (set 1, 2 objects) on house, led by house")
 

@@ -222,9 +222,9 @@ function Command.Click(words, modifier)
 	local window = Furnish.Window
 	local kind, value = linked(words)
 	if kind == "import" then
-		local uid, entry = value:match("^(%d+):(%d+)$")
+		local uid, entry, map = value:match("^(%d+):(%d+):(%d+)$")
 		if modifier == "open" then
-			return window.ShowDoodad(uid, tonumber(entry))
+			return window.ShowDoodad(tonumber(uid), tonumber(entry), tonumber(map))
 		end
 		return Console.Import({ uid = uid, ways = Command.WAYS })
 	elseif kind == "list" then
@@ -280,12 +280,12 @@ _G.SLASH_FURNISH2 = "/furnish"
 _G.SlashCmdList.FURNISH = Client.Guarded(Command.Run)
 Chat.OnLinks(Command.Click, Command.Hover)
 
---- The unique id and the gob entry of the doodad a server line names by its link, where it is
--- a WMO Furnish has sets for, still on the map, and the map placed it with a set beyond its base,
--- so that importing it spawns something. The number after the name in the link is the object's
--- gameobject entry, and the data answers for it; the name is never read, since many a WMO's name
--- has no `.wmo` in it. A select line names its map, and a near line's doodads stand on the
--- player's. The first such line loads the data.
+--- The unique id, the gob entry and the map of the doodad a server line names by its link, where
+-- it is a WMO Furnish has sets for, still on the map, and the map placed it with a set beyond its
+-- base, so that importing it spawns something. The number after the name in the link is the
+-- object's gameobject entry, and the data answers for it; the name is never read, since many a
+-- WMO's name has no `.wmo` in it. A select line names its map, and a near line's doodads stand on
+-- the player's. The first such line loads the data.
 function Command.PlacedWmo(line)
 	local uid, entry, map, removed = Furnish.Commands.DoodadLink(line)
 	-- One taken off the map, by a delete, an import or a replace, cannot be imported.
@@ -293,8 +293,9 @@ function Command.PlacedWmo(line)
 	if not file then
 		return nil
 	end
-	if Furnish.Sets.DrawsBeyondBase(file, map or Client.Map(), uid) then
-		return uid, entry
+	map = map or Client.Map()
+	if Furnish.Sets.DrawsBeyondBase(file, map, uid) then
+		return uid, entry, map
 	end
 	return nil
 end
@@ -317,9 +318,9 @@ Chat.OnServerLines(function(line)
 	if not Furnish.Settings.chatButtons then
 		return nil
 	end
-	local uid, entry = Command.PlacedWmo(line)
+	local uid, entry, map = Command.PlacedWmo(line)
 	if uid then
-		return " - " .. link("import", uid .. ":" .. entry, Furnish.NAME)
+		return " - " .. link("import", uid .. ":" .. entry .. ":" .. map, Furnish.NAME)
 	end
 	entry = Command.SelectedWmo(line)
 	return entry and " - " .. link("list", entry, Furnish.NAME) or nil

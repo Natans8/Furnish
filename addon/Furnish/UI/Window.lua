@@ -2150,13 +2150,16 @@ function Window.ShowSet(file, index, name)
 end
 
 --- Open the window on a doodad a chat button names, in its panel, as `.doodad select` puts
--- one there: by its unique id and its gob entry, on the player's map.
-function Window.ShowDoodad(uid, entry)
+-- one there: by its unique id, its gob entry and the map the line says it stands on.
+function Window.ShowDoodad(uid, entry, map)
 	local file = Sets.OfEntry(entry)
+	-- Shown again, a doodad imported stays imported, since the server refuses a second import.
+	local imported = doodad and doodad.uid == uid and doodad.imported or nil
 	doodad = {
 		uid = uid,
 		entry = entry,
-		map = Client.Map(),
+		map = map,
+		imported = imported,
 		name = file and Client.FileName(file) or ("object %d"):format(entry),
 	}
 	if frame:IsShown() then
