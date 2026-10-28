@@ -25,35 +25,6 @@ function Rows.OfSet(id)
 	return rows
 end
 
---- The models a set holds: each model file it draws once, { file, count }, the file being the id
--- a model frame renders, the most numerous first and then by file; and how many of its objects
--- draw a display whose file the data does not know, which are left out. Nil and the reason where
--- the set is not in the data.
--- @param id a set id, as Sets.OfFile or Sets.OfPlacement give it
-function Rows.Models(id)
-	local rows, reason = Rows.OfSet(id)
-	if not rows then
-		return nil, reason
-	end
-	local counts, unknown = {}, 0
-	for _, row in ipairs(rows) do
-		local file = Reader.ModelFile(row.display)
-		if file then
-			counts[file] = (counts[file] or 0) + 1
-		else
-			unknown = unknown + 1
-		end
-	end
-	local models = {}
-	for file, count in pairs(counts) do
-		models[#models + 1] = { file = file, count = count }
-	end
-	table.sort(models, function(a, b)
-		return a.count > b.count or (a.count == b.count and a.file < b.file)
-	end)
-	return models, unknown
-end
-
 --- A set's placements with the model file each draws, for a scene of the set: each { file, x, y,
 -- z, qx, qy, qz, qw, scale }, about the WMO's origin as the rows are. Those drawing a display the
 -- data names no file for are left out. Nil and the reason where the set is not in the data.

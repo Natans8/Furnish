@@ -109,16 +109,13 @@ local LIST_INSET, BAR_ROOM = 8, 22
 --- The room an empty list's line saying why takes, its margins in FurnishListTemplate.
 local EMPTY_ROOM = 40
 
---- The smallest the window may be drawn, which is the size its layout was made for; it may grow
--- to twice that.
-local MIN_WIDTH, MIN_HEIGHT = 400, 628
+--- The smallest the window may be drawn, which is the size its layout was made for without the
+-- source's picture; it may grow to twice that.
+local MIN_WIDTH, MIN_HEIGHT = 400, 656
 
 --- How many letters a name search waits for, as Blizzard's own searches do; how many WMOs it
 -- lists at most, and how many rows of them show before the list scrolls.
 local SEARCH_FROM, RESULTS, RESULT_ROWS = 3, 60, 8
-
---- How many models a set's tooltip names before it says how many more there are.
-local NAMED = 8
 
 --- How many objects a run places before the bar guesses the time left from its pace.
 local PACED = 5
@@ -166,12 +163,8 @@ local NUMBER_ROWS, NUMBER_GAP, NUMBER_ART = { 170, 144 }, 8, 5
 --- A button's caps either side of its words.
 local CAPS = 24
 
---- How wide a room is while it is closed: never nought, which the client reads as no width at all.
-local CLOSED = 0.001
-
---- How many pieces the Preview pane draws at most, the first of each chosen set in its own order
--- past it: a few hundred are measured smooth, and thousands are not measured.
-local MOST_PIECES = 1000
+--- How far the source's words stand from its picture.
+local PICTURE_GAP = 8
 
 --- How many of a doodad's sets its panel shows before its list scrolls.
 local DOODAD_ROWS = 10
@@ -181,8 +174,6 @@ local list = frame.Sets
 local panel = frame.Doodad
 local offer = frame.Blueprint
 local preview = frame.Preview
---- How wide the room for the source's picture is while it shows one, as Window.xml draws it.
-local PICTURE_ROOM = frame.PictureRoom:GetWidth()
 local provider, found, drawn =
 	_G.CreateDataProvider(), _G.CreateDataProvider(), _G.CreateDataProvider()
 
@@ -225,6 +216,10 @@ local run, told
 --- The scene the Preview pane draws in, made as the window is built; and what it last drew, as
 -- its source and chosen sets, so it is drawn again only when they change.
 local stage, previewed
+
+--- The least height the window may be drawn at: MIN_HEIGHT, deepened as the source section is
+-- where there is room for its picture.
+local leastHeight = MIN_HEIGHT
 
 --- The search match Enter takes, by its place in the list.
 local picked = 1
@@ -301,8 +296,8 @@ local function kindOf(selected)
 	return selected and selected.group and "group" or "gob"
 end
 
---- Take down what resting on a row showed: its tooltip, and the preview beside it.
-local function leaveRow()
+--- Take down what resting on a found WMO showed: its tooltip, and the preview beside it.
+local function leaveResult()
 	_G.GameTooltip:Hide()
 	Previews.Unpeek()
 end
@@ -439,39 +434,6 @@ local function updateMore()
 		button.nearest = nearest
 		button.Label:SetText(("%d more chosen"):format(#hidden))
 	end
-end
-
---- What each set holds, once worked out, by set id: the catalogue's names do not change.
-local holding = {}
-
---- What a set holds, by model name, the most numerous first: a list of { name, count }, and how
--- many of its objects the client's catalogue does not name. Asked only once the catalogue is
--- walked. Two files the catalogue names alike count as one.
-local function holds(set)
-	local known = holding[set.id]
-	if known then
-		return known[1], known[2]
-	end
-	local models, unnamed = Rows.Models(set.id)
-	local counts = {}
-	for _, model in ipairs(models or {}) do
-		local name = Client.FileName(model.file)
-		if name then
-			counts[name] = (counts[name] or 0) + model.count
-		else
-			unnamed = unnamed + model.count
-		end
-	end
-	unnamed = models and unnamed or 0
-	local held = {}
-	for name, count in pairs(counts) do
-		held[#held + 1] = { name = name, count = count }
-	end
-	table.sort(held, function(a, b)
-		return a.count > b.count or (a.count == b.count and a.name < b.name)
-	end)
-	holding[set.id] = { held, unnamed }
-	return held, unnamed
 end
 
 --- What to know before the next spawn, the weightiest first, each { text, colour }.
@@ -625,31 +587,20 @@ local function updatePreview()
 		return
 	end
 	previewed = key
-	local pieces, names, total = {}, {}, 0
+	local pieces, names = {}, {}
 	for _, set in ipairs(shown and shown.sets or {}) do
 		if chosen[set.index] then
 			names[#names + 1] = set.name
 			for _, piece in ipairs(Rows.Pieces(set.id) or {}) do
-				total = total + 1
-				if #pieces < MOST_PIECES then
-					pieces[#pieces + 1] = piece
-				end
+				pieces[#pieces + 1] = piece
 			end
 		end
 	end
 	stage:Draw(pieces)
 	preview.Name:SetText(shown and shown.name or "No sets")
-	local detail
-	if #names == 0 then
-		detail = "Choose a set to see it laid out."
-	elseif total > #pieces then
-		detail = ("%s, the first %s of %s"):format(
-			table.concat(names, ", "),
-			thousands(#pieces),
-			objects(total)
-		)
-	else
-		detail = ("%s, %s"):format(table.concat(names, ", "), objects(total))
+	local detail = "Choose a set to see it laid out."
+	if #names > 0 then
+		detail = ("%s, %s"):format(table.concat(names, ", "), objects(#pieces))
 	end
 	preview.Detail:SetText(detail)
 end
@@ -863,12 +814,8 @@ local function refresh()
 	frame.SourceName:SetText(name)
 	frame.SourceName:SetTextColor(shade, shade, shade)
 	frame.SourceDetail:SetText(detail)
-	-- The source's WMO as Glimpse pictures it; with no picture its room closes, and the controls
-	-- beside it move back to the edge.
-	local picture = shown and Previews.Picture(shownEntry, shown.name) or nil
-	frame.Picture:SetTexture(picture)
-	frame.Picture:SetShown(picture ~= nil)
-	frame.PictureRoom:SetWidth(picture and PICTURE_ROOM or CLOSED)
+	-- The source's WMO as Glimpse pictures it, its box left empty where there is none.
+	frame.PictureBox.Picture:SetTexture(shown and Previews.Picture(shownEntry, shown.name) or nil)
 	list.Empty:SetText(empty or "")
 	list.Empty:SetShown(not shown)
 	update()
@@ -1001,7 +948,8 @@ local function finished(result, seconds)
 	showOffer()
 end
 
---- A click chooses the one set, and a ctrl- or shift-click adds or removes it.
+--- A click chooses the one set, and a ctrl- or shift-click adds or removes it; either opens the
+-- Preview pane on what is chosen then.
 local function rowClick(button)
 	if run then
 		return
@@ -1012,6 +960,11 @@ local function rowClick(button)
 		chosen[index] = not chosen[index] or nil
 	else
 		chosen = { [index] = true }
+	end
+	-- A scene applies nothing while hidden, so a pane opened now is drawn afresh.
+	if not preview:IsShown() then
+		preview:Show()
+		previewed = nil
 	end
 	update()
 end
@@ -1037,7 +990,7 @@ local function fillSetRow(button, set, tag)
 end
 
 --- A set's tooltip, read off the row as it stands, since rows are reused as the list scrolls:
--- what it is, whether the source draws it already, and the models it holds.
+-- what it is, and whether the source draws it already.
 local function rowEnter(button)
 	local set = button:GetElementData()
 	local lines = setLines(set)
@@ -1046,43 +999,16 @@ local function rowEnter(button)
 	elseif set.placed then
 		lines[#lines + 1] = { text = "The doodad drew it.", colour = GREEN }
 	end
-	if Console.ModelsNamed() then
-		local held, unnamed = holds(set)
-		if #held > 0 then
-			lines[#lines + 1] = { text = "Holds", colour = GOLD }
-			for i = 1, math.min(NAMED, #held) do
-				lines[#lines + 1] = { label = held[i].name, value = held[i].count }
-			end
-			if #held > NAMED then
-				lines[#lines + 1] =
-					{ text = ("and %d more models"):format(#held - NAMED), colour = GREY }
-			end
-		end
-		if unnamed > 0 then
-			local text = ("and %s the client does not name"):format(objects(unnamed))
-			lines[#lines + 1] = { text = text, colour = GREY }
-		end
-	else
-		-- The names come from one walk of the client's catalogue; the tooltip redraws when it ends,
-		-- if the row is still the one under the cursor.
-		lines[#lines + 1] = { text = "Naming the models...", colour = GREY }
-		Console.NameModels(function()
-			if _G.GameTooltip:IsOwned(button) and button:GetElementData() == set then
-				rowEnter(button)
-			end
-		end)
-	end
 	lines[#lines + 1] = { text = "Click: choose only this set", colour = GREEN }
 	lines[#lines + 1] = { text = "Ctrl- or shift-click: add or remove this set", colour = GREEN }
 	tip(button, set.name, lines)
-	Previews.Peek(Console.SetPreview(set.id, ("%s's %s"):format(shown.name, set.name)))
 end
 
 local function initRow(button, set, new)
 	if new then
 		button:SetScript("OnClick", Client.Guarded(rowClick))
 		button:SetScript("OnEnter", Client.Guarded(rowEnter))
-		button:SetScript("OnLeave", Client.Guarded(leaveRow))
+		button:SetScript("OnLeave", _G.GameTooltip_Hide)
 	end
 	fillSetRow(button, set, baked(set) and "baked")
 	mark(button, set)
@@ -1134,7 +1060,7 @@ local function initResult(button, wmo, new)
 			end)
 		)
 		button:SetScript("OnEnter", Client.Guarded(resultEnter))
-		button:SetScript("OnLeave", Client.Guarded(leaveRow))
+		button:SetScript("OnLeave", Client.Guarded(leaveResult))
 	end
 	button.Label:SetText(wmo.name)
 	button.Count:SetText(Chat.Count(wmo.sets, "set"))
@@ -1243,13 +1169,12 @@ local function drawnEnter(button)
 		lines[#lines + 1] = { text = text, colour = GREEN }
 	end
 	tip(button, set.name, lines)
-	Previews.Peek(Console.SetPreview(set.id, ("%s's %s"):format(doodad.name, set.name)))
 end
 
 local function initDrawn(button, set, new)
 	if new then
 		button:SetScript("OnEnter", Client.Guarded(drawnEnter))
-		button:SetScript("OnLeave", Client.Guarded(leaveRow))
+		button:SetScript("OnLeave", _G.GameTooltip_Hide)
 	end
 	fillSetRow(button, set, set.draws and "baked")
 end
@@ -1377,7 +1302,6 @@ local function fitButtons()
 		frame.Here,
 		frame.UseSelected,
 		frame.SpawnSource,
-		frame.PreviewButton,
 		frame.Highlight,
 		offer.Paste,
 	}
@@ -1547,16 +1471,6 @@ local function buildSource()
 			} or {},
 		}
 	end)
-	frame.PreviewButton:SetText("Preview")
-	frame.PreviewButton:SetScript(
-		"OnClick",
-		Client.Guarded(function()
-			preview:SetShown(not preview:IsShown())
-			previewed = nil
-			updatePreview()
-		end)
-	)
-	hint(frame.PreviewButton, nil, { { text = "Show the chosen sets laid out, without the WMO." } })
 	listOf(list, provider, "FurnishSetRowTemplate", initRow)
 	list.ScrollBox:RegisterCallback(
 		_G.BaseScrollBoxEvents.OnScroll,
@@ -1737,6 +1651,12 @@ local function buildDoodad()
 	hint(panel.Import, nil, importLines, "import")
 end
 
+--- Stand the Preview pane at the window's right, past the doodad panel while it shows.
+local function placePreview()
+	preview:ClearAllPoints()
+	preview:SetPoint("TOPLEFT", panel:IsShown() and panel or frame, "TOPRIGHT", 5, 0)
+end
+
 local function buildPreview()
 	preview.Label:SetText("Preview")
 	preview.Hint:SetText("Drag to turn, wheel to zoom.")
@@ -1747,6 +1667,23 @@ local function buildPreview()
 			preview:Hide()
 		end)
 	)
+	panel:HookScript("OnShow", Client.Guarded(placePreview))
+	panel:HookScript("OnHide", Client.Guarded(placePreview))
+end
+
+--- Make room for the source's picture where Glimpse's WMO pictures are installed: its box shown,
+-- the section as deep as the box, the words beside it, and the window deeper by as much, so its
+-- list keeps its rows. Done once, since an addon is installed or not for the whole session.
+local function buildPicture()
+	if not Previews.Pictured() then
+		return
+	end
+	local box = frame.PictureBox
+	dress(box, PANEL)
+	box:Show()
+	leastHeight = MIN_HEIGHT + box:GetHeight() - frame.SourceSpan:GetHeight()
+	frame.SourceSpan:SetHeight(box:GetHeight())
+	frame.PictureRoom:SetWidth(box:GetWidth() + PICTURE_GAP)
 end
 
 local function buildOffer()
@@ -1818,8 +1755,9 @@ local function build()
 	frame:SetScript("OnDragStart", frame.StartMoving)
 	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 	-- Moved or resized by hand, the game's own layout cache keeps the window's place and size.
-	frame:SetMinResize(MIN_WIDTH, MIN_HEIGHT)
-	frame:SetMaxResize(MIN_WIDTH * 2, MIN_HEIGHT * 2)
+	buildPicture()
+	frame:SetMinResize(MIN_WIDTH, leastHeight)
+	frame:SetMaxResize(MIN_WIDTH * 2, leastHeight * 2)
 	frame.Grip:SetScript("OnMouseDown", function()
 		-- Held by its centre, the frame would grow on both sides and the corner leave the cursor;
 		-- held by its top left corner, the corner dragged is the one that moves.
@@ -1852,8 +1790,8 @@ local function build()
 			_G.PlaySound(_G.SOUNDKIT.IG_CHARACTER_INFO_OPEN)
 			-- A size the game kept from an older window may be smaller than this layout needs.
 			local width, height = frame:GetSize()
-			if width < MIN_WIDTH or height < MIN_HEIGHT then
-				frame:SetSize(math.max(width, MIN_WIDTH), math.max(height, MIN_HEIGHT))
+			if width < MIN_WIDTH or height < leastHeight then
+				frame:SetSize(math.max(width, MIN_WIDTH), math.max(height, leastHeight))
 			end
 			-- A position read when nothing was selected is read again when the window opens, so it is
 			-- where the player stands now rather than wherever they stood last time.

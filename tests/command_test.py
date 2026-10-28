@@ -873,16 +873,12 @@ def listed_set(lua: lua51.LuaRuntime) -> str:
     return words
 
 
-def test_resting_on_a_listed_set_peeks_its_models_through_glimpse(tmp_path: Path) -> None:
+def test_resting_on_a_listed_set_describes_it_and_peeks_nothing(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     words = listed_set(lua)
     lua.execute(GLIMPSE)
     lua.eval("Furnish.Command.Hover")(words, lua.eval("TOOLTIP"))
-    read = lua.eval("PEEKED[1]")
-    assert (read.kind, read.name) == ("models", "house's Full")
-    assert [(m.file, m.count) for m in read.models.values()] == [(1001, 1), (1002, 1)]
-    lua.eval("Furnish.Command.Unhover")()
-    assert lua.eval("UNPEEKED") == 1
+    assert lua.eval("#PEEKED") == 0
 
 
 @pytest.mark.parametrize(
@@ -893,15 +889,11 @@ def test_resting_on_a_listed_set_peeks_its_models_through_glimpse(tmp_path: Path
         "local fail = function() error('broken') end Glimpse = { Peek = fail, Unpeek = fail }",
     ],
 )
-def test_without_a_working_preview_door_a_set_is_only_described(
-    tmp_path: Path, glimpse: str
-) -> None:
+def test_without_a_working_preview_door_nothing_is_peeked(tmp_path: Path, glimpse: str) -> None:
     lua = command_lua(tmp_path)
-    words = listed_set(lua)
     lua.execute(glimpse)
-    lua.eval("Furnish.Command.Hover")(words, lua.eval("TOOLTIP"))
-    lua.eval("Furnish.Command.Unhover")()
     assert lua.eval("Furnish.Previews.Peek(Furnish.Console.WmoPreview('house'))") is False
+    lua.eval("Furnish.Previews.Unpeek")()
     assert not [line for line in printed(lua) if "error" in line]
 
 
@@ -913,27 +905,32 @@ def test_a_wmo_is_previewed_by_its_files_name(tmp_path: Path) -> None:
     assert (read.kind, read.id, read.name) == ("wmo", 0, "house")
 
 
+#: The house's picture, where Glimpse's WMO pictures keep it.
+HOUSE_PICTURE = "Interface\\AddOns\\Glimpse_WMO\\Pictures\\001\\100.blp"
+
 #: Glimpse's WMO pictures as released: a picture of the house, found by entry or by name, and a
 #: watertile, which draws nothing from outside.
-PICTURES = r"""
-ASKED = {}
-Glimpse_WMO = {
+PICTURES = rf"""
+ASKED = {{}}
+Glimpse_WMO = {{
   Picture = function(id, name)
-    ASKED[#ASKED + 1] = { id = id, name = name }
-    if id == 500 or name == "house" then return "Interface\\AddOns\\Glimpse_WMO\\Pictures\\001\\100.blp" end
+    ASKED[#ASKED + 1] = {{ id = id, name = name }}
+    if id == 500 or name == "house" then return [[{HOUSE_PICTURE}]] end
     if name == "watertile" then return false end
     return nil
   end,
-}
+}}
 """
 
 
 def test_a_wmo_s_picture_is_read_by_its_entry_and_its_name(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
+    assert lua.eval("Furnish.Previews.Pictured()") is False
     lua.execute(PICTURES)
+    assert lua.eval("Furnish.Previews.Pictured()") is True
     picture = lua.eval("Furnish.Previews.Picture")
-    assert picture(500, "object 500") == "Interface\\AddOns\\Glimpse_WMO\\Pictures\\001\\100.blp"
-    assert picture(None, "house") == "Interface\\AddOns\\Glimpse_WMO\\Pictures\\001\\100.blp"
+    assert picture(500, "object 500") == HOUSE_PICTURE
+    assert picture(None, "house") == HOUSE_PICTURE
     asked = lua.eval("ASKED[1]")
     assert (asked.id, asked.name) == (500, "object 500")
 

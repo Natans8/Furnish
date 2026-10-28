@@ -1,7 +1,7 @@
--- What Glimpse shows for Furnish. A preview at the pointer, of a WMO or the models a set holds, is
--- handed over as data through Glimpse's preview door where the Glimpse installed has one. A WMO's
--- picture is read from Glimpse's WMO pictures, for the window to draw. With neither installed
--- nothing is shown and every call answers so.
+-- What Glimpse shows for Furnish. A preview of a WMO at the pointer is handed over as data through
+-- Glimpse's preview door where the Glimpse installed has one. A WMO's picture is read from
+-- Glimpse's WMO pictures, for the window to draw. With neither installed nothing is shown and
+-- every call answers so.
 --
 -- Glimpse is another addon, so a fault inside its door is its own: each call is made protected,
 -- and a fault answers that nothing was shown.
@@ -40,6 +40,20 @@ function Previews.Unpeek()
 	end
 end
 
+--- Glimpse's WMO pictures, where they are installed with the door that finds one; nil otherwise.
+local function pictures()
+	local addon = _G.Glimpse_WMO
+	if type(addon) == "table" and type(addon.Picture) == "function" then
+		return addon
+	end
+	return nil
+end
+
+--- Whether Glimpse's WMO pictures are installed, so a WMO's picture may be asked for.
+function Previews.Pictured()
+	return pictures() ~= nil
+end
+
 --- A WMO's picture, as Glimpse's WMO pictures have it: found by its gob entry where they know the
 -- entry, and otherwise by its name.
 -- @param entry a gob entry, or nil
@@ -47,11 +61,11 @@ end
 -- @return the picture's texture path; nil where the pictures are not installed, have none of the
 --   WMO, or have it as drawing nothing from outside
 function Previews.Picture(entry, name)
-	local pictures = _G.Glimpse_WMO
-	if type(pictures) ~= "table" or type(pictures.Picture) ~= "function" then
+	local addon = pictures()
+	if not addon then
 		return nil
 	end
-	local ok, path = pcall(pictures.Picture, entry, name)
+	local ok, path = pcall(addon.Picture, entry, name)
 	if ok and type(path) == "string" then
 		return path
 	end

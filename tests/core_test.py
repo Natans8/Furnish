@@ -673,24 +673,18 @@ def test_with_both_that_may_lead_refused_the_rest_stand_loose(tmp_path: Path) ->
     assert (result.leader, result.joined, len(result.spawned)) == (None, 0, 1)
 
 
-def test_a_set_holds_each_model_it_draws_once_with_its_count(tmp_path: Path) -> None:
-    lua = lua_core(tmp_path)
-    models, unknown = lua.eval("Furnish.Rows.Models(Furnish.Sets.Pick(900, 1).id)")
-    assert ([(m.file, m.count) for m in models.values()], unknown) == ([(1001, 1), (1002, 1)], 0)
-    # A display the data names no file for is counted, not drawn.
-    lua.execute(
-        "local file = Furnish.Reader.ModelFile function Furnish.Reader.ModelFile(display)"
-        " if display == 20 then return nil end return file(display) end"
-    )
-    models, unknown = lua.eval("Furnish.Rows.Models(Furnish.Sets.Pick(900, 1).id)")
-    assert ([m.file for m in models.values()], unknown) == ([1002], 1)
-
-
 def test_a_sets_pieces_are_its_placements_by_the_file_each_draws(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     pieces = lua.eval("Furnish.Rows.Pieces(Furnish.Sets.Pick(900, 1).id)")
     drawn = sorted((p.file, p.x, p.y, p.z, p.qw, p.scale) for p in pieces.values())
     assert drawn == [(1001, 1.5, -2.0, 0.25, 1.0, 1.0), (1002, 0.0, 0.0, 3.0, 1.0, 0.5)]
+    # A display the data names no file for is left out.
+    lua.execute(
+        "local file = Furnish.Reader.ModelFile function Furnish.Reader.ModelFile(display)"
+        " if display == 20 then return nil end return file(display) end"
+    )
+    pieces = lua.eval("Furnish.Rows.Pieces(Furnish.Sets.Pick(900, 1).id)")
+    assert [p.file for p in pieces.values()] == [1002]
 
 
 #: A model scene that keeps what each actor and the camera were last told, by method.
@@ -1075,11 +1069,9 @@ def test_one_walk_names_the_wanted_files_and_a_second_ask_walks_nothing(tmp_path
         " { displayid = 10, fileid = 1, name = 'a.m2' } }"
     )
     lua.execute(CATALOGUE)
-    assert lua.eval("Furnish.Client.FilesNamed()") is False
     lua.execute("DONE = 0; COUNT = function() DONE = DONE + 1 end")
     lua.execute("Furnish.Client.NameFiles({ [3] = true, [9] = true }, COUNT)")
     assert lua.eval("DONE") == 1
-    assert lua.eval("Furnish.Client.FilesNamed()") is True
     # Named as a player reads it, kept only where wanted, and nil where the catalogue lacks it.
     assert lua.eval("Furnish.Client.FileName(3)") == "c"
     assert lua.eval("Furnish.Client.FileName(2)") is None

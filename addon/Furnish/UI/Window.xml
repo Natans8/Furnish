@@ -253,31 +253,33 @@
 	</Frame>
 
 	<Frame name="FurnishFrame" parent="UIParent" toplevel="true" movable="true" resizable="true" enableMouse="true" clampedToScreen="true" hidden="true">
-		<Size x="400" y="628"/>
+		<Size x="400" y="656"/>
 		<Anchors>
 			<Anchor point="CENTER"/>
 		</Anchors>
 		<Layers>
 			<Layer level="ARTWORK">
-				<!-- The room the source's WMO picture takes at the section's right, the gap before it
-				     included. Window.lua closes it where there is no picture, and what is anchored to
-				     its left moves back to the edge. -->
+				<!-- The source section's depth: what is below it hangs from its foot. As drawn it is the
+				     depth without a picture; Window.lua deepens it to the picture's box where Glimpse's
+				     WMO pictures are installed. -->
+				<Texture parentKey="SourceSpan">
+					<Size x="1" y="98"/>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="14" y="-66"/>
+					</Anchors>
+				</Texture>
+				<!-- The room the source's picture takes at the section's right, the gap before it
+				     included. As drawn it is closed, only the margin the section's words keep from
+				     the edge; Window.lua opens it where the pictures are installed. What is anchored
+				     to its left stands beside the picture. -->
 				<Texture parentKey="PictureRoom">
-					<Size x="72" y="64"/>
+					<Size x="6" y="1"/>
 					<Anchors>
-						<Anchor point="TOPRIGHT" x="-20" y="-70"/>
+						<Anchor point="TOPRIGHT" x="-14" y="-66"/>
 					</Anchors>
 				</Texture>
-				<!-- The source's WMO as Glimpse's WMO pictures have it, as tall as the section's three
-				     rows. -->
-				<Texture parentKey="Picture" hidden="true">
-					<Size x="64" y="64"/>
-					<Anchors>
-						<Anchor point="TOPRIGHT" relativeKey="$parent.PictureRoom"/>
-					</Anchors>
-				</Texture>
-				<!-- Where the sets come from: the WMO's name across the width, then what it is with
-				     its follow box on the line below. -->
+				<!-- Where the sets come from: the WMO's name, what it is below it, and its follow box
+				     on the line below that, beside the picture where there is one. -->
 				<FontString parentKey="SourceLabel" inherits="GameFontNormal" justifyH="LEFT">
 					<Anchors>
 						<Anchor point="TOPLEFT" x="20" y="-74"/>
@@ -286,13 +288,13 @@
 				<FontString parentKey="SourceName" inherits="GameFontHighlightMedium" justifyH="LEFT" wordwrap="false">
 					<Anchors>
 						<Anchor point="TOPLEFT" x="96" y="-72"/>
-						<Anchor point="TOPRIGHT" relativeKey="$parent.PictureRoom" relativePoint="TOPLEFT" x="0" y="-2"/>
+						<Anchor point="TOPRIGHT" relativeKey="$parent.PictureRoom" relativePoint="TOPLEFT" x="0" y="-6"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="SourceDetail" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false">
 					<Anchors>
 						<Anchor point="TOPLEFT" x="96" y="-92"/>
-						<Anchor point="TOPRIGHT" relativeKey="$parent.PictureRoom" relativePoint="TOPLEFT" x="-130" y="-22"/>
+						<Anchor point="TOPRIGHT" relativeKey="$parent.PictureRoom" relativePoint="TOPLEFT" x="0" y="-26"/>
 					</Anchors>
 				</FontString>
 				<!-- Where the sets go, the same two lines over the position below them. -->
@@ -330,15 +332,35 @@
 
 			<CheckButton parentKey="SourceFollow" inherits="FurnishFollowTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativeKey="$parent.PictureRoom" relativePoint="TOPLEFT" x="0" y="-14"/>
+					<Anchor point="TOPRIGHT" relativeKey="$parent.PictureRoom" relativePoint="TOPLEFT" x="0" y="-44"/>
 				</Anchors>
 			</CheckButton>
 
+			<!-- The source's WMO as Glimpse's WMO pictures have it, in a box edged as the list is, at
+			     the section's right and as deep as it; shown by Window.lua where the pictures are
+			     installed. -->
+			<Frame parentKey="PictureBox" inherits="BackdropTemplate" hidden="true">
+				<Size x="138" y="138"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-14" y="-66"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<Texture parentKey="Picture">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="5" y="-5"/>
+								<Anchor point="BOTTOMRIGHT" x="-5" y="5"/>
+							</Anchors>
+						</Texture>
+					</Layer>
+				</Layers>
+			</Frame>
+
 			<!-- The gob entry the sets come from, as the destination's boxes hold its position: a third
-			     of the width, sized by Window.lua with them. -->
+			     of the width, sized by Window.lua with them; on the section's foot. -->
 			<EditBox parentKey="SourceID" inherits="FurnishNumberTemplate">
 				<Anchors>
-					<Anchor point="TOPLEFT" x="25" y="-114"/>
+					<Anchor point="BOTTOMLEFT" relativeKey="$parent.SourceSpan" x="11" y="0"/>
 				</Anchors>
 			</EditBox>
 			<!-- The source's WMO itself, spawned where the player stands; as wide as its words, which
@@ -349,20 +371,12 @@
 					<Anchor point="LEFT" relativeKey="$parent.SourceID" relativePoint="RIGHT" x="8" y="0"/>
 				</Anchors>
 			</Button>
-			<!-- The chosen sets laid out, in the pane against the window's left edge; on the ID's row,
-			     at its right. -->
-			<Button parentKey="PreviewButton" inherits="UIPanelButtonTemplate">
-				<Size y="22"/>
-				<Anchors>
-					<Anchor point="TOPRIGHT" relativeKey="$parent.PictureRoom" relativePoint="TOPLEFT" x="0" y="-43"/>
-				</Anchors>
-			</Button>
 
-			<!-- The sets, eleven rows at the size the window opens at, or a line saying why there
-			     are none. -->
+			<!-- The sets, below the source section, eleven rows at the size the window opens at, or a
+			     line saying why there are none. -->
 			<Frame parentKey="Sets" inherits="FurnishListTemplate">
 				<Anchors>
-					<Anchor point="TOPLEFT" x="14" y="-142"/>
+					<Anchor point="TOPLEFT" relativeKey="$parent.SourceSpan" relativePoint="BOTTOMLEFT" x="0" y="-6"/>
 					<Anchor point="BOTTOMRIGHT" x="-14" y="228"/>
 				</Anchors>
 			</Frame>
@@ -490,18 +504,14 @@
 				</Anchors>
 			</Frame>
 
-			<!-- The doodad `.doodad select` picked, in a panel of its own top-aligned to the window's
-			     right edge, shown while there is one: its name, the sets of the WMO it is, and what it
-			     gives the window, its sets to the source and itself, as a gob, to the destination. Its
-			     height follows its list, set by Window.lua: the list hangs from the top, and the two
-			     buttons stand on the bottom. -->
-			<!-- The chosen sets laid out, without the WMO, which no model frame can draw: a pane against
-			     the window's left edge, shown by the Preview button. The scene fills it under the
-			     names, and a line under the scene says how to move it. -->
+			<!-- The chosen sets laid out, without the WMO, which no model frame can draw: a pane at the
+			     window's right, past the doodad panel while it shows, which Window.lua sets; shown when
+			     a set is clicked. The scene fills it under the names, and a line under the scene says
+			     how to move it. -->
 			<Frame parentKey="Preview" enableMouse="true" hidden="true">
 				<Size x="440" y="460"/>
 				<Anchors>
-					<Anchor point="TOPRIGHT" relativePoint="TOPLEFT" x="-5" y="0"/>
+					<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" x="5" y="0"/>
 				</Anchors>
 				<Layers>
 					<Layer level="ARTWORK">
@@ -545,6 +555,11 @@
 				</Frames>
 			</Frame>
 
+			<!-- The doodad `.doodad select` picked, in a panel of its own top-aligned to the window's
+			     right edge, shown while there is one: its name, the sets of the WMO it is, and what it
+			     gives the window, its sets to the source and itself, as a gob, to the destination. Its
+			     height follows its list, set by Window.lua: the list hangs from the top, and the two
+			     buttons stand on the bottom. -->
 			<Frame parentKey="Doodad" enableMouse="true" hidden="true">
 				<Size x="300" y="300"/>
 				<Anchors>

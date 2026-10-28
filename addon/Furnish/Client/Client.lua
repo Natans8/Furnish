@@ -360,11 +360,6 @@ function Client.FileName(file)
 	return names[file]
 end
 
---- Whether the walk of the catalogue has ended, so a file it did not name has no name.
-function Client.FilesNamed()
-	return walked
-end
-
 --- Read the client's whole display catalogue once a session, a few thousand rows a frame,
 -- keeping the name of every file wanted, then call done. A walk under way is waited on and one
 -- already ended calls done at once. The catalogue is ordered by display, not by file, so only the

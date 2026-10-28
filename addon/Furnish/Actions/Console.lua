@@ -655,11 +655,6 @@ function Console.NameModels(done)
 	Client.NameFiles(wantedFiles, done)
 end
 
---- Whether the walk Console.NameModels starts has ended, so a model it did not name has none.
-function Console.ModelsNamed()
-	return Client.FilesNamed()
-end
-
 --- The name of the model a display draws, as the client's catalogue spells it; nil until
 -- Console.NameModels has ended, or where the catalogue does not carry the file.
 function Console.ModelName(display)
@@ -907,29 +902,6 @@ function Console.Describe(request, tooltip)
 		{ text = "Click: spawn on the selected gob", colour = tip.click },
 		{ text = "Ctrl-click: spawn at your feet", colour = tip.click },
 	})
-end
-
---- What a preview of a set shows: the models it holds, each once with its count, under a name;
--- nil where it holds none the data can name.
--- @param id the set's id
--- @param name what to call it, its WMO's name before its own: "house's Full"
-function Console.SetPreview(id, name)
-	local models = Rows.Models(id)
-	if not (models and models[1]) then
-		return nil
-	end
-	return { kind = "models", name = name, models = models }
-end
-
---- What a preview of a list link's set shows, as Console.SetPreview gives it; nil where the
--- link names no set the data has.
--- @param request a list link's request
-function Console.LinkPreview(request)
-	local set = Reader.Load() and Sets.Pick(request.file, request.index)
-	if not set then
-		return nil
-	end
-	return Console.SetPreview(set.id, ("%s's %s"):format(request.label, setName(set)))
 end
 
 --- What a preview of a WMO shows: its picture, found by the WMO file's name.
