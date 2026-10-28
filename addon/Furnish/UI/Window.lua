@@ -572,7 +572,7 @@ end
 --- Say in the Preview pane how many pieces are chosen in it, and offer to spawn them while any
 -- are and nothing runs.
 local function updateChosen()
-	local count = #stage:Chosen()
+	local count = stage:Count()
 	local detail = previewedDetail or ""
 	if count > 0 then
 		detail = ("%s, %d chosen"):format(detail, count)

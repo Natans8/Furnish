@@ -773,6 +773,12 @@ local function leader(actors)
 	return leads
 end
 
+--- How many pieces are chosen, which a band's every frame asks, and so without the ranking
+-- Chosen does.
+function Scene:Count()
+	return #self.chosen
+end
+
 --- The pieces chosen, as Draw was given them, in the order they would spawn: the one that leads
 -- first, as leader says it, then the rest in the order drawn.
 function Scene:Chosen()
