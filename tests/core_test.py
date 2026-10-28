@@ -884,12 +884,11 @@ def test_the_piece_under_the_pointer_is_marked_and_named(tmp_path: Path) -> None
     )
     # Not looked for until the pointer is on the scene.
     assert lua.eval("ACTORS[1].SetSpellVisualKit") is None
-    # On the scene's middle the pointer is on the cube, which takes the pale yellow tint and is
-    # named.
+    # On the scene's middle the pointer is on the cube, which takes the outline and is named.
     lua.execute("HOOKED.OnEnter() SCENE:Tick(0)")
-    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (170969, False)
+    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (90111, False)
     assert lua.eval("HOVERS[#HOVERS]") == 7
-    # Off the cube, the tint comes off and the name goes.
+    # Off the cube, the outline comes off and the name goes.
     lua.execute("GetCursorPosition = function() return 0, 100 end SCENE:Tick(0)")
     assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (0,)
     assert lua.eval("HOVERS[#HOVERS]") is False
