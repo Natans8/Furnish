@@ -1,138 +1,124 @@
 # Furnish
 
-The doodad sets of World of Warcraft's WMOs as a database, so that an Epsilon addon can
-spawn a WMO's furniture as gameobjects.
+Spawn a WMO's doodad sets as gameobjects on Epsilon: the chairs, tables, shelves and lamps a WMO
+was furnished with, placed where the game placed them, on a WMO you spawned or anywhere you like.
 
-A WMO root file names its doodad sets (`MODS`) and every placement each set holds
-(`MODD`, `MODI`). Epsilon spawns a WMO with its default set only, and spawns each model
-as a gameobject by a display id. The build joins the two: it reads the root files, resolves
-every model to the display that spawns it, and writes one SQLite file.
+Epsilon spawns a WMO with its default set only. Furnish reads every set from the game's files and
+spawns its pieces one gob at a time, grouped so you can move the whole furnishing as one.
+
+## Install
+
+1. Download `Furnish-<version>.zip` from the [releases](https://github.com/Natans8/Furnish/releases).
+2. Unzip it into `World of Warcraft/_retail_/Interface/AddOns`, so `Furnish` and `Furnish_Data` sit
+   side by side there.
+
+Furnish needs EpsilonLib, which Epsilon ships. [Glimpse](https://github.com/Natans8/Glimpse) is
+optional: with its WMO pictures installed, the window shows the WMO you are furnishing.
+
+## Quick start
+
+1. Spawn or select a WMO gob.
+2. Type `/furn` to open the window. The selected WMO is the source, its sets are listed.
+3. Click a set to choose it and see it in the preview.
+4. Press **Spawn**. The set is spawned onto the selected WMO, grouped, and the group is selected
+   so `.gob group` commands act on it next.
+
+Turn highlighting off before spawning a big set: highlighting many objects can crash the game.
+Furnish reminds you once a session and leaves the choice to you.
+
+## The window
+
+**Source**: the WMO the sets come from.
+- Follows the selected gob, or untick *Follow selection* to keep it.
+- Type a gob entry into its ID box, or search a WMO by name.
+- A set the WMO already shows as part of its model is marked *baked*.
+- Click a set to choose it; ctrl- or shift-click to add or remove one.
+
+**Destination**: where the sets go, as numbers.
+- X, Y, Z, roll, pitch, turn and scale, in ObjectMover's colours.
+- Follows the selected gob, or untick *Follow selection* to keep what you typed.
+- *Here* fills in where you stand; *Use selected gob* fills them in once.
+
+**Group leader**: what leads the spawned objects' group.
+- *Pivot* (the default): one extra invisible object at the destination.
+- *First spawned*: the first object leads, nothing extra spawns.
+- *Selected gob*: the selected gob leads, or its group is joined.
+- *No group*: every object stands alone.
+
+**Spawning**
+- *Spawn* starts the run; the bar shows its progress.
+- *Stop* ends it; *Stop and delete* also removes what it spawned.
+- A whole run onto a WMO offers a blueprint name at the bottom right. *Paste to chat* puts the
+  `.gobject blueprint new` command in your chat box for you to send.
+
+**Doodad panel**: after `.doodad select`, the selected doodad shows beside the window.
+- *Use as source* takes that WMO and the sets it shows.
+- *Import doodad* turns it into a gob and spawns its sets onto it.
+
+## The preview
+
+Click a set and the preview opens beside the window, laying out its pieces.
+
+| mouse           | does                                       |
+|-----------------|--------------------------------------------|
+| drag            | turn the view                              |
+| wheel           | zoom toward the pointer                    |
+| right-drag      | pan                                        |
+| click           | choose a piece                             |
+| shift-click     | add a piece, or let it go                  |
+| ctrl-click      | make a piece lead                          |
+| shift-drag      | add every piece in a band                  |
+| ctrl-drag       | let go of every piece in a band            |
+| right-click     | spawn that piece alone                     |
+
+The pointed piece glows yellow, chosen pieces azure, the leader green. The leader is the piece
+standing lowest, the widest among those level, unless you ctrl-clicked another. **Spawn** spawns
+the chosen pieces at Destination; right-click **Spawn** to put the leader at your feet instead.
+The **i** at the end of the control bar lists these clicks.
+
+## Chat
+
+- `[Furnish]` after a doodad line (`.doodad select`, `.doodad near`) imports and furnishes it.
+- `[Furnish]` after a WMO gob's select or spawn line lists its sets as buttons. Click a set to
+  spawn it on the selected gob, ctrl-click to spawn it at your feet.
+- Right-click any `[Furnish]` button to open the window on it instead.
 
 ## Commands
 
-The command is `/furn`, or `/furnish`, and `/furn help` prints a short form of what follows; every
-message reads the first name.
+`/furn` or `/furnish`. `/furn help` lists them in game.
 
-| command                    | does                                                                           |
-|----------------------------|--------------------------------------------------------------------------------|
-| `/furn`                    | open the window, described below                                               |
-| `/furn list`               | list the selected WMO's sets                                                   |
-| `/furn list <entry>`       | list the sets of the WMO an entry names, the number on a lookup line           |
-| `/furn <set>`              | spawn one of the selected WMO's sets onto that WMO                             |
-| `/furn <set> from <entry>` | spawn a set of the WMO an entry names onto the selected gob                    |
-| `/furn <set> here`         | spawn the selected WMO's set at your feet                                      |
-| `/furn <set> here <entry>` | spawn a set of the WMO an entry names at your feet                             |
-| `/furn import`             | turn the selected doodad into a gob, then spawn the doodad's sets onto the gob |
-| `/furn stop`               | stop spawning; a second stop gives up on a reply that never comes              |
-| `/furn stop delete`        | stop spawning, then delete what was spawned, one object at a time              |
-| `/furn options`            | open the settings, in the game's Options; `settings` says the same             |
+| command                      | does                                                  |
+|------------------------------|-------------------------------------------------------|
+| `/furn`                      | open the window                                       |
+| `/furn list [<entry>]`       | list the selected WMO's sets, or an entry's WMO's     |
+| `/furn <set>`                | spawn a set onto the selected WMO                     |
+| `/furn <set> from <entry>`   | spawn a set of the entry's WMO onto the selected gob  |
+| `/furn <set> here [<entry>]` | spawn a set at your feet                              |
+| `/furn import`               | import the selected doodad and spawn its sets onto it |
+| `/furn stop [delete]`        | stop a run, and with `delete` remove what it spawned  |
+| `/furn options`              | open the settings                                     |
 
-A set, list or import takes any of these words after it:
+After a set, list or import:
 
-| word      | does                                                                             |
-|-----------|----------------------------------------------------------------------------------|
-| `first`   | the first object spawned leads the group, so no pivot spawns                     |
-| `merge`   | merge the set into the selected gob's group, so no pivot spawns                  |
-| `nogroup` | spawn every object ungrouped                                                     |
-| `base`    | spawn the base set as well, as a WMO that comes unfurnished always gets          |
-| `quiet`   | leave the progress counts out of chat, saying only how the run began and ended   |
+| word      | does                                                   |
+|-----------|--------------------------------------------------------|
+| `first`   | the first object leads the group; no pivot             |
+| `merge`   | join the selected gob's group; no pivot                |
+| `nogroup` | spawn every object ungrouped                           |
+| `base`    | spawn the base set too                                 |
+| `quiet`   | leave the progress counts out of chat                  |
 
-`/furn help` prints one short line a command and the words on one line, each a link whose tooltip
-says what it does. Furnish's settings are in the game's Options, under AddOns: whether chat lines
-carry `[Furnish]` buttons, how many commands a run sends before the first is answered, and what
-a pivot spawns as, written as `.gob spawn` takes it: a gob entry, or a display as a negative
-number. A change takes effect at once; Cancel puts back what the panel showed when it opened.
+## Settings
 
-A list is a menu of buttons, one a set: a click spawns the set onto the selected gob, WMO or
-not, a ctrl-click at your feet, and resting on one says its index, its objects and what it is.
-Without a word, a pivot leads the group: one extra invisible object where the WMO stands,
-turned and scaled with the set. The first run of a session reminds you that highlighting too
-many objects can crash the game; turning it off is yours to do. A run that leaves a group selects that group
-when it ends, in the chat as if typed, so `.gob group` commands act on it next. While it stays
-selected it stands for the object the run was on, so the next set or list needs no reselecting.
-A WMO's doodad line, from `.doodad select` or `.doodad near`, carries a `[Furnish]` button
-that imports that WMO by its unique id and furnishes it as `/furn import` does, where the map
-placed it with a set beyond its base, so that the import spawns something; and a WMO gob's
-selection line, from `.gob select`, or its spawn line, from `.gob spawn`, which selects what it
-makes, one that lists its sets. A right-click on either, or on a set's button in a list, opens
-the window on it instead: the doodad in its panel, the gob's WMO as the source, or that set
-chosen on its WMO.
+In the game's Options under AddOns, or `/furn options`: whether chat lines carry `[Furnish]`
+buttons, how many commands a run sends ahead of the server's replies, and what a pivot spawns as.
 
-The window reads top to bottom as where the sets come from, which to spawn, and where they go.
-Source is the WMO a gob entry is, held in its ID box as Destination's numbers are: the selected gob's, one typed, which
-keeps it whatever gob is selected, or the lowest entry of a WMO searched by name, since every entry of one WMO reads
-the same sets. A search lists the WMOs with sets that the client's own catalogue names like it, the first
-lit so Enter takes it and Up and Down moving the light, and those that come unfurnished
-marked. Where Glimpse and its WMO pictures are installed, the source's WMO shows as its picture
-beside these rows, read through the pictures' own door. A set the selected WMO draws already, as
-part of its model, is marked baked: its base set, unless it comes unfurnished. A click chooses one
-set and opens the Preview pane, a ctrl- or shift-click adds or removes one, and a strip at either
-end of the list counts the chosen sets scrolled out of view. Destination is
-numbers and nothing else: X, Y and Z, then the roll, pitch and turn about each in ObjectMover's
-colours, then the scale. Following the selected gob is one way to fill them, Here and Use
-selected gob fill them once, typing a number keeps what was typed, and while no gob is followed
-they hold where you stood when they were read, so every number always holds a value; Tab moves
-through the boxes. Either block's Follow selection, unticked, keeps what it shows whatever you
-select. A selected group is followed by neither block, as a model is no source, and Use selected
-group fills Destination once with the group's position and facing, level, since a group has no
-roll or pitch of its own. The selection decides nothing else about Destination: what it decides
-is the group. The group a run selects when it ends still stands for the WMO the run was on. The
-doodad `.doodad select` picks is a selection of its own, held beside the gob's: it never changes
-Source or Destination, and while there is one a panel stands against the window's right edge with
-its name and the sets of the WMO it is, those it draws already marked baked. Every pick takes
-the panel, the window open or not, and a doodad with no sets Furnish knows of shows there saying so. Use as source keeps
-that WMO as the source, with the sets the doodad drew beyond its base chosen. Import doodad is
-`/furn import`: it turns the doodad into a gob and spawns those sets merged into it, the run on
-the window's bar. The doodad is hidden, not gone, and stays selected; closing the panel lets it
-go. Group leader is one choice
-of four, all in view: No group spawns the objects loose; Pivot, the default, makes them one
-group led by an invisible pivot at the destination, which the button counts; First spawned lets
-the first object lead instead, so nothing extra spawns; Selected gob makes whatever is selected
-when the run starts lead, wherever Destination's numbers came from, or joins its group where it is
-in one already, which a mark on the segment warns of and Spawn asks about first; with a group
-selected it reads Selected group and joins that group. A group moves, turns and scales about its
-leader. Selected gob greys while nothing is selected or while what is selected is not yours to
-edit in the phase, Pivot standing in until it can lead; typed, such a merge is refused before
-anything spawns, and a join the server refuses during a run stops it there. The
-status row
-holds Highlighting, which toggles the client's outline on selected objects, beside a run's
-progress with its time left, a warning while Destination follows a WMO the sets were not made for,
-or the reminder that highlighting too many objects can crash the game. During a run every
-control holds still and Stop and delete stands beside Stop. It deletes what the run spawned one
-object at a time, at the pace the run spawned, while the bar empties; Stop while it deletes sends
-no more. Once the run ends, its group is yours to manage. A run that ends whole, at scale 1 with
-no roll or pitch, led by its pivot or merged into a WMO that stood where they were placed, alone
-and owning its sets, offers a blueprint at the window's bottom right whenever its group is the
-selection: a suggested name, held to 225 bytes, and Paste to chat, which puts
-`.gobject blueprint new <name>` in the chat box for you to send. A run from chat, an import
-included, ends on the same offer as a button carrying the name, which pastes the command while the
-run's group is selected and otherwise says how to select it. Closed or overtaken by the next run,
-the offer goes. The window resizes from its corner, and the game keeps its size and place.
+# For developers
 
-Preview is a pane against the window's right edge, below the doodad panel and above the blueprint
-offer while they show, that any click on a set opens. It lays the chosen sets out in a model
-scene, every piece at its own place, tilt and scale, without the WMO, which no model frame can
-draw. The camera opens from a corner, framing the sphere around the models as they load, and a
-line under the scene counts them in and then says how long they took. Drag to turn, right- or
-middle-drag to pan, and turn the wheel to zoom, each about the piece under the pointer, so a zoom
-closes on what is pointed at and a pan carries it with the pointer; the game's own model controls
-stand over the scene, and Reset frames the sets as they opened. The pane's corner drags it wider
-and the window taller with it. Resting on a piece marks it with a glow and names it in a tooltip
-at the pointer: its model and the display it spawns by, its set, its position and rotation from
-the WMO's origin as `.gob spawn` takes them, in Destination's colours, and its scale where it is
-not one. Choosing follows the grammar of the 3D editors: a click chooses a piece alone; a
-shift-click adds one or lets it go; a shift-drag adds every piece in its band as it is drawn,
-and a ctrl-drag takes them away; a ctrl-click makes a piece lead; a right-click spawns the piece
-under the pointer alone. The chosen glow azure, the
-leader green, the pointed piece yellow, and a line beside Spawn counts them and names the
-leader; Spawn,
-at the pane's foot, spawns them where a run of their sets would put them at Destination, one
-alone and several as a group led by the piece standing lowest, the one covering most ground among
-those standing level, so a table leads what is on it, a carpet leads the chairs on it, and a group
-moved to the ground sits on it. It unticks
-Destination's Follow selection,
-since the server selects what it spawns and a destination that followed would carry the next
-pieces off; what spawned stays selected, and the choice is let go.
+The rest of this file is for making the data and working on the addon. A WMO root file names its
+doodad sets (`MODS`) and every placement each holds (`MODD`, `MODI`); the build reads the root
+files, resolves every model to the gameobject display that spawns it, and writes one SQLite file,
+which `furnish export` turns into the addon's data.
 
 ## Build
 
