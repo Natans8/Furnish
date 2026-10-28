@@ -47,11 +47,18 @@ function Commands.Spawn(display, pose)
 	return Commands.SpawnObject(-display, pose)
 end
 
+--- The spawn command for what `.gob spawn` takes, where the player stands and the way they face,
+-- as the server places a spawn that names no position.
+-- @param id a gameobject entry, or a display as a negative number
+function Commands.SpawnHere(id)
+	return ("%s %d"):format(Commands.SPAWN, id)
+end
+
 --- The spawn command for what `.gob spawn` takes, at a world pose, as Spawn says it.
 -- @param id a gameobject entry, or a display as a negative number
 -- @param pose { x, y, z, roll, pitch, turn, scale }, what Transform.Place answers
 function Commands.SpawnObject(id, pose)
-	local words = { ("%s %d"):format(Commands.SPAWN, id) }
+	local words = { Commands.SpawnHere(id) }
 	if not Commands.IsUnit(pose.scale) then
 		words[#words + 1] = "scale " .. Commands.Number(pose.scale)
 	end

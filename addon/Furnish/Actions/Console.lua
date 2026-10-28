@@ -1031,27 +1031,15 @@ local function spawnOn(request, destination, selected)
 	})
 end
 
---- Spawn the one gob an entry names at a destination's numbers, as `.gob spawn` does, its
--- reply shown as if typed; the server selects what it spawns, so a set can merge into it next.
+--- Spawn the one gob an entry names where the player stands, as a typed `.gob spawn` does, its
+-- reply shown as if typed; the server selects what it spawns.
 -- @param entry a gameobject entry, as a lookup line prints it
--- @param destination a pose's numbers
 -- @param ways the ways out of the door it came through, as a request carries them
-function Console.SpawnGob(entry, destination, ways)
+function Console.SpawnGob(entry, ways)
 	local send = ready(ways)
-	if not send then
-		return
+	if send then
+		send(Commands.SpawnHere(entry), nil, true)
 	end
-	local at, turned = destination.position, destination.rotation
-	local placed = {
-		x = at.x,
-		y = at.y,
-		z = at.z,
-		roll = turned.roll,
-		pitch = turned.pitch,
-		turn = turned.turn,
-		scale = destination.scale,
-	}
-	send(Commands.SpawnObject(entry, placed), nil, true)
 end
 
 --- Spawn a set on the selected object, or at the player.

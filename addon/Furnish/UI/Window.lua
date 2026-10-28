@@ -621,12 +621,7 @@ local function update()
 	-- player's, and nothing here knows what has been done to it since. Shown, it stands where
 	-- the spawn button ends, which shortens to meet it.
 	frame.SpawnSource:SetEnabled(
-		not run
-			and shownEntry ~= nil
-			and spot ~= nil
-			and spot.scale > 0
-			and Client.CanSpawn(true)
-			and not Console.Busy()
+		not run and shownEntry ~= nil and Client.CanSpawn(true) and not Console.Busy()
 	)
 	local delete = frame.DeleteButton
 	delete:SetShown(run ~= nil)
@@ -1471,19 +1466,17 @@ local function buildSource()
 	frame.SpawnSource:SetScript(
 		"OnClick",
 		Client.Guarded(function()
-			Console.SpawnGob(shownEntry, Pose.Copy(spot), WAYS)
+			Console.SpawnGob(shownEntry, WAYS)
 		end)
 	)
 	hint(frame.SpawnSource, nil, function()
 		return {
-			{ text = "Spawn the source's WMO at the destination." },
-			{
-				text = ("Typed: %s %s"):format(
-					Commands.Typed(Commands.SPAWN),
-					shownEntry or "<entry>"
-				),
+			{ text = "Spawn the source's WMO where you stand." },
+			-- Read when shown: the entry the source has then, or none while there is none.
+			shownEntry and {
+				text = "Typed: " .. Commands.Typed(Commands.SpawnHere(shownEntry)),
 				colour = GREY,
-			},
+			} or {},
 		}
 	end)
 	listOf(list, provider, "FurnishSetRowTemplate", initRow)

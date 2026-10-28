@@ -833,6 +833,22 @@ def test_resting_on_a_link_says_the_set_and_the_clicks(tmp_path: Path) -> None:
     ]
 
 
+def test_spawning_a_wmo_alone_spawns_it_where_the_player_stands(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("Furnish.Console.SpawnGob(817579)")
+    assert sent(lua) == ["gobject spawn 817579"]
+
+
+def test_a_wmo_alone_waits_for_a_run_going_on(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path, deferred=True)
+    lua.execute("SELECTED = 500")
+    run(lua, "1")
+    before = len(sent(lua))
+    lua.execute("Furnish.Console.SpawnGob(817579)")
+    assert len(sent(lua)) == before
+    assert printed(lua)[-1] == PREFIX + "Furnish is still spawning"
+
+
 # -- Previews through Glimpse ------------------------------------------------------------
 
 #: A tooltip that takes lines and keeps none.
