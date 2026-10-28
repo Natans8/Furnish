@@ -107,6 +107,14 @@ function Chat.Tip(tooltip, title, lines)
 	end
 end
 
+--- Show a tooltip beside a control, its lines as Chat.Tip takes them.
+function Chat.TipBeside(owner, title, lines)
+	local tooltip = _G.GameTooltip
+	tooltip:SetOwner(owner, "ANCHOR_RIGHT")
+	Chat.Tip(tooltip, title, lines)
+	tooltip:Show()
+end
+
 --- What a player types for an action, as a message spells it: the command's first name, as
 -- Command.lua registers it, and the words, if any.
 function Chat.Typed(words)

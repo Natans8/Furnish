@@ -211,6 +211,15 @@
 		</Layers>
 	</Button>
 
+	<!-- A corner grip that drags a frame's size, as a chat window's does; what it sizes is wired in
+	     Window.lua. -->
+	<Button name="FurnishGripTemplate" virtual="true">
+		<Size x="16" y="16"/>
+		<NormalTexture file="Interface\ChatFrame\UI-ChatIM-SizeGrabber-Up"/>
+		<PushedTexture file="Interface\ChatFrame\UI-ChatIM-SizeGrabber-Down"/>
+		<HighlightTexture file="Interface\ChatFrame\UI-ChatIM-SizeGrabber-Highlight" alphaMode="ADD"/>
+	</Button>
+
 	<!-- A list in a bordered box, with its scroll bar, its edge counts and a line said where it is
 	     empty. The scroll bar shows only while there is somewhere to scroll. -->
 	<Frame name="FurnishListTemplate" inherits="BackdropTemplate" virtual="true">
@@ -552,14 +561,10 @@
 					</Button>
 					<!-- Drags the pane wider and the window taller with it, as the window's own grip
 					     sizes the window. -->
-					<Button parentKey="Grip">
-						<Size x="16" y="16"/>
+					<Button parentKey="Grip" inherits="FurnishGripTemplate">
 						<Anchors>
 							<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
 						</Anchors>
-						<NormalTexture file="Interface\ChatFrame\UI-ChatIM-SizeGrabber-Up"/>
-						<PushedTexture file="Interface\ChatFrame\UI-ChatIM-SizeGrabber-Down"/>
-						<HighlightTexture file="Interface\ChatFrame\UI-ChatIM-SizeGrabber-Highlight" alphaMode="ADD"/>
 					</Button>
 					<ModelScene parentKey="Scene" inherits="ModelSceneMixinTemplate">
 						<Anchors>
@@ -747,14 +752,10 @@
 			</Frame>
 
 			<!-- Drags the window's corner; the list takes whatever height it gains. -->
-			<Button parentKey="Grip">
-				<Size x="16" y="16"/>
+			<Button parentKey="Grip" inherits="FurnishGripTemplate">
 				<Anchors>
 					<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
 				</Anchors>
-				<NormalTexture file="Interface\ChatFrame\UI-ChatIM-SizeGrabber-Up"/>
-				<PushedTexture file="Interface\ChatFrame\UI-ChatIM-SizeGrabber-Down"/>
-				<HighlightTexture file="Interface\ChatFrame\UI-ChatIM-SizeGrabber-Highlight" alphaMode="ADD"/>
 			</Button>
 		</Frames>
 	</Frame>

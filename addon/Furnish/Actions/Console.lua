@@ -82,14 +82,15 @@ function Console.Grouping(word)
 	return GROUPING[word or Console.GROUPED]
 end
 
---- The run going on, if any, and whether it was asked to stop. A wait for an object's record:
--- { what it waits for, what a stop leaves standing or nil, stop }. The group the last run
--- selected and the object that run was anchored on: { leader, guid, pose }.
-local running, stopping, waiting, anchored
+--- A wait for an object's record: { what it waits for, what a stop leaves standing or nil,
+-- stop }. The group the last run selected and the object that run was anchored on: { leader,
+-- pose }.
+local waiting, anchored
 
---- The run as a window draws it: { total, done, started } while one goes, and { result, seconds,
--- offer } for the one that ended last, so a window opened in the middle of either can catch up.
--- The offer is { name, leader }, or nil where the run offers no blueprint.
+--- The run going on, as a window draws it and as a stop reaches it: { total, done, started,
+-- handle, stopping, deleting } while one goes, and { result, seconds, offer } for the one that
+-- ended last, so a window opened in the middle of either can catch up. The handle is the
+-- kernel's, and the offer is { name, leader }, or nil where the run offers no blueprint.
 local current, last
 
 --- Who hears a run besides the chat, as a window registers: { started(total, what),
@@ -158,7 +159,7 @@ local function busy(ways)
 	local doing
 	if waiting then
 		doing = "waiting for " .. waiting.what
-	elseif running and not running.Done() then
+	elseif current then
 		doing = current and current.deleting and "still deleting what it spawned"
 			or "still spawning"
 	else
@@ -263,7 +264,7 @@ local function withSelection(ways, what, otherwise, fn)
 	if not send then
 		return
 	end
-	local guid = anchored.guid
+	local guid = tostring(anchored.pose.guid)
 	local stopAwaiting
 	stopAwaiting, reason = reselect(send, guid, function(record)
 		fn(Pose.OfRecord(record))
@@ -471,9 +472,7 @@ local function finish(result, started, anchor, watched)
 	end
 	if result.joined > 0 and not result.deleted then
 		Client.Send()(Commands.SelectGroup(result.leader), nil, true)
-		anchored = anchor
-				and { leader = tostring(result.leader), guid = tostring(anchor.guid), pose = anchor }
-			or nil
+		anchored = anchor and { leader = tostring(result.leader), pose = anchor } or nil
 	end
 end
 
@@ -488,31 +487,39 @@ local function madeBy(result)
 	return made
 end
 
+--- A hook that follows one count of a run, its spawns or its deletes: it notes the count for a
+-- window, tells every watcher, and, where the chat counts, says it by strides.
+-- @param name the hook's name, which the watchers hear it by
+-- @param words how a line says the count, with its two numbers
+-- @param counted whether the chat counts
+-- @param note function(done, total) noting the count for a window
+local function counter(name, words, counted, note)
+	local told = 0
+	return function(done, total)
+		note(done, total)
+		tell(name, done, total)
+		if counted and done < total and done - told >= stride(total) then
+			told = done
+			say(words:format(done, total))
+		end
+	end
+end
+
 local function hooks(about)
-	local told, cleaned, started = 0, 0, Client.Now()
+	local started = Client.Now()
 	local counted = not (about.quiet or about.watched)
 	return {
-		progress = function(done, total)
+		progress = counter("progress", "%d of %d", counted, function(done)
 			if current then
 				current.done = done
 			end
-			tell("progress", done, total)
-			if counted and done < total and done - told >= stride(total) then
-				told = done
-				say(("%d of %d"):format(done, total))
-			end
-		end,
-		deleting = function(done, total)
+		end),
+		deleting = counter("deleting", "deleted %d of %d", counted, function(done, total)
 			if current then
 				current.deleting = current.deleting or { stopping = false }
 				current.deleting.done, current.deleting.total = done, total
 			end
-			tell("deleting", done, total)
-			if counted and done < total and done - cleaned >= stride(total) then
-				cleaned = done
-				say(("deleted %d of %d"):format(done, total))
-			end
-		end,
+		end),
 		finished = function(result)
 			finish(result, started, about.anchor, about.watched)
 			local offer = about.blueprint
@@ -583,7 +590,10 @@ local function start(rows, destination, group, about)
 		tell("finished", nil, 0)
 		return say("nothing was sent: " .. refused)
 	end
-	running, stopping = handle, false
+	-- A run that answered whole before Spawn returned has ended already.
+	if current then
+		current.handle = handle
+	end
 end
 
 --- The selected object's pose, any object, or nil and why there is none. While the group the
@@ -1293,25 +1303,25 @@ function Console.Stop(delete, ways)
 		wait(nil)
 		return say("stopped; nothing was spawned" .. (left and ", and " .. left or ""))
 	end
-	if not (running and not running.Done()) then
+	if not current then
 		return say("nothing is spawning")
 	end
 	local stop = way(ways, "stop")
 	local again = stop and stop .. AGAIN
 	-- Once the run is deleting, a stop ends the deleting the way it ends a run.
-	local deleting = current and current.deleting
+	local deleting = current.deleting
 	if deleting then
 		say(deleting.stopping and GIVING_UP or offering("no more deletes", again))
 		deleting.stopping = true
-		return running.Abort()
+		return current.handle.Abort()
 	end
-	if stopping then
+	if current.stopping then
 		say(GIVING_UP)
 	elseif delete then
 		say(offering("stopping, then deleting what was spawned", again))
 	else
 		say(offering("stopping", again))
 	end
-	stopping = true
-	running.Abort(delete)
+	current.stopping = true
+	current.handle.Abort(delete)
 end

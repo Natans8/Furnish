@@ -302,13 +302,6 @@ local function leaveResult()
 	Previews.Unpeek()
 end
 
---- Show a tooltip beside a control, its lines as Chat.Tip takes them.
-local function tip(owner, title, lines)
-	_G.GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-	Chat.Tip(_G.GameTooltip, title, lines)
-	_G.GameTooltip:Show()
-end
-
 --- Size a button to its words and its caps.
 local function fit(button)
 	button:SetWidth(math.ceil(button:GetFontString():GetStringWidth()) + CAPS)
@@ -333,7 +326,7 @@ local function hint(owner, title, lines, words)
 			if words then
 				all[#all + 1] = { text = "Typed: " .. Chat.Typed(words), colour = GREY }
 			end
-			tip(owner, shownTitle, all)
+			Chat.TipBeside(owner, shownTitle, all)
 		end)
 	)
 	owner:SetScript("OnLeave", _G.GameTooltip_Hide)
@@ -1015,7 +1008,7 @@ local function rowEnter(button)
 	end
 	lines[#lines + 1] = { text = "Click: choose only this set", colour = GREEN }
 	lines[#lines + 1] = { text = "Ctrl- or shift-click: add or remove this set", colour = GREEN }
-	tip(button, set.name, lines)
+	Chat.TipBeside(button, set.name, lines)
 end
 
 local function initRow(button, set, new)
@@ -1061,7 +1054,7 @@ local function resultEnter(button)
 		lines[#lines + 1] = { text = "Unfurnished: it draws none of its sets.", colour = GREY }
 	end
 	lines[#lines + 1] = { text = "Click: show its sets", colour = GREEN }
-	tip(button, wmo.name, lines)
+	Chat.TipBeside(button, wmo.name, lines)
 	Previews.PeekWmo(wmo.name)
 end
 
@@ -1182,7 +1175,7 @@ local function drawnEnter(button)
 		local text = set.placed and "The doodad draws it on the map." or "Its model draws it."
 		lines[#lines + 1] = { text = text, colour = GREEN }
 	end
-	tip(button, set.name, lines)
+	Chat.TipBeside(button, set.name, lines)
 end
 
 local function initDrawn(button, set, new)
@@ -1380,7 +1373,7 @@ local function listen()
 	stops = {
 		Client.OnSelection(refresh),
 		-- The blueprint offer shows while the run's group is selected.
-		Client.OnSelection(Client.Guarded(showOffer)),
+		Client.OnSelection(showOffer),
 		Client.OnPhaseChange(update),
 		Console.Watch({
 			started = Client.Guarded(started),
@@ -2035,7 +2028,7 @@ local function buildFooter()
 	frame.Notice:SetScript(
 		"OnEnter",
 		Client.Guarded(function(button)
-			tip(button, "Before you spawn", button.said or {})
+			Chat.TipBeside(button, "Before you spawn", button.said or {})
 		end)
 	)
 	frame.Notice:SetScript("OnLeave", _G.GameTooltip_Hide)

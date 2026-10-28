@@ -49,15 +49,13 @@ buttons:SetScript(
 buttons:SetScript(
 	"OnEnter",
 	Client.Guarded(function(self)
-		_G.GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		Chat.Tip(_G.GameTooltip, self.text:GetText(), {
+		Chat.TipBeside(self, self.text:GetText(), {
 			{
 				text = ("A [%s] button after a WMO's doodad, selection and spawn lines."):format(
 					Furnish.NAME
 				),
 			},
 		})
-		_G.GameTooltip:Show()
 	end)
 )
 buttons:SetScript("OnLeave", _G.GameTooltip_Hide)
