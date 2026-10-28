@@ -913,6 +913,47 @@ def test_a_wmo_is_previewed_by_its_files_name(tmp_path: Path) -> None:
     assert (read.kind, read.id, read.name) == ("wmo", 0, "house")
 
 
+#: Glimpse's WMO pictures as released: a picture of the house, found by entry or by name, and a
+#: watertile, which draws nothing from outside.
+PICTURES = r"""
+ASKED = {}
+Glimpse_WMO = {
+  Picture = function(id, name)
+    ASKED[#ASKED + 1] = { id = id, name = name }
+    if id == 500 or name == "house" then return "Interface\\AddOns\\Glimpse_WMO\\Pictures\\001\\100.blp" end
+    if name == "watertile" then return false end
+    return nil
+  end,
+}
+"""
+
+
+def test_a_wmo_s_picture_is_read_by_its_entry_and_its_name(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute(PICTURES)
+    picture = lua.eval("Furnish.Previews.Picture")
+    assert picture(500, "object 500") == "Interface\\AddOns\\Glimpse_WMO\\Pictures\\001\\100.blp"
+    assert picture(None, "house") == "Interface\\AddOns\\Glimpse_WMO\\Pictures\\001\\100.blp"
+    asked = lua.eval("ASKED[1]")
+    assert (asked.id, asked.name) == (500, "object 500")
+
+
+@pytest.mark.parametrize(
+    ("pictures", "name"),
+    [
+        ("Glimpse_WMO = nil", "house"),
+        ("Glimpse_WMO = {}", "house"),
+        ("Glimpse_WMO = { Picture = function() error('broken') end }", "house"),
+        (PICTURES, "watertile"),
+        (PICTURES, "shed"),
+    ],
+)
+def test_without_a_picture_none_is_given(tmp_path: Path, pictures: str, name: str) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute(pictures)
+    assert lua.eval("Furnish.Previews.Picture")(None, name) is None
+
+
 # -- Importing ---------------------------------------------------------------------------
 
 

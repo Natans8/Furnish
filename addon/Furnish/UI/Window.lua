@@ -166,6 +166,9 @@ local NUMBER_ROWS, NUMBER_GAP, NUMBER_ART = { 170, 144 }, 8, 5
 --- A button's caps either side of its words.
 local CAPS = 24
 
+--- How wide a room is while it is closed: never nought, which the client reads as no width at all.
+local CLOSED = 0.001
+
 --- How many pieces the Preview pane draws at most, the first of each chosen set in its own order
 -- past it: a few hundred are measured smooth, and thousands are not measured.
 local MOST_PIECES = 1000
@@ -178,6 +181,8 @@ local list = frame.Sets
 local panel = frame.Doodad
 local offer = frame.Blueprint
 local preview = frame.Preview
+--- How wide the room for the source's picture is while it shows one, as Window.xml draws it.
+local PICTURE_ROOM = frame.PictureRoom:GetWidth()
 local provider, found, drawn =
 	_G.CreateDataProvider(), _G.CreateDataProvider(), _G.CreateDataProvider()
 
@@ -858,6 +863,12 @@ local function refresh()
 	frame.SourceName:SetText(name)
 	frame.SourceName:SetTextColor(shade, shade, shade)
 	frame.SourceDetail:SetText(detail)
+	-- The source's WMO as Glimpse pictures it; with no picture its room closes, and the controls
+	-- beside it move back to the edge.
+	local picture = shown and Previews.Picture(shownEntry, shown.name) or nil
+	frame.Picture:SetTexture(picture)
+	frame.Picture:SetShown(picture ~= nil)
+	frame.PictureRoom:SetWidth(picture and PICTURE_ROOM or CLOSED)
 	list.Empty:SetText(empty or "")
 	list.Empty:SetShown(not shown)
 	update()

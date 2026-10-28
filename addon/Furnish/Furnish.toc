@@ -4,7 +4,7 @@
 ## Version: 0.1.0
 ## Author: Nataari
 ## Dependencies: EpsilonLib
-## OptionalDeps: GLink, Glimpse
+## OptionalDeps: GLink, Glimpse, Glimpse_WMO
 ## SavedVariables: FurnishSettings
 ## X-License: AGPL-3.0-or-later
 

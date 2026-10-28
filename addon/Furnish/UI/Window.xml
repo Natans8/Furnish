@@ -259,6 +259,23 @@
 		</Anchors>
 		<Layers>
 			<Layer level="ARTWORK">
+				<!-- The room the source's WMO picture takes at the section's right, the gap before it
+				     included. Window.lua closes it where there is no picture, and what is anchored to
+				     its left moves back to the edge. -->
+				<Texture parentKey="PictureRoom">
+					<Size x="72" y="64"/>
+					<Anchors>
+						<Anchor point="TOPRIGHT" x="-20" y="-70"/>
+					</Anchors>
+				</Texture>
+				<!-- The source's WMO as Glimpse's WMO pictures have it, as tall as the section's three
+				     rows. -->
+				<Texture parentKey="Picture" hidden="true">
+					<Size x="64" y="64"/>
+					<Anchors>
+						<Anchor point="TOPRIGHT" relativeKey="$parent.PictureRoom"/>
+					</Anchors>
+				</Texture>
 				<!-- Where the sets come from: the WMO's name across the width, then what it is with
 				     its follow box on the line below. -->
 				<FontString parentKey="SourceLabel" inherits="GameFontNormal" justifyH="LEFT">
@@ -269,13 +286,13 @@
 				<FontString parentKey="SourceName" inherits="GameFontHighlightMedium" justifyH="LEFT" wordwrap="false">
 					<Anchors>
 						<Anchor point="TOPLEFT" x="96" y="-72"/>
-						<Anchor point="TOPRIGHT" x="-20" y="-72"/>
+						<Anchor point="TOPRIGHT" relativeKey="$parent.PictureRoom" relativePoint="TOPLEFT" x="0" y="-2"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="SourceDetail" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false">
 					<Anchors>
 						<Anchor point="TOPLEFT" x="96" y="-92"/>
-						<Anchor point="TOPRIGHT" x="-150" y="-92"/>
+						<Anchor point="TOPRIGHT" relativeKey="$parent.PictureRoom" relativePoint="TOPLEFT" x="-130" y="-22"/>
 					</Anchors>
 				</FontString>
 				<!-- Where the sets go, the same two lines over the position below them. -->
@@ -313,7 +330,7 @@
 
 			<CheckButton parentKey="SourceFollow" inherits="FurnishFollowTemplate">
 				<Anchors>
-					<Anchor point="TOPRIGHT" x="-20" y="-84"/>
+					<Anchor point="TOPRIGHT" relativeKey="$parent.PictureRoom" relativePoint="TOPLEFT" x="0" y="-14"/>
 				</Anchors>
 			</CheckButton>
 
@@ -337,7 +354,7 @@
 			<Button parentKey="PreviewButton" inherits="UIPanelButtonTemplate">
 				<Size y="22"/>
 				<Anchors>
-					<Anchor point="TOPRIGHT" x="-20" y="-113"/>
+					<Anchor point="TOPRIGHT" relativeKey="$parent.PictureRoom" relativePoint="TOPLEFT" x="0" y="-43"/>
 				</Anchors>
 			</Button>
 
