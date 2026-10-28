@@ -1676,7 +1676,7 @@ end
 
 local function buildPreview()
 	preview.Label:SetText("Preview")
-	preview.Hint:SetText("Drag to turn, wheel to zoom.")
+	preview.Hint:SetText("Drag to turn, right-drag to pan, wheel to zoom.")
 	stage = Scene.New(preview.Scene, showLoading)
 	preview.CloseButton:SetScript(
 		"OnClick",

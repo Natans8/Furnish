@@ -7,8 +7,10 @@
 --
 -- The camera frames the sphere around every loaded model's box: a sphere looks the same from every
 -- side, so no turn takes a piece out of the frame, and each model that loads widens the frame until
--- the player zooms. The client's own scene script moves the camera every frame; the scene only says
--- where it looks from.
+-- the player zooms or pans. A right or middle drag pans, as the game's own dressing room moves its
+-- model, the pieces following the pointer, and the wheel zooms toward the point under the pointer.
+-- The client's own scene script moves the camera every frame; the scene only says where it looks
+-- from.
 
 local _, Furnish = ...
 local Scene = {}
@@ -25,8 +27,15 @@ local CAMERA = 114
 -- keeps, and the radians one pixel turns.
 local ZOOM_STEP, TURN_PER_PIXEL = 0.88, 0.008
 
---- The nearest and farthest the wheel brings the camera, as shares of the distance framed.
-local NEAREST, FARTHEST = 0.15, 4
+--- The nearest the camera draws, and so the nearest the wheel brings it to what it looks at.
+local NEAR = 0.01
+
+--- The farthest the wheel takes the camera, as a share of the distance framed, short of the
+-- pieces shrinking to a point.
+local FARTHEST = 4
+
+--- What each button drags: the left turns the camera, the right and the middle pan it.
+local DRAGS = { LeftButton = "Turn", RightButton = "Pan", MiddleButton = "Pan" }
 
 --- How far the camera tilts up or down, short of looking straight down the vertical.
 local STEEPEST = 1.45
@@ -56,7 +65,7 @@ function Scene.New(frame, onLoad)
 		distance = 1,
 		centre = { 0, 0, 0 },
 	}, Scene)
-	frame:SetCameraNearClip(0.01)
+	frame:SetCameraNearClip(NEAR)
 	frame:SetCameraFarClip(2 ^ 64)
 	frame:EnableMouse(true)
 	frame:EnableMouseWheel(true)
@@ -64,8 +73,9 @@ function Scene.New(frame, onLoad)
 	-- its own way; its per-frame script stays, since it is what moves the camera, and a drag is
 	-- read beside it.
 	frame:SetScript("OnMouseDown", function(_, button)
-		if button == "LeftButton" then
-			self.dragged = { _G.GetCursorPosition() }
+		if DRAGS[button] then
+			local x, y = _G.GetCursorPosition()
+			self.dragged = { x = x, y = y, button = button }
 		end
 	end)
 	frame:SetScript("OnMouseUp", function()
@@ -74,8 +84,7 @@ function Scene.New(frame, onLoad)
 	frame:SetScript(
 		"OnMouseWheel",
 		Client.Guarded(function(_, delta)
-			self.zoom = clamp(self.zoom * ZOOM_STEP ^ delta, NEAREST, FARTHEST)
-			self.zoomed = true
+			self:Zoom(delta)
 			self:Aim()
 		end)
 	)
@@ -111,7 +120,7 @@ function Scene:Aim()
 	if not camera then
 		return
 	end
-	camera:SetMinZoomDistance(self.distance * NEAREST)
+	camera:SetMinZoomDistance(NEAR)
 	camera:SetMaxZoomDistance(self.distance * FARTHEST)
 	camera:SetTarget(self.centre[1], self.centre[2], self.centre[3])
 	camera:SetYaw(self.yaw)
@@ -169,25 +178,58 @@ function Scene:Hold(actor)
 	self.low, self.high = low, high
 end
 
---- What a frame does: a drag turns the camera, and what loaded since the last frame is framed and
--- told, once for however many loaded.
+--- Turn the camera about what it looks at, by how far the pointer moved, in screen pixels.
+function Scene:Turn(dx, dy)
+	self.yaw = self.yaw - dx * TURN_PER_PIXEL
+	self.pitch = clamp(self.pitch + dy * TURN_PER_PIXEL, -STEEPEST, STEEPEST)
+end
+
+--- Move what the camera looks at across the view, so the pieces at its depth follow the pointer:
+-- a pixel is the share of the view's height it spans, at the camera's distance.
+function Scene:Pan(dx, dy)
+	local frame = self.frame
+	local tall = 2 * self.distance * self.zoom * math.tan(frame:GetCameraFieldOfView() / 2)
+	local step = tall / (frame:GetHeight() * frame:GetEffectiveScale())
+	local rx, ry, rz = frame:GetCameraRight()
+	local ux, uy, uz = frame:GetCameraUp()
+	local centre = self.centre
+	centre[1] = centre[1] - (rx * dx + ux * dy) * step
+	centre[2] = centre[2] - (ry * dx + uy * dy) * step
+	centre[3] = centre[3] - (rz * dx + uz * dy) * step
+	self.moved = true
+end
+
+--- Bring the camera nearer or farther by steps of the wheel, toward the point under the pointer,
+-- which stays under it: what the camera looks at moves toward that point by the share of the
+-- distance the step takes off.
+function Scene:Zoom(steps)
+	local zoom = clamp(self.zoom * ZOOM_STEP ^ steps, NEAR / self.distance, FARTHEST)
+	local share = 1 - zoom / self.zoom
+	local x, y = _G.GetCursorPosition()
+	local cx, cy = self.frame:GetCenter()
+	local scale = self.frame:GetEffectiveScale()
+	self:Pan(-(x - cx * scale) * share, -(y - cy * scale) * share)
+	self.zoom = zoom
+end
+
+--- What a frame does: a drag turns or pans the camera, and what loaded since the last frame is
+-- framed and told, once for however many loaded.
 function Scene:Tick()
-	if self.dragged then
+	local dragged = self.dragged
+	if dragged then
 		-- A press let go off the scene is not heard by it, so the button is read as it is.
-		if not _G.IsMouseButtonDown("LeftButton") then
+		if not _G.IsMouseButtonDown(dragged.button) then
 			self.dragged = nil
 		else
 			local x, y = _G.GetCursorPosition()
-			local from = self.dragged
-			self.yaw = self.yaw - (x - from[1]) * TURN_PER_PIXEL
-			self.pitch = clamp(self.pitch + (y - from[2]) * TURN_PER_PIXEL, -STEEPEST, STEEPEST)
-			from[1], from[2] = x, y
+			self[DRAGS[dragged.button]](self, x - dragged.x, y - dragged.y)
+			dragged.x, dragged.y = x, y
 			self:Aim()
 		end
 	end
 	if self.arrived then
 		self.arrived = false
-		if not self.zoomed then
+		if not self.moved then
 			self:Fit()
 		end
 		self:Tell()
@@ -217,7 +259,7 @@ function Scene:Draw(pieces)
 	end
 	local cx, cy, cz = (low[1] + high[1]) / 2, (low[2] + high[2]) / 2, (low[3] + high[3]) / 2
 	local drawing = (self.drawing or 0) + 1
-	self.drawing, self.low, self.high, self.zoom, self.zoomed = drawing, nil, nil, 1, false
+	self.drawing, self.low, self.high, self.zoom, self.moved = drawing, nil, nil, 1, false
 	self.loaded, self.took, self.started = 0, nil, Client.Now()
 	local function loaded(actor)
 		if self.drawing == drawing and actor.drawing ~= drawing then

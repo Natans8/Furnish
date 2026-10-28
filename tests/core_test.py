@@ -694,6 +694,8 @@ def test_a_sets_pieces_are_its_placements_by_the_file_each_draws(tmp_path: Path)
 RECORDING_SCENE = """
 ACTORS, CAMERA, TOLD, SCRIPTS, NOW = {}, {}, {}, {}, 10
 GetTime = function() return NOW end
+-- The pointer rests on the scene's middle unless a test moves it.
+GetCursorPosition = function() return 100, 50 end
 local function recorder(into, own)
   return setmetatable(own or {}, { __index = function(_, method)
     return function(_, ...) into[method] = { ... } end
@@ -706,6 +708,8 @@ FRAME = {
   SetScript = function(_, name, fn) SCRIPTS[name] = fn end,
   GetCameraFieldOfView = function() return 2 * math.atan(0.5) end,
   GetWidth = function() return 200 end, GetHeight = function() return 100 end,
+  GetEffectiveScale = function() return 1 end, GetCenter = function() return 100, 50 end,
+  GetCameraRight = function() return 0, -1, 0 end, GetCameraUp = function() return 0, 0, 1 end,
   GetActiveCamera = function() return recorder(CAMERA) end,
   CreateActor = function()
     local told = {}
@@ -804,6 +808,67 @@ def test_once_the_wheel_has_turned_a_load_leaves_the_camera_be(tmp_path: Path) -
     lua.execute("LOAD(2) SCENE:Tick()")
     assert lua.eval("CAMERA.SetZoomDistance[1]") == pytest.approx(framed * 0.88)
     assert tuple(lua.eval("TOLD[#TOLD]").values())[:2] == (2, 2)
+    # Zooming in stops only where the camera stops drawing.
+    lua.execute("for _ = 1, 200 do SCRIPTS.OnMouseWheel(FRAME, 1) end")
+    assert lua.eval("CAMERA.SetZoomDistance[1]") == pytest.approx(0.01)
+
+
+def test_a_right_or_middle_drag_pans_and_the_pieces_follow_the_pointer(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute(RECORDING_SCENE)
+    lua.execute(
+        """
+        CURSOR, HELD = { 100, 100 }, {}
+        GetCursorPosition = function() return CURSOR[1], CURSOR[2] end
+        IsMouseButtonDown = function(button) return HELD[button] end
+        SCENE = Furnish.Scene.New(FRAME, SAID)
+        SCENE:Draw({
+          { file = 1, x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 },
+          { file = 2, x = 30, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 },
+        })
+        LOAD(1) SCENE:Tick()
+        """
+    )
+    centre = tuple(lua.eval("CAMERA.SetTarget").values())
+    distance = lua.eval("CAMERA.SetZoomDistance[1]")
+    for button in ("RightButton", "MiddleButton"):
+        lua.execute(
+            f"HELD.{button} = true SCRIPTS.OnMouseDown(FRAME, '{button}')"
+            " CURSOR[1] = CURSOR[1] + 10 SCENE:Tick()"
+            f" HELD.{button} = nil SCENE:Tick()"
+        )
+    # Twenty pixels right, at a view one framed distance tall over a hundred pixels: what the
+    # camera looks at moves against the view's right, which here points along -y.
+    moved = tuple(lua.eval("CAMERA.SetTarget").values())
+    assert moved == pytest.approx((centre[0], centre[1] + 20 * distance / 100, centre[2]))
+    assert lua.eval("SCENE.dragged") is None
+    # Panned, a load leaves the camera where the player put it.
+    lua.execute("LOAD(2) SCENE:Tick()")
+    assert tuple(lua.eval("CAMERA.SetTarget").values()) == pytest.approx(moved)
+
+
+def test_the_wheel_zooms_toward_the_point_under_the_pointer(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute(RECORDING_SCENE)
+    lua.execute(
+        """
+        SCENE = Furnish.Scene.New(FRAME, SAID)
+        SCENE:Draw({ { file = 1, x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 } })
+        LOAD(1) SCENE:Tick()
+        """
+    )
+    centre = tuple(lua.eval("CAMERA.SetTarget").values())
+    distance = lua.eval("CAMERA.SetZoomDistance[1]")
+    # At the scene's middle the wheel zooms straight in.
+    lua.execute("SCRIPTS.OnMouseWheel(FRAME, 1)")
+    assert tuple(lua.eval("CAMERA.SetTarget").values()) == pytest.approx(centre)
+    # Fifty pixels right of the middle, the point there is approached by the twelfth the step
+    # takes off: fifty pixels at the view's scale then, against the view's right, -y.
+    lua.execute("GetCursorPosition = function() return 150, 50 end SCRIPTS.OnMouseWheel(FRAME, 1)")
+    nearer = distance * 0.88
+    shift = 50 * nearer / 100 * (1 - 0.88)
+    aimed = tuple(lua.eval("CAMERA.SetTarget").values())
+    assert aimed == pytest.approx((centre[0], centre[1] - shift, centre[2]))
 
 
 def test_rows_from_two_sets_spawn_as_one_collection(tmp_path: Path) -> None:
