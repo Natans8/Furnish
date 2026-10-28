@@ -357,6 +357,24 @@ def test_no_blueprint_is_offered_off_scale_tilted_or_otherwise_grouped(
     assert offer(lua) is None
 
 
+@pytest.mark.parametrize(
+    ("at", "offered"),
+    [
+        ("Furnish.Pose.Copy(Furnish.Console.Selected())", "house_full"),
+        # Read back off the boxes, which round to three places.
+        ("Furnish.Pose.At(10, 20, 30.0004, 90)", "house_full"),
+        ("Furnish.Pose.At(11, 20, 30, 90)", None),
+        ("Furnish.Pose.At(10, 20, 30, 0)", None),
+    ],
+)
+def test_a_merge_is_offered_as_its_wmo_furnished_only_where_the_wmo_stands(
+    tmp_path: Path, at: str, offered: str | None
+) -> None:
+    lua = on_the_house_at_scale_one(tmp_path)
+    spawn(lua, f"{{ index = 1, file = 900, label = 'house', at = {at}, group = 'merge' }}")
+    assert offer(lua) == offered
+
+
 def test_the_offer_waits_for_its_group_and_lapses_once_anything_else_is_selected(
     tmp_path: Path,
 ) -> None:

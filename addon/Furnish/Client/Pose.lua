@@ -11,6 +11,11 @@ local Pose = {}
 Furnish.Pose = Pose
 
 local Client = Furnish.Client
+local Commands = Furnish.Commands
+
+--- How far apart two positions may be, in yards, and still be one place: far below what the eye
+-- can tell, and above the rounding a position read back from the server carries.
+local NEAR = 0.01
 
 --- A pose from plain values.
 -- @param turn degrees, 0 north, or nil for north
@@ -32,6 +37,21 @@ function Pose.Copy(pose)
 		rotation = { roll = turned.roll, pitch = turned.pitch, turn = turned.turn },
 		scale = pose.scale,
 	}
+end
+
+--- Whether two poses stand in one place, turned and scaled alike, as the server reads them.
+function Pose.Same(a, b)
+	for _, axis in ipairs({ "x", "y", "z" }) do
+		if math.abs(a.position[axis] - b.position[axis]) >= NEAR then
+			return false
+		end
+	end
+	for _, angle in ipairs({ "roll", "pitch", "turn" }) do
+		if not Commands.IsLevel((a.rotation[angle] or 0) - (b.rotation[angle] or 0)) then
+			return false
+		end
+	end
+	return Commands.IsUnit(a.scale / b.scale)
 end
 
 --- The player's own spot and facing, level, at scale 1; `map` beside it.

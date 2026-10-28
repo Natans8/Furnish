@@ -63,7 +63,7 @@ the same sets. A search lists the WMOs with sets that the client's own catalogue
 lit so Enter takes it and Up and Down moving the light, and those that come unfurnished
 marked. A set the selected WMO draws already, as part of its model, is marked baked: its
 base set, unless it comes unfurnished. A click chooses one set and a
-ctrl-click adds or removes one, a strip at either end of the list counts the chosen sets
+ctrl- or shift-click adds or removes one, a strip at either end of the list counts the chosen sets
 scrolled out of view, and resting on a set names the models it holds, as the client's own
 catalogue names them once a walk of it, started when the window opens, has ended. Destination is
 numbers and nothing else: X, Y and Z, then the roll, pitch and turn about each in ObjectMover's

@@ -916,14 +916,14 @@ local function finished(result, seconds)
 	showOffer()
 end
 
---- A click chooses the one set, and a ctrl-click adds or removes it.
+--- A click chooses the one set, and a ctrl- or shift-click adds or removes it.
 local function rowClick(button)
 	if run then
 		return
 	end
 	_G.PlaySound(CHOOSE)
 	local index = button:GetElementData().index
-	if _G.IsControlKeyDown() then
+	if _G.IsControlKeyDown() or _G.IsShiftKeyDown() then
 		chosen[index] = not chosen[index] or nil
 	else
 		chosen = { [index] = true }
@@ -989,7 +989,7 @@ local function rowEnter(button)
 		end)
 	end
 	lines[#lines + 1] = { text = "Click: choose this set alone", colour = GREEN }
-	lines[#lines + 1] = { text = "Ctrl-click: add or remove this set", colour = GREEN }
+	lines[#lines + 1] = { text = "Ctrl- or shift-click: add or remove this set", colour = GREEN }
 	tip(button, set.name, lines)
 end
 

@@ -337,7 +337,9 @@ end
 
 --- The blueprint name a run is to offer once it ends whole, or nil: at scale 1 with no roll or
 -- pitch, as the server reads them, either led by its pivot, named after the source as a set
--- apart, or merged into a gob that stood alone and owns every set spawned, named after that gob.
+-- apart, or merged into a gob that stood alone, owns every set spawned and stands where they
+-- were placed, named after that gob. Placed anywhere else, the gob and its sets are not the WMO
+-- furnished, and the name would say they were.
 -- @param word the request's group word, nil being Console.GROUPED
 -- @param destination the pose the rows are placed at
 -- @param owner the gob a merge joins, as groupOf reads it
@@ -365,6 +367,9 @@ local function offered(word, destination, owner, label, chosen)
 		return Names.Blueprint(label, sets, true)
 	end
 	if word ~= "merge" or not owner or owner.group or owner.groupLeader ~= 0 or not owner.file then
+		return nil
+	end
+	if not Pose.Same(destination, owner) then
 		return nil
 	end
 	if #Sets.Named(owner.file, ids) < #ids then
