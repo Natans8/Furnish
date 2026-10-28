@@ -127,13 +127,34 @@ local PACED = 5
 local RED_AXIS, BLUE_AXIS, GREEN_AXIS =
 	{ 1, 0.376, 0.376 }, { 0.22, 0.43, 0.97 }, { 0.13, 0.99, 0.55 }
 local NUMBERS = {
-	{ box = "X", row = 1, part = "position", key = "x", colour = RED_AXIS },
-	{ box = "Y", row = 1, part = "position", key = "y", colour = BLUE_AXIS },
-	{ box = "Z", row = 1, part = "position", key = "z", colour = GREEN_AXIS },
-	{ box = "Roll", row = 2, part = "rotation", key = "roll", colour = RED_AXIS },
-	{ box = "Pitch", row = 2, part = "rotation", key = "pitch", colour = BLUE_AXIS },
-	{ box = "Turn", row = 2, part = "rotation", key = "turn", colour = GREEN_AXIS },
-	{ box = "Scale", row = 2, key = "scale", colour = GREY },
+	{ box = "X", row = 1, part = "position", key = "x", colour = RED_AXIS, unit = "In yards." },
+	{ box = "Y", row = 1, part = "position", key = "y", colour = BLUE_AXIS, unit = "In yards." },
+	{ box = "Z", row = 1, part = "position", key = "z", colour = GREEN_AXIS, unit = "In yards." },
+	{
+		box = "Roll",
+		row = 2,
+		part = "rotation",
+		key = "roll",
+		colour = RED_AXIS,
+		unit = "In degrees.",
+	},
+	{
+		box = "Pitch",
+		row = 2,
+		part = "rotation",
+		key = "pitch",
+		colour = BLUE_AXIS,
+		unit = "In degrees.",
+	},
+	{
+		box = "Turn",
+		row = 2,
+		part = "rotation",
+		key = "turn",
+		colour = GREEN_AXIS,
+		unit = "In degrees, from north.",
+	},
+	{ box = "Scale", row = 2, key = "scale", colour = GREY, unit = "1 is the model's own size." },
 }
 
 --- Where each row of boxes stands, measured up from the window's foot to its top, and how far
@@ -229,6 +250,16 @@ local function dress(box, backdrop, shade)
 	box:SetBackdrop(backdrop)
 	box:SetBackdropColor(unpack(shade or SHADE))
 	box:SetBackdropBorderColor(unpack(EDGE))
+end
+
+--- Light a number box while the pointer rests on it, unless a run holds it still.
+local function lightOnHover(box)
+	box:HookScript("OnEnter", function(self)
+		self.Hover:SetShown(self:IsEnabled())
+	end)
+	box:HookScript("OnLeave", function(self)
+		self.Hover:Hide()
+	end)
 end
 
 --- Set a box's words in after its axis word, as every number box has them.
@@ -579,6 +610,14 @@ local function update()
 	-- A run's objects can be taken back only while it goes; once it ends, its group is the
 	-- player's, and nothing here knows what has been done to it since. Shown, it stands where
 	-- the spawn button ends, which shortens to meet it.
+	frame.SpawnSource:SetEnabled(
+		not run
+			and shownEntry ~= nil
+			and spot ~= nil
+			and spot.scale > 0
+			and Client.CanSpawn(true)
+			and not Console.Busy()
+	)
 	local delete = frame.DeleteButton
 	delete:SetShown(run ~= nil)
 	if run then
@@ -1264,7 +1303,9 @@ end
 
 --- Size each button to its words and its caps.
 local function fitButtons()
-	for _, button in ipairs({ frame.Here, frame.UseSelected, frame.Highlight, offer.Paste }) do
+	local buttons =
+		{ frame.Here, frame.UseSelected, frame.SpawnSource, frame.Highlight, offer.Paste }
+	for _, button in ipairs(buttons) do
 		fit(button)
 	end
 end
@@ -1411,6 +1452,27 @@ local function buildSource()
 		{ text = "The gob entry of the source's WMO." },
 		{ text = "Type one to keep that WMO." },
 	})
+	lightOnHover(id)
+	frame.SpawnSource:SetText("Spawn WMO")
+	frame.SpawnSource:SetMotionScriptsWhileDisabled(true)
+	frame.SpawnSource:SetScript(
+		"OnClick",
+		Client.Guarded(function()
+			Console.SpawnGob(shownEntry, Pose.Copy(spot), WAYS)
+		end)
+	)
+	hint(frame.SpawnSource, nil, function()
+		return {
+			{ text = "Spawn the source's WMO at the destination." },
+			{
+				text = ("Typed: %s %s"):format(
+					Commands.Typed(Commands.SPAWN),
+					shownEntry or "<entry>"
+				),
+				colour = GREY,
+			},
+		}
+	end)
 	listOf(list, provider, "FurnishSetRowTemplate", initRow)
 	list.ScrollBox:RegisterCallback(
 		_G.BaseScrollBoxEvents.OnScroll,
@@ -1515,6 +1577,8 @@ local function buildDestination()
 		local box = frame[number.box]
 		box.number = number
 		box.Axis:SetText(number.box)
+		hint(box, number.box, { { text = number.unit } })
+		lightOnHover(box)
 		box:HookScript("OnTextChanged", Client.Guarded(numberChanged))
 		box:SetScript("OnEnterPressed", box.ClearFocus)
 		-- Leaving a box shows the value the destination holds, so text that is no number does not stay.

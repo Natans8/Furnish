@@ -158,6 +158,17 @@
 	<EditBox name="FurnishNumberTemplate" inherits="InputBoxTemplate" autoFocus="false" letters="14" virtual="true">
 		<Size x="100" y="20"/>
 		<Layers>
+			<!-- A faint wash while the pointer rests on the box, shown by Window.lua, over the
+			     border art that reaches five units left of the box. -->
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Hover" alphaMode="ADD" hidden="true">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-5" y="0"/>
+						<Anchor point="BOTTOMRIGHT" x="0" y="0"/>
+					</Anchors>
+					<Color r="1" g="1" b="1" a="0.12"/>
+				</Texture>
+			</Layer>
 			<Layer level="ARTWORK">
 				<FontString parentKey="Axis" inherits="ChatFontNormal" justifyH="LEFT">
 					<Anchors>
@@ -313,6 +324,14 @@
 					<Anchor point="TOPLEFT" x="25" y="-114"/>
 				</Anchors>
 			</EditBox>
+			<!-- The source's WMO itself, spawned at the destination; as wide as its words, which
+			     Window.lua sets. -->
+			<Button parentKey="SpawnSource" inherits="UIPanelButtonTemplate">
+				<Size y="22"/>
+				<Anchors>
+					<Anchor point="LEFT" relativeKey="$parent.SourceID" relativePoint="RIGHT" x="8" y="0"/>
+				</Anchors>
+			</Button>
 
 			<!-- The sets, eleven rows at the size the window opens at, or a line saying why there
 			     are none. -->
