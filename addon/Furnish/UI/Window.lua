@@ -607,9 +607,9 @@ local function updatePreview()
 				names[#names + 1] = set.name
 				-- A placement two sets share is drawn once, under the first set that places it.
 				for _, piece in ipairs(Rows.Pieces(set.id) or {}) do
-					local key = Rows.Key(piece)
-					if not seen[key] then
-						seen[key] = true
+					local placement = Rows.Key(piece)
+					if not seen[placement] then
+						seen[placement] = true
 						piece.set = set.name
 						pieces[#pieces + 1] = piece
 					end
@@ -1715,7 +1715,7 @@ local MODEL_CONTROLS = {
 		key = "ZoomIn",
 		icon = { 0.578125, 0.828125, 0.1484375, 0.2734375 },
 		title = "Zoom in",
-		text = "Or turn the wheel.",
+		lines = { { text = "Or turn the wheel." } },
 		click = function()
 			stage:Zoom(1, true)
 		end,
@@ -1724,7 +1724,7 @@ local MODEL_CONTROLS = {
 		key = "ZoomOut",
 		icon = { 0.296875, 0.546875, 0.0078125, 0.1328125 },
 		title = "Zoom out",
-		text = "Or turn the wheel.",
+		lines = { { text = "Or turn the wheel." } },
 		click = function()
 			stage:Zoom(-1, true)
 		end,
@@ -1733,7 +1733,7 @@ local MODEL_CONTROLS = {
 		key = "Pan",
 		icon = { 0.296875, 0.546875, 0.2890625, 0.4140625 },
 		title = "Pan",
-		text = "Hold and drag. Or right-drag the view.",
+		lines = { { text = "Hold and drag. Or right-drag the view." } },
 		hold = function()
 			stage:Drag("Pan", "LeftButton")
 		end,
@@ -1742,7 +1742,7 @@ local MODEL_CONTROLS = {
 		key = "RotateLeft",
 		icon = { 0.015625, 0.265625, 0.2890625, 0.4140625 },
 		title = "Rotate left",
-		text = "Hold. Or drag the view.",
+		lines = { { text = "Hold. Or drag the view." } },
 		hold = function()
 			stage:Spin(1)
 		end,
@@ -1751,7 +1751,7 @@ local MODEL_CONTROLS = {
 		key = "RotateRight",
 		icon = { 0.578125, 0.828125, 0.2890625, 0.4140625 },
 		title = "Rotate right",
-		text = "Hold. Or drag the view.",
+		lines = { { text = "Hold. Or drag the view." } },
 		hold = function()
 			stage:Spin(-1)
 		end,
@@ -1759,7 +1759,7 @@ local MODEL_CONTROLS = {
 	{
 		key = "Reset",
 		title = "Reset view",
-		text = "As the sets were first framed.",
+		lines = { { text = "As the sets were first framed." } },
 		click = function()
 			stage:Reset()
 		end,
@@ -1768,14 +1768,14 @@ local MODEL_CONTROLS = {
 		key = "Help",
 		texture = "Interface\\Common\\help-i",
 		title = "Choosing pieces",
-		text = table.concat({
-			"Click: choose a piece.",
-			"Shift-click: add one, or let it go.",
-			"Ctrl-click: make one lead.",
-			"Shift-drag: add a band of pieces.",
-			"Ctrl-drag: let a band go.",
-			"Right-click: spawn one alone.",
-		}, "\n"),
+		lines = {
+			{ label = "Click", value = "choose a piece" },
+			{ label = "Shift-click", value = "add or let go" },
+			{ label = "Ctrl-click", value = "make it lead" },
+			{ label = "Shift-drag", value = "add a band" },
+			{ label = "Ctrl-drag", value = "let a band go" },
+			{ label = "Right-click", value = "spawn it alone" },
+		},
 	},
 }
 
@@ -1786,7 +1786,16 @@ local function buildControls()
 	controls:SetFrameLevel(preview.Scene:GetFrameLevel() + Scene.ABOVE)
 	for _, control in ipairs(MODEL_CONTROLS) do
 		local button = controls[control.key]
-		button:Init("AnyUp", control.icon, control.title, control.text)
+		button:Init("AnyUp", control.icon, control.title)
+		-- The game's own handler shows its tooltip at the screen's corner; this one stands
+		-- beside the button, drawn as the window's other tooltips are. The handler stays for
+		-- the bar's fade.
+		button:HookScript(
+			"OnEnter",
+			Client.Guarded(function(self)
+				Chat.TipBeside(self, control.title, control.lines)
+			end)
+		)
 		if control.texture then
 			button.icon:SetTexture(control.texture)
 			button.icon:SetTexCoord(0, 1, 0, 1)
