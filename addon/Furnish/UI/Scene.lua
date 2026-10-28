@@ -13,8 +13,8 @@
 -- from.
 --
 -- A click chooses the piece under the pointer, a shift-click chooses it too, and a shift-drag
--- chooses every piece whose middle its band holds, as it is drawn; what is chosen stays lit as the
--- pointed piece is, and the scene says when that changes. Chosen lists them as they would spawn,
+-- chooses every piece whose middle its band holds, as it is drawn; what is chosen glows blue, the
+-- pointed piece yellow, and the scene says when that changes. Chosen lists them as they would spawn,
 -- the lowest-standing piece first, so that it leads the group they form, unless a ctrl-click has
 -- made another lead.
 
@@ -77,10 +77,11 @@ local STEEPEST = 1.45
 -- projection is asked about to measure it.
 local LENS_STEP = 0.1
 
---- The kit that lights the piece under the pointer and the pieces chosen: a steady pale yellow
+--- The kits that light the piece under the pointer and the pieces chosen: a steady pale yellow
 -- glow along the edges, the nearest a scene draws to the outline `.gob select` puts on a gob,
--- which a scene does not draw.
-local GLOW_KIT = 87979
+-- which a scene does not draw, and the same glow in sky blue, judged in game against seven other
+-- pale tones. A chosen piece under the pointer keeps its blue.
+local GLOW_KIT, CHOSEN_KIT = 87979, 117557
 
 --- The corners of a box, as which of its two ends each axis takes.
 local CORNERS = {}
@@ -602,23 +603,28 @@ function Scene:Load(actor)
 	actor:SetModelByFileID(actor.source.file)
 end
 
---- Light an actor's piece, or put its light out, as it is pointed at or chosen: the kit goes on
--- as either begins and comes off once both have ended. The glow stays painted once its kit is
--- taken off, so what the kit painted is cleared too, by the method Epsilon's client gives every
--- scene actor; a client without it has the model loaded afresh instead, which draws it without.
+--- Light an actor's piece as it stands, chosen, pointed at or neither: the chosen kit, the
+-- pointed kit or none, the one on it changed only when that changes. A glow stays painted once
+-- its kit is taken off, so what the kit painted is cleared too, by the method Epsilon's client
+-- gives every scene actor; a client without it has the model loaded afresh instead, which draws
+-- it without.
 function Scene:Paint(actor)
-	local lit = (actor == self.hovered and actor ~= self.dimmed) or actor.chosen == true
-	if lit == (actor.lit == true) then
+	local kit = actor.chosen == true and CHOSEN_KIT or actor == self.hovered and GLOW_KIT or nil
+	local on = type(actor.lit) == "number" and actor.lit or nil
+	if kit == on then
 		return
 	end
-	actor.lit = lit or nil
-	if lit then
-		actor:SetSpellVisualKit(GLOW_KIT, false)
-	elseif actor.ClearAllEffects then
-		actor:SetSpellVisualKit(nil)
-		actor:ClearAllEffects()
-	else
-		self:Load(actor)
+	if on then
+		if actor.ClearAllEffects then
+			actor:SetSpellVisualKit(nil)
+			actor:ClearAllEffects()
+		else
+			self:Load(actor)
+		end
+	end
+	actor.lit = kit
+	if kit then
+		actor:SetSpellVisualKit(kit, false)
 	end
 end
 
@@ -629,7 +635,7 @@ function Scene:Hover(actor)
 		return
 	end
 	local left = self.hovered
-	self.hovered, self.dimmed = actor, nil
+	self.hovered = actor
 	if left then
 		self:Paint(left)
 	end
@@ -702,10 +708,6 @@ function Scene:Choose(actor, more, lead)
 		self.lead = actor
 	elseif actor and not (more and actor.chosen == true) then
 		chosen[#chosen + 1] = actor
-	elseif actor then
-		-- Let go under the pointer, the piece goes dark until the pointer leaves it, or the light
-		-- it keeps as the pointed piece would hide that it was let go.
-		self.dimmed = actor
 	end
 	if not self:Settle(chosen) and self.lead ~= led and self.onChoose then
 		self.onChoose()

@@ -1030,9 +1030,13 @@ def test_a_click_chooses_the_piece_under_the_pointer_alone(tmp_path: Path) -> No
     lua = core_scene_choosing(tmp_path)
     click(lua)
     assert chosen(lua) == [7] and lua.eval("TOLD_CHOSEN") == 1
-    # Chosen, the cube stays lit once the pointer leaves it.
+    # Chosen, the cube turns from the pointed yellow to the chosen blue, the yellow cleared first,
+    # and stays blue once the pointer leaves it.
+    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (117557, False)
+    assert lua.eval("ACTORS[1].ClearAllEffects") is not None
+    lua.execute("ACTORS[1].ClearAllEffects = nil")
     lua.execute("GetCursorPosition = function() return 0, 100 end SCENE:Tick(0)")
-    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (87979, False)
+    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (117557, False)
     assert lua.eval("ACTORS[1].ClearAllEffects") is None
     # A click on nothing chooses none, and the light goes out.
     click(lua)
@@ -1057,13 +1061,9 @@ def test_a_shift_click_chooses_a_piece_too_and_again_lets_it_go(tmp_path: Path) 
     click(lua)
     assert chosen(lua) == [7, 8]
     # Shift-clicked again, a chosen piece is let go, the first keeping its place; under the
-    # pointer still, it goes dark, so the letting go shows, and lights again once the pointer
-    # comes back to it.
+    # pointer still, it turns back from blue to the pointed yellow, so the letting go shows.
     click(lua)
     assert chosen(lua) == [7]
-    assert tuple(lua.eval("ACTORS[2].SetSpellVisualKit").values()) == ()
-    lua.execute("GetCursorPosition = function() return 0, 100 end SCENE:Tick(0)")
-    lua.execute(f"GetCursorPosition = function() return {x}, {y} end SCENE:Tick(0)")
     assert tuple(lua.eval("ACTORS[2].SetSpellVisualKit").values()) == (87979, False)
     # Clicked without shift, the second stands alone.
     lua.execute("SHIFT = nil")
@@ -1103,7 +1103,7 @@ def test_a_shift_drag_chooses_every_piece_whose_middle_its_band_holds(tmp_path: 
     # Let go, the band is read once more where it ends.
     lua.execute("BAND.Hide = nil HELD.LeftButton = nil SCENE:Tick(0)")
     assert chosen(lua) == [7, 8] and lua.eval("BAND.Hide") is not None
-    assert tuple(lua.eval("ACTORS[2].SetSpellVisualKit").values()) == (87979, False)
+    assert tuple(lua.eval("ACTORS[2].SetSpellVisualKit").values()) == (117557, False)
     assert lua.eval("ACTORS[3].SetSpellVisualKit") is None
 
 

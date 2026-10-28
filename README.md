@@ -120,7 +120,8 @@ and the window taller with it. Resting on a piece marks it with a glow and names
 at the pointer: its model and the display it spawns by, its set, its position and rotation from
 the WMO's origin as `.gob spawn` takes them, in Destination's colours, and its scale where it is
 not one. A click chooses a piece alone, a shift-click chooses it too, and a shift-drag chooses
-every piece in its band as it is drawn; the chosen stay lit and are counted under the pane's name, and Spawn,
+every piece in its band as it is drawn; the chosen glow sky blue, the pointed piece yellow, and are counted under
+the pane's name, and Spawn,
 at the pane's foot, spawns them where a run of their sets would put them at Destination, one
 alone and several as a group led by the piece standing lowest, the one covering most ground among
 those standing level, so a table leads what is on it, a carpet leads the chairs on it, and a group
