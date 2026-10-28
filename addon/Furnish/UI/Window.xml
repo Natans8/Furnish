@@ -1,6 +1,6 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
 	<!-- The window's layout, read top to bottom as where the sets come from, which of them, and
-	     where they go. Every offset is the design's, at the 400 by 628 the window opens at: what
+	     where they go. Every offset is the design's, at the 400 by 668 the window opens at: what
 	     hangs from the top stays there, what stands on the bottom stays there, and the set list
 	     takes whatever height the window gains. What it does is in Window.lua, which loads after
 	     this file and sets every word. -->

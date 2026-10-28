@@ -932,7 +932,7 @@ def test_resting_on_a_listed_set_describes_it_and_peeks_nothing(tmp_path: Path) 
 def test_without_a_working_preview_door_nothing_is_peeked(tmp_path: Path, glimpse: str) -> None:
     lua = command_lua(tmp_path)
     lua.execute(glimpse)
-    assert lua.eval("Furnish.Previews.Peek(Furnish.Console.WmoPreview('house'))") is False
+    assert lua.eval("Furnish.Previews.PeekWmo('house')") is False
     lua.eval("Furnish.Previews.Unpeek")()
     assert not [line for line in printed(lua) if "error" in line]
 
@@ -940,7 +940,7 @@ def test_without_a_working_preview_door_nothing_is_peeked(tmp_path: Path, glimps
 def test_a_wmo_is_previewed_by_its_files_name(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute(GLIMPSE)
-    assert lua.eval("Furnish.Previews.Peek(Furnish.Console.WmoPreview('house'))") is True
+    assert lua.eval("Furnish.Previews.PeekWmo('house')") is True
     read = lua.eval("PEEKED[1]")
     assert (read.kind, read.id, read.name) == ("wmo", 0, "house")
 

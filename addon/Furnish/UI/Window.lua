@@ -111,10 +111,6 @@ local LIST_INSET, BAR_ROOM = 8, 22
 --- The room an empty list's line saying why takes, its margins in FurnishListTemplate.
 local EMPTY_ROOM = 40
 
---- The smallest the window may be drawn, which is the size its layout was made for; it may grow
--- to twice that.
-local MIN_WIDTH, MIN_HEIGHT = 400, 668
-
 --- How many letters a name search waits for, as Blizzard's own searches do; how many WMOs it
 -- lists at most, and how many rows of them show before the list scrolls.
 local SEARCH_FROM, RESULTS, RESULT_ROWS = 3, 60, 8
@@ -176,6 +172,10 @@ local list = frame.Sets
 local panel = frame.Doodad
 local offer = frame.Blueprint
 local preview = frame.Preview
+
+--- The smallest the window may be drawn: the size it opens at, which its layout was made for; it
+-- may grow to twice that.
+local MIN_WIDTH, MIN_HEIGHT = frame:GetSize()
 --- How wide the Preview pane is drawn, and so the narrowest its grip drags it to.
 local PREVIEW_WIDTH = preview:GetWidth()
 local provider, found, drawn =
@@ -188,7 +188,6 @@ local CONTROLS = {
 	frame.SourceID,
 	frame.DestinationFollow,
 	frame.Here,
-	frame.UseSelected,
 }
 for _, number in ipairs(NUMBERS) do
 	CONTROLS[#CONTROLS + 1] = frame[number.box]
@@ -364,7 +363,7 @@ end
 -- about first; a selected group is chosen as one, so it is not asked about.
 local function joinsGroup()
 	local selected = grouped() == "merge" and Console.Selected()
-	return selected and (selected.groupLeader or 0) ~= 0 and selected or nil
+	return selected and selected.groupLeader ~= 0 and selected or nil
 end
 
 --- Whether the selected gob draws a set already, as part of its model: its base set, unless
@@ -766,11 +765,6 @@ local function refresh()
 	local before = shown
 	-- What is pinned, the doodad's WMO among them, or nil for the selected gob.
 	shown = not (pinned and pinned.empty) and Console.Source(pinned) or nil
-	if shown then
-		for _, set in ipairs(shown.sets) do
-			shown.placed = shown.placed or set.placed
-		end
-	end
 	if shown and (rechoose or not (before and before.file == shown.file)) then
 		rechoose = false
 		chooseFirst(shown.file, shown.sets)
@@ -869,12 +863,12 @@ local function showOffer()
 	local name, leader = Console.Offer()
 	if not name then
 		offer:Hide()
-		offer.made = nil
+		offer.named = nil
 		return
 	end
 	offer.leader = leader
-	if offer.made ~= name then
-		offer.made = name
+	if offer.named ~= name then
+		offer.named = name
 		offer.Name:SetText(name)
 		offer.Name:SetCursorPosition(0)
 	end
@@ -1068,7 +1062,7 @@ local function resultEnter(button)
 	end
 	lines[#lines + 1] = { text = "Click: show its sets", colour = GREEN }
 	tip(button, wmo.name, lines)
-	Previews.Peek(Console.WmoPreview(wmo.name))
+	Previews.PeekWmo(wmo.name)
 end
 
 local function initResult(button, wmo, new)
@@ -1461,6 +1455,8 @@ local function buildSource()
 	local id = frame.SourceID
 	id.Axis:SetText("ID")
 	id.Axis:SetTextColor(GREY[1], GREY[2], GREY[3])
+	-- An entry is whole and positive, so the box takes digits and nothing else.
+	id:SetNumeric(true)
 	id:SetScript("OnEnterPressed", id.ClearFocus)
 	id:SetScript("OnEscapePressed", function(box)
 		box:SetText(shownEntry and tostring(shownEntry) or "")
@@ -1537,7 +1533,7 @@ local function leadLines(choice)
 		lines = { { text = "The objects join the selected group." } }
 	else
 		lines = { { text = "The selected gob leads." } }
-		if selected and (selected.groupLeader or 0) ~= 0 then
+		if selected and selected.groupLeader ~= 0 then
 			lines[#lines + 1] = {
 				text = selected.name .. " is in a group already; the objects join it.",
 				colour = WARN,
@@ -1709,7 +1705,6 @@ local MODEL_CONTROLS = {
 		text = "Or turn the wheel.",
 		click = function()
 			stage:Zoom(1, true)
-			stage:Aim()
 		end,
 	},
 	{
@@ -1719,7 +1714,6 @@ local MODEL_CONTROLS = {
 		text = "Or turn the wheel.",
 		click = function()
 			stage:Zoom(-1, true)
-			stage:Aim()
 		end,
 	},
 	{
@@ -1793,6 +1787,11 @@ end
 -- within the window's own bounds, the pane growing with it, so the two stay one column.
 local function buildPreviewGrip()
 	local grip = preview.Grip
+	--- Let the grip go: the pane and the window keep their size, and the controls follow it.
+	local function release()
+		grip:SetScript("OnUpdate", nil)
+		update()
+	end
 	grip:SetScript("OnMouseDown", function()
 		holdTopLeft()
 		local x, y = _G.GetCursorPosition()
@@ -1803,6 +1802,10 @@ local function buildPreviewGrip()
 		grip:SetScript(
 			"OnUpdate",
 			Client.Guarded(function()
+				-- A press let go off the grip, or while the window was hidden, is not heard by it.
+				if not _G.IsMouseButtonDown("LeftButton") then
+					return release()
+				end
 				local nowX, nowY = _G.GetCursorPosition()
 				local widest = _G.UIParent:GetRight() - preview:GetLeft()
 				preview:SetWidth(
@@ -1812,10 +1815,7 @@ local function buildPreviewGrip()
 			end)
 		)
 	end)
-	grip:SetScript("OnMouseUp", function()
-		grip:SetScript("OnUpdate", nil)
-		update()
-	end)
+	grip:SetScript("OnMouseUp", release)
 end
 
 --- The parts of a pose the hovered piece's tooltip sets out, each a row of numbers under its

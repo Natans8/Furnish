@@ -34,13 +34,10 @@ function Chat.Escape(colour)
 end
 
 --- The colours lines are drawn in, as escapes: the tooltip's own gold for a command and a number,
--- white for a name, grey for what is said in passing and red for a fault, with the client's link
--- blue for what a click acts on and the blue of the prefix.
-Chat.GOLD, Chat.WHITE, Chat.GREY, Chat.RED =
-	Chat.Escape(Chat.TIP.title),
-	Chat.Escape(Chat.TIP.text),
-	Chat.Escape(Chat.TIP.label),
-	Chat.Escape(Chat.TIP.refusal)
+-- grey for what is said in passing and red for a fault, with the client's link blue for what a
+-- click acts on and the blue of the prefix.
+Chat.GOLD, Chat.GREY, Chat.RED =
+	Chat.Escape(Chat.TIP.title), Chat.Escape(Chat.TIP.label), Chat.Escape(Chat.TIP.refusal)
 Chat.BLUE, Chat.PREFIX = "|cff71d5ff", "|cff66ccff"
 Chat.END = "|r"
 

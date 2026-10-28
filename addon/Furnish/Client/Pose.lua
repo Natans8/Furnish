@@ -54,15 +54,13 @@ function Pose.Same(a, b)
 	return Commands.IsUnit(a.scale / b.scale)
 end
 
---- The player's own spot and facing, level, at scale 1; `map` beside it.
+--- The player's own spot and facing, level, at scale 1.
 function Pose.Here()
-	local x, y, z, map = Client.Position()
+	local x, y, z = Client.Position()
 	if not x then
 		return nil, "the client did not answer the player's position"
 	end
-	local pose = Pose.At(x, y, z, Client.Facing())
-	pose.map = map
-	return pose
+	return Pose.At(x, y, z, Client.Facing())
 end
 
 --- An object's pose from EpsilonLib's record of it. The rotation is the record's own, roll

@@ -32,6 +32,14 @@ function Previews.Peek(read)
 	return ok and shown == true
 end
 
+--- Show a WMO's preview at the pointer while it rests on what names the WMO: its picture, found
+-- by the WMO file's name.
+-- @param name the file's name, as the client's catalogue spells it, whole or as a line shows it
+-- @return true where something was shown
+function Previews.PeekWmo(name)
+	return Previews.Peek({ kind = "wmo", id = 0, name = name })
+end
+
 --- Take down a preview Peek showed.
 function Previews.Unpeek()
 	local addon = glimpse()

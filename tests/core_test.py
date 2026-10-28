@@ -122,6 +122,14 @@ def lua_core(tmp_path: Path, layered: bool = False) -> lua51.LuaRuntime:
             if frame.events[event] and frame.handler then frame.handler(frame, event, ...) end
           end
         end
+        -- Every row of every list given, in the order given: several sets' rows as one run.
+        function UNION(...)
+          local out = {}
+          for i = 1, select("#", ...) do
+            for _, row in ipairs(select(i, ...)) do out[#out + 1] = row end
+          end
+          return out
+        end
         """
     )
     lua.globals().DATA_PATH = (tmp_path / "Data.lua").as_posix()
@@ -160,7 +168,7 @@ def fake_server(lua: lua51.LuaRuntime, refuse: int | None = None) -> Callable[[]
 
 
 def rows(lua: lua51.LuaRuntime, *sets: int) -> str:
-    return "Furnish.Rows.Union(" + ", ".join(f"Furnish.Rows.OfSet({s})" for s in sets) + ")"
+    return "UNION(" + ", ".join(f"Furnish.Rows.OfSet({s})" for s in sets) + ")"
 
 
 def spawn(lua: lua51.LuaRuntime, rows_expr: str, group: str = "Furnish.Group.Pivot") -> Any:
@@ -719,7 +727,7 @@ FRAME = {
   SetScript = function(_, name, fn) SCRIPTS[name] = fn end,
   GetCameraFieldOfView = function() return 2 * math.atan(0.5) end,
   GetWidth = function() return 200 end, GetHeight = function() return 100 end,
-  GetEffectiveScale = function() return 1 end, GetCenter = function() return 100, 50 end,
+  GetEffectiveScale = function() return 1 end,
   GetLeft = function() return 0 end, GetBottom = function() return 0 end,
   GetFrameLevel = function() return 1 end,
   GetActiveCamera = function() return recorder(CAMERA) end,
@@ -1457,7 +1465,7 @@ def test_pose_here_reads_the_servers_position_and_the_facing(tmp_path: Path) -> 
     lua = lua_core(tmp_path)
     fake_client(lua)
     pose = lua.eval("Furnish.Pose.Here()")
-    assert (pose.position.x, pose.position.y, pose.position.z, pose.map) == (1, 2, 3, 1116)
+    assert (pose.position.x, pose.position.y, pose.position.z) == (1, 2, 3)
     assert round(pose.rotation.turn) == 90 and pose.scale == 1
 
 

@@ -725,9 +725,7 @@ end
 --- The selected object's pose, whatever it is, with its name, guid, groupLeader and canEdit
 -- beside it; or nil and why nothing is selected. A window reads it for its source, as one source
 -- of a destination's numbers, and for the group a merge would join.
-function Console.Selected()
-	return selectedPose()
-end
+Console.Selected = selectedPose
 
 --- The selected group, which a merge joins and a destination may take its numbers from once,
 -- never by following it: its pose as Pose.OfGroup gives it. Nil when no group is selected, when
@@ -831,9 +829,7 @@ end
 
 --- Why nothing new can start, or nil; with ways, as a request carries them, the way that ends
 -- it too.
-function Console.Busy(ways)
-	return busy(ways)
-end
+Console.Busy = busy
 
 --- Turn the client's highlighting of the selection on or off, as Tiler and ObjectMover do.
 function Console.ToggleHighlight()
@@ -956,12 +952,6 @@ function Console.Describe(request, tooltip, more)
 		{ text = "Ctrl-click: spawn at your feet", colour = tip.click },
 		more or {},
 	})
-end
-
---- What a preview of a WMO shows: its picture, found by the WMO file's name.
--- @param name the file's name, as the client's catalogue spells it, whole or as a line shows it
-function Console.WmoPreview(name)
-	return { kind = "wmo", id = 0, name = name }
 end
 
 --- Fill a tooltip for the button on a WMO's doodad line.

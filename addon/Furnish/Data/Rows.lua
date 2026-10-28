@@ -48,14 +48,3 @@ function Rows.Pieces(id)
 	end
 	return pieces
 end
-
---- Every row of every list given, in the order given.
-function Rows.Union(...)
-	local out = {}
-	for i = 1, select("#", ...) do
-		for _, row in ipairs(select(i, ...) or {}) do
-			out[#out + 1] = row
-		end
-	end
-	return out
-end
