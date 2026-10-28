@@ -2131,9 +2131,9 @@ local function build()
 			catchUp()
 			refresh()
 			-- Started now, so the models are usually named by the time a set is rested on; a WMO
-			-- shown by its entry takes its name from the same walk, once it ends.
+			-- shown by its entry or its file takes its name from the same walk, once it ends.
 			Console.NameModels(Client.Guarded(function()
-				if frame:IsShown() and pinned and pinned.entry and not pinned.placement then
+				if frame:IsShown() and pinned and not (pinned.placement or pinned.name) then
 					refresh()
 				end
 			end))
@@ -2175,9 +2175,10 @@ function Window.ShowSource(entry)
 end
 
 --- Open the window with a WMO as the source and one of its sets alone chosen, as a list's button
--- names them.
-function Window.ShowSet(file, index, name)
-	pinned = { file = file, name = name }
+-- names them. The WMO is named by the catalogue, since the list may have been printed before the
+-- catalogue was walked.
+function Window.ShowSet(file, index)
+	pinned = { file = file }
 	frame.Search:SetText("")
 	frame.Results:Hide()
 	open()

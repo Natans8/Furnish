@@ -1001,7 +1001,7 @@ OPENED = {}
 Furnish.Window = {
   ShowDoodad = function(uid, entry, map) OPENED[#OPENED + 1] = { "doodad", uid, entry, map } end,
   ShowSource = function(entry) OPENED[#OPENED + 1] = { "source", entry } end,
-  ShowSet = function(file, index, name) OPENED[#OPENED + 1] = { "set", file, index, name } end,
+  ShowSet = function(file, index) OPENED[#OPENED + 1] = { "set", file, index } end,
 }
 """
 
@@ -1017,7 +1017,7 @@ def test_a_right_click_on_a_chat_button_opens_the_window_on_it(tmp_path: Path) -
     click("garrmission:furnish:import:4242:817579:1116", None, "RightButton")
     opened = [list(each.values()) for each in lua.eval("OPENED").values()]
     assert opened == [
-        ["set", 900, 1, "house"],
+        ["set", 900, 1],
         ["source", 817579],
         ["doodad", 4242, 817579, 1116],
     ]

@@ -650,7 +650,8 @@ function Console.Source(of)
 	local placement = of.placement
 	local drawn = placement and Sets.OfPlacement(placement.map, placement.uid) or nil
 	if of.file then
-		return described(of.file, of.name, drawn)
+		local name = of.name or Client.FileName(of.file) or ("file %d"):format(of.file)
+		return described(of.file, name, drawn)
 	end
 	if of.entry then
 		local file, reason = Sets.OfEntry(of.entry)

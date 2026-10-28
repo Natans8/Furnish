@@ -247,7 +247,7 @@ function Command.Click(words, modifier)
 		return
 	end
 	if modifier == "open" then
-		return window.ShowSet(request.file, request.index, request.label)
+		return window.ShowSet(request.file, request.index)
 	end
 	request.here = modifier == "ctrl"
 	request.ways = Command.WAYS
