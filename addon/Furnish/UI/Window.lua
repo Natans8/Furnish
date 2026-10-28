@@ -1758,6 +1758,19 @@ local MODEL_CONTROLS = {
 			stage:Reset()
 		end,
 	},
+	{
+		key = "Help",
+		texture = "Interface\\Common\\help-i",
+		title = "Choosing pieces",
+		text = table.concat({
+			"Click: choose a piece.",
+			"Shift-click: add one, or let it go.",
+			"Ctrl-click: make one lead.",
+			"Shift-drag: add a band of pieces.",
+			"Ctrl-drag: let a band go.",
+			"Right-click: spawn one alone.",
+		}, "\n"),
+	},
 }
 
 --- Wire the model controls over the scene, which keep the game's own pressed look and fade.
@@ -1768,6 +1781,10 @@ local function buildControls()
 	for _, control in ipairs(MODEL_CONTROLS) do
 		local button = controls[control.key]
 		button:Init("AnyUp", control.icon, control.title, control.text)
+		if control.texture then
+			button.icon:SetTexture(control.texture)
+			button.icon:SetTexCoord(0, 1, 0, 1)
+		end
 		if control.click then
 			button:SetScript(
 				"OnClick",
@@ -1776,7 +1793,7 @@ local function buildControls()
 					control.click()
 				end)
 			)
-		else
+		elseif control.hold then
 			button:HookScript("OnMouseDown", Client.Guarded(control.hold))
 		end
 	end
@@ -1934,16 +1951,8 @@ local function spawnHovered(piece)
 	spawnPieces({ piece })
 end
 
---- How pieces are chosen in the pane, as the Spawn tooltip ends: the grammar the 3D editors
--- share.
-local CHOOSING = {
-	"Click chooses a piece; shift-click adds one or lets it go; ctrl-click makes one lead.",
-	"Shift-drag adds a band of pieces, ctrl-drag takes one away.",
-	"Right-click spawns the piece under the pointer alone.",
-}
-
---- What the pane's Spawn offers: where the pieces go, that the destination is held there, and
--- how pieces are chosen.
+--- What the pane's Spawn offers: where the pieces go, who leads, and that the destination is
+-- held there.
 local function spawnChosenLines()
 	local pieces = stage:Chosen()
 	local lines = { { text = "Where their sets would put them." } }
@@ -1962,17 +1971,11 @@ local function spawnChosenLines()
 			colour = GREY,
 		}
 	end
-	for _, way in ipairs(CHOOSING) do
-		lines[#lines + 1] = { text = way, colour = GREY }
-	end
 	return lines
 end
 
 local function buildPreview()
 	preview.Label:SetText("Preview")
-	preview.Hint:SetText(
-		"Drag turns, wheel zooms, right-drag pans; click chooses, right-click spawns."
-	)
 	stage = Scene.New(preview.Scene, showLoading, showHovered, updateChosen, spawnHovered)
 	preview.Scene:HookScript("OnUpdate", Client.Guarded(followPointer))
 	buildControls()

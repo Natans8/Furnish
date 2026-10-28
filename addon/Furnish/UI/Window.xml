@@ -506,7 +506,7 @@
 			<!-- The chosen sets laid out, without the WMO, which no model frame can draw: a pane against
 			     the window's right edge, below the doodad panel and above the blueprint offer while
 			     they show, which Window.lua sets; shown when a set is clicked. The scene fills it under
-			     the names, beside which a line says how to move it; under the scene a line says how
+			     the names; under the scene a line says how
 			     far the models have loaded or, once any piece is chosen, how many are and which leads,
 			     and a button spawns them. -->
 			<Frame parentKey="Preview" enableMouse="true" hidden="true">
@@ -538,15 +538,9 @@
 						     how many are and which leads. It ends where Spawn begins, which Window.lua
 						     anchors, since the button is made after the layers and a layer cannot name it;
 						     Window.lua fills it. -->
-						<FontString parentKey="Status" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false">
+						<FontString parentKey="Status" inherits="GameFontHighlightSmall" justifyH="LEFT" wordwrap="false">
 							<Anchors>
 								<Anchor point="BOTTOMLEFT" x="16" y="16"/>
-							</Anchors>
-						</FontString>
-						<FontString parentKey="Hint" inherits="GameFontDisableSmall" justifyH="RIGHT" wordwrap="false">
-							<Anchors>
-								<Anchor point="TOPLEFT" relativeKey="$parent.Label" relativePoint="TOPRIGHT" x="8" y="-2"/>
-								<Anchor point="TOPRIGHT" x="-32" y="-18"/>
 							</Anchors>
 						</FontString>
 					</Layer>
@@ -579,9 +573,10 @@
 						<Frames>
 							<!-- The game's own model controls, as its dressing room lays them over the model:
 							     zoom in, zoom out, a pan held and dragged, rotate left and right while held,
-							     and reset. Half seen until the pointer is on them; Window.lua wires them. -->
+							     reset, and help, which says how pieces are chosen. Half seen until the pointer
+							     is on them; Window.lua wires them. -->
 							<Frame parentKey="Controls" alpha="0.5">
-								<Size x="112" y="23"/>
+								<Size x="130" y="23"/>
 								<Anchors>
 									<Anchor point="TOP" x="0" y="-4"/>
 								</Anchors>
@@ -640,6 +635,11 @@
 									<Button parentKey="Reset" inherits="ModelControlButtonTemplate">
 										<Anchors>
 											<Anchor point="LEFT" relativeKey="$parent.RotateRight" relativePoint="RIGHT"/>
+										</Anchors>
+									</Button>
+									<Button parentKey="Help" inherits="ModelControlButtonTemplate">
+										<Anchors>
+											<Anchor point="LEFT" relativeKey="$parent.Reset" relativePoint="RIGHT"/>
 										</Anchors>
 									</Button>
 								</Frames>
