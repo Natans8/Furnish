@@ -1876,13 +1876,12 @@ local function showHovered(piece)
 	local line = grid:AddHeader()
 	grid:SetCell(line, 1, pieceName(piece), nil, "LEFT", 3)
 	grid:SetCellTextColor(line, 1, unpack(colours.title))
-	local id = ("%sID%s %d"):format(Chat.GREY, Chat.END, -piece.display)
+	local id = ("%sID%s %d"):format(Chat.GREY, Chat.END, Commands.OfDisplay(piece.display))
 	grid:SetCell(line, 4, id, grid:GetFont(), "RIGHT")
 	line = grid:AddLine()
 	grid:SetCell(line, 1, piece.set, nil, "LEFT", 4)
 	grid:SetCellTextColor(line, 1, unpack(colours.label))
-	local roll, pitch, turn =
-		Transform.ToAngles({ x = piece.qx, y = piece.qy, z = piece.qz, w = piece.qw })
+	local roll, pitch, turn = Transform.ToAngles(Transform.TurnOf(piece))
 	local pose = { x = piece.x, y = piece.y, z = piece.z, roll = roll, pitch = pitch, turn = turn }
 	for _, row in ipairs(POSE_ROWS) do
 		local words, values = grid:AddLine(), grid:AddLine(row.word)
@@ -1897,10 +1896,9 @@ local function showHovered(piece)
 			end
 		end
 	end
-	-- A scale is stored as a float, so one that shows as one is the model's own.
-	local scale = shownNumber(piece.scale)
-	if scale ~= "1" then
-		line = grid:AddLine("Scale", scale)
+	-- A scale the server would not be told is the model's own, and goes unsaid here too.
+	if not Commands.IsUnit(piece.scale) then
+		line = grid:AddLine("Scale", shownNumber(piece.scale))
 		grid:SetCellTextColor(line, 1, unpack(colours.label))
 	end
 	for _, click in ipairs(PIECE_CLICKS) do

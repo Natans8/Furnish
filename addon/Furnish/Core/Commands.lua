@@ -93,6 +93,7 @@ function Commands.Join(leader)
 	return "gobject group add " .. leader
 end
 
+--- Delete an object by its GUID.
 function Commands.Delete(guid)
 	return "gobject delete " .. guid
 end

@@ -813,6 +813,8 @@ function Scene:Tick(elapsed)
 		if not self.moved then
 			self:Fit()
 		end
+		-- What lies under a pointer that has not moved may have, a model having loaded there.
+		self.looked = nil
 		self:Tell()
 	end
 end
@@ -867,7 +869,7 @@ function Scene:Draw(pieces)
 				self.actors[placed] = actor
 			end
 			local offset = { piece.x - cx, piece.y - cy, piece.z - cz }
-			local turn = { x = piece.qx, y = piece.qy, z = piece.qz, w = piece.qw }
+			local turn = Transform.TurnOf(piece)
 			actor.piece = { offset = offset, turn = turn, scale = scale }
 			actor.source = piece
 			actor:SetOnModelLoadedCallback(Client.Guarded(loaded))
