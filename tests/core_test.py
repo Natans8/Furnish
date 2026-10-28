@@ -905,6 +905,51 @@ def test_the_piece_under_the_pointer_is_marked_and_named(tmp_path: Path) -> None
     assert lua.eval("HOVERS[#HOVERS]") is False
 
 
+def hovered_of(lua: lua51.LuaRuntime, pieces: str) -> int:
+    """Draw the pieces, load them all, put the pointer on the middle of the view, and answer the
+    file of the piece it is on."""
+    lua.execute(RECORDING_SCENE)
+    lua.execute(
+        f"""
+        HOVERS = {{}}
+        SCENE = Furnish.Scene.New(FRAME, SAID, function(piece)
+          HOVERS[#HOVERS + 1] = piece and piece.file or false
+        end)
+        SCENE:Draw({{ {pieces} }})
+        for i = 1, #ACTORS do LOAD(i) end
+        SCENE:Tick(0)
+        HOOKED.OnEnter() SCENE:Tick(0)
+        """
+    )
+    hovered: int = lua.eval("HOVERS[#HOVERS]")
+    return hovered
+
+
+def piece_at(file: int, at: tuple[float, float, float], scale: float) -> str:
+    """A piece as Rows.Pieces gives one, unturned, for a scene test."""
+    x, y, z = at
+    return (
+        f"{{ file = {file}, display = {file}, x = {x}, y = {y}, z = {z},"
+        f" qx = 0, qy = 0, qz = 0, qw = 1, scale = {scale} }},"
+    )
+
+
+def test_a_piece_standing_in_another_is_the_one_pointed_at(tmp_path: Path) -> None:
+    # A jar at the middle of a shelf, inside the shelf's box: the ray meets the shelf's box first,
+    # but the pointer is on the jar.
+    lua = lua_core(tmp_path)
+    assert hovered_of(lua, piece_at(1, (0, 0, 0), 1) + piece_at(2, (0, 0, 0), 0.2)) == 2
+
+
+def test_a_piece_only_behind_another_is_not_pointed_at(tmp_path: Path) -> None:
+    # A small piece further along the view than a cube, its middle outside the cube's box: the
+    # cube, nearer, is what the pointer is on.
+    lua = lua_core(tmp_path)
+    ahead = forward(math.radians(225), math.radians(35))
+    behind = tuple(3 * a for a in ahead)
+    assert hovered_of(lua, piece_at(1, (0, 0, 0), 1) + piece_at(2, behind, 0.2)) == 1
+
+
 def test_a_held_rotate_button_turns_and_reset_reframes(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     lua.execute(RECORDING_SCENE)

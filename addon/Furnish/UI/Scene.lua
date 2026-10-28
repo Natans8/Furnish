@@ -66,20 +66,22 @@ local function forwardOf(yaw, pitch)
 	return math.cos(pitch) * math.cos(yaw), math.cos(pitch) * math.sin(yaw), -math.sin(pitch)
 end
 
---- How far in front of the camera a ray enters a box it starts outside of, as a depth along the
--- view; nil where it misses the box or starts inside it.
+--- How far along a ray it enters a box square to its axes that it starts outside of; nil where it
+-- misses the box, starts inside it, or meets it nearer than the camera draws.
 -- @param ray a direction whose share along the view is one, so its distances are depths
--- @param box { low x, low y, low z, high x, high y, high z }
-local function enters(origin, ray, box)
+-- @param low the box's least corner, { x, y, z }
+-- @param high the box's greatest corner
+local function enters(origin, ray, low, high)
 	local near, far = -math.huge, math.huge
 	for axis = 1, 3 do
-		local from, along, low, high = origin[axis], ray[axis], box[axis], box[axis + 3]
+		local from, along = origin[axis], ray[axis]
+		local least, most = low[axis], high[axis]
 		if along == 0 then
-			if from < low or from > high then
+			if from < least or from > most then
 				return nil
 			end
 		else
-			local a, b = (low - from) / along, (high - from) / along
+			local a, b = (least - from) / along, (most - from) / along
 			if a > b then
 				a, b = b, a
 			end
@@ -222,8 +224,38 @@ function Scene:Reset()
 	end
 end
 
---- Take in a loaded actor's box, turned, scaled and placed as its piece stands: kept, square to the
--- scene's axes, for finding the piece under the pointer, and taken into the bounds framed.
+--- A point or a direction in the scene's axes, in a held box's own: the piece's offset taken off a
+-- point, the piece's turn undone and its scale divided out. A ray keeps its distances so carried.
+local function inBox(box, vector, isPoint)
+	local x, y, z = vector[1], vector[2], vector[3]
+	if isPoint then
+		x, y, z = x - box.offset[1], y - box.offset[2], z - box.offset[3]
+	end
+	local turned = Transform.Rotate(box.undo, { x = x, y = y, z = z })
+	local scale = box.scale
+	return { turned.x / scale, turned.y / scale, turned.z / scale }
+end
+
+--- Where a ray enters a held box, turned as its piece is: the ray carried into the box's own axes
+-- and tested against the model's box there.
+local function entersBox(origin, ray, box)
+	return enters(inBox(box, origin, true), inBox(box, ray, false), box.low, box.high)
+end
+
+--- Whether a point in the scene's axes lies within a held box, turned as its piece is.
+local function holds(box, point)
+	local at = inBox(box, point, true)
+	for axis = 1, 3 do
+		if at[axis] < box.low[axis] or at[axis] > box.high[axis] then
+			return false
+		end
+	end
+	return true
+end
+
+--- Take in a loaded actor's box, turned, scaled and placed as its piece stands: kept as the model's
+-- own box with the piece's turn, offset and scale, for finding the piece under the pointer, and
+-- taken into the bounds framed, square to the scene's axes.
 function Scene:Hold(actor)
 	local x1, y1, z1, x2, y2, z2 = actor:GetActiveBoundingBox()
 	if not (x1 and y1 and z1 and x2 and y2 and z2) then
@@ -245,7 +277,20 @@ function Scene:Hold(actor)
 			box[axis], box[axis + 3] = math.min(box[axis], value), math.max(box[axis + 3], value)
 		end
 	end
-	box.actor = actor
+	local turn = piece.turn
+	box.actor, box.offset, box.scale = actor, piece.offset, scale
+	box.undo = { x = -turn.x, y = -turn.y, z = -turn.z, w = turn.w }
+	box.low, box.high = { x1, y1, z1 }, { x2, y2, z2 }
+	box.volume = (x2 - x1) * (y2 - y1) * (z2 - z1) * scale ^ 3
+	local middle = Transform.Rotate(
+		turn,
+		{ x = (x1 + x2) / 2 * scale, y = (y1 + y2) / 2 * scale, z = (z1 + z2) / 2 * scale }
+	)
+	box.centre = {
+		piece.offset[1] + middle.x,
+		piece.offset[2] + middle.y,
+		piece.offset[3] + middle.z,
+	}
 	self.boxes[#self.boxes + 1] = box
 	local low = self.low or { math.huge, math.huge, math.huge }
 	local high = self.high or { -math.huge, -math.huge, -math.huge }
@@ -342,14 +387,43 @@ function Scene:Pick()
 		fy + ry * across + uy * upward,
 		fz + rz * across + uz * upward,
 	}
-	local nearest, picked
+	local hits = {}
 	for _, box in ipairs(self.boxes) do
-		local depth = enters(origin, ray, box)
-		if depth and (not nearest or depth < nearest) then
-			nearest, picked = depth, box
+		local depth = entersBox(origin, ray, box)
+		if depth then
+			hits[#hits + 1] = { box = box, depth = depth }
 		end
 	end
-	return picked, nearest, origin
+	local chosen
+	for _, hit in ipairs(hits) do
+		if not chosen or hit.depth < chosen.depth then
+			chosen = hit
+		end
+	end
+	-- A piece standing in another, as a jar on a shelf stands in the shelf's box, is what the
+	-- pointer is on when the ray meets both: the smaller whose middle the larger holds, nearest
+	-- first, and so on inward. A piece only behind another has its middle outside it.
+	while chosen do
+		local inner
+		for _, hit in ipairs(hits) do
+			local box = hit.box
+			if
+				box.volume < chosen.box.volume
+				and holds(chosen.box, box.centre)
+				and (not inner or hit.depth < inner.depth)
+			then
+				inner = hit
+			end
+		end
+		if not inner then
+			break
+		end
+		chosen = inner
+	end
+	if chosen then
+		return chosen.box, chosen.depth, origin
+	end
+	return nil
 end
 
 --- Move what the camera turns about and zooms toward to the nearest piece under the pointer, at
