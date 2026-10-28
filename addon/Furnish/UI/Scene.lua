@@ -160,6 +160,9 @@ function Scene.New(frame, onLoad, onHover, onChoose, onSpawn)
 		actors = {},
 		boxes = {},
 		chosen = {},
+		-- The boxes a pick's ray meets and how deep, by position, reused from pick to pick.
+		hitBoxes = {},
+		hitDepths = {},
 		onLoad = onLoad,
 		onHover = onHover,
 		onChoose = onChoose,
@@ -543,16 +546,17 @@ function Scene:Pick()
 	local dx = fx + rx * across + ux * upward
 	local dy = fy + ry * across + uy * upward
 	local dz = fz + rz * across + uz * upward
-	local hits = {}
+	local boxes, depths, count = self.hitBoxes, self.hitDepths, 0
 	for _, box in ipairs(self.boxes) do
 		local depth = entersBox(ox, oy, oz, dx, dy, dz, box)
 		if depth then
-			hits[#hits + 1] = { box = box, depth = depth }
+			count = count + 1
+			boxes[count], depths[count] = box, depth
 		end
 	end
 	local chosen
-	for _, hit in ipairs(hits) do
-		if not chosen or hit.depth < chosen.depth then
+	for hit = 1, count do
+		if not chosen or depths[hit] < depths[chosen] then
 			chosen = hit
 		end
 	end
@@ -560,13 +564,14 @@ function Scene:Pick()
 	-- pointer is on when the ray meets both: the smaller whose middle the larger holds, nearest
 	-- first, and so on inward. A piece only behind another has its middle outside it.
 	while chosen do
-		local inner
-		for _, hit in ipairs(hits) do
-			local box, middle = hit.box, hit.box.centre
+		local inner, outer = nil, boxes[chosen]
+		for hit = 1, count do
+			local box = boxes[hit]
+			local middle = box.centre
 			if
-				box.volume < chosen.box.volume
-				and holds(chosen.box, middle[1], middle[2], middle[3])
-				and (not inner or hit.depth < inner.depth)
+				box.volume < outer.volume
+				and holds(outer, middle[1], middle[2], middle[3])
+				and (not inner or depths[hit] < depths[inner])
 			then
 				inner = hit
 			end
@@ -577,7 +582,7 @@ function Scene:Pick()
 		chosen = inner
 	end
 	if chosen then
-		return chosen.box, chosen.depth, origin
+		return boxes[chosen], depths[chosen], origin
 	end
 	return nil
 end
@@ -1030,7 +1035,7 @@ function Scene:Draw(pieces)
 	local cx, cy, cz = (low[1] + high[1]) / 2, (low[2] + high[2]) / 2, (low[3] + high[3]) / 2
 	local drawing = (self.drawing or 0) + 1
 	self.drawing, self.low, self.high, self.zoom, self.moved = drawing, nil, nil, 1, false
-	self.boxes = {}
+	self.boxes, self.hitBoxes, self.hitDepths = {}, {}, {}
 	local chose = #self.chosen > 0
 	for _, actor in ipairs(self.chosen) do
 		actor.chosen = nil
