@@ -19,6 +19,7 @@ Command.USAGE = {
 	{ "<set> here [<entry>]", "spawn a set at your feet" },
 	{ "import", "import the selected doodad with its set" },
 	{ "stop [delete]", "stop a run, deleting what it spawned with delete" },
+	{ "options", "the settings, in the game's Options" },
 }
 
 --- The words that may follow a set, a list or an import, in the order the help says them.
@@ -65,8 +66,8 @@ local function number(token)
 end
 
 --- What a player typed after the command, as a request; or nil and the way out.
--- @return { action = "window" | "help" | "list" | "spawn" | "import" | "stop", and the fields the
---   console reads: index, entry, here, group, base, delete }
+-- @return { action = "window" | "help" | "options" | "list" | "spawn" | "import" | "stop", and
+--   the fields the console reads: index, entry, here, group, base, delete }
 function Command.Parse(text)
 	local tokens = {}
 	for token in text:lower():gmatch("%S+") do
@@ -77,6 +78,8 @@ function Command.Parse(text)
 		return { action = "window" }
 	elseif head == "help" then
 		return { action = "help" }
+	elseif head == "options" or head == "settings" then
+		return { action = "options" }
 	end
 	if head == "stop" then
 		if tokens[2] == nil or (tokens[2] == "delete" and tokens[3] == nil) then
@@ -192,6 +195,8 @@ function Command.Run(text)
 		for _, line in ipairs(helpLines()) do
 			Chat.Line(line)
 		end
+	elseif request.action == "options" then
+		Furnish.Options.Open()
 	elseif request.action == "list" then
 		Console.List(request)
 	elseif request.action == "spawn" then

@@ -25,6 +25,7 @@ message reads the first name.
 | `/furn import`             | turn the selected doodad into a gob, then spawn the doodad's sets onto the gob |
 | `/furn stop`               | stop spawning; a second stop gives up on a reply that never comes              |
 | `/furn stop delete`        | stop spawning, then delete what was spawned, one object at a time              |
+| `/furn options`            | open the settings, in the game's Options; `settings` says the same             |
 
 A set, list or import takes any of these words after it:
 

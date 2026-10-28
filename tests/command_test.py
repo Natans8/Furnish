@@ -116,6 +116,8 @@ def began(lua: lua51.LuaRuntime) -> str:
     [
         ("", {"action": "window"}),
         ("help me", {"action": "help"}),
+        ("options", {"action": "options"}),
+        ("settings", {"action": "options"}),
         ("list", {"action": "list"}),
         (
             "list 830385 merge base",
@@ -176,7 +178,7 @@ def test_the_help_names_every_command_and_word(tmp_path: Path) -> None:
     words = lines[-1]
     for word in ("first", "merge", "nogroup", "base", "quiet"):
         assert f"|Hgarrmission:furnish:word:{word}|h[{word}]|h" in words
-    assert len(lines) == 1 + 6 + 1
+    assert len(lines) == 1 + 7 + 1
     lua.execute(
         "TIP = {}; FAKE = { SetText = function(_, t) TIP[#TIP + 1] = t end,"
         " AddLine = function(_, t) TIP[#TIP + 1] = t end }"
@@ -1021,6 +1023,13 @@ def test_a_right_click_on_a_chat_button_opens_the_window_on_it(tmp_path: Path) -
     ]
     # Nothing was spawned, listed or imported by them.
     assert not [command for command in sent(lua) if "spawn" in command or "import" in command]
+
+
+def test_options_opens_the_settings_panel(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("OPENED = 0 Furnish.Options = { Open = function() OPENED = OPENED + 1 end }")
+    run(lua, "options")
+    assert lua.eval("OPENED") == 1 and sent(lua) == []
 
 
 # -- Importing ---------------------------------------------------------------------------

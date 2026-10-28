@@ -4,6 +4,9 @@
 -- opened, and Defaults what the addon ships with.
 
 local _, Furnish = ...
+local Options = {}
+Furnish.Options = Options
+
 local Client = Furnish.Client
 local Chat = Furnish.Chat
 local Commands = Furnish.Commands
@@ -163,3 +166,10 @@ credit:SetPoint("BOTTOMLEFT", 16, 16)
 credit:SetText("Put together by Nataari, mostly with AI — mistakes are possible")
 
 _G.InterfaceOptions_AddCategory(panel)
+
+--- Open the game's Options on the panel, as `/furn options` does. Asked once, the client opens
+-- the Options window without scrolling to the panel the first time; asked again, it scrolls.
+function Options.Open()
+	_G.InterfaceOptionsFrame_OpenToCategory(panel)
+	_G.InterfaceOptionsFrame_OpenToCategory(panel)
+end
