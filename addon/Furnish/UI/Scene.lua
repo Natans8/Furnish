@@ -909,6 +909,11 @@ function Scene:Stretch(pressed)
 	local frame, band = self.frame, self.band
 	local scale = frame:GetEffectiveScale()
 	local x, y = _G.GetCursorPosition()
+	-- A band held still is read once, not every frame: reading it projects every piece.
+	if x == pressed.atX and y == pressed.atY then
+		return
+	end
+	pressed.atX, pressed.atY = x, y
 	if wandered(frame, pressed, x, y) <= CLICK_SLOP then
 		band:Hide()
 		return
