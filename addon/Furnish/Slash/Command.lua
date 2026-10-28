@@ -258,14 +258,15 @@ _G.SlashCmdList.FURNISH = Client.Guarded(Command.Run)
 Chat.OnLinks(Command.Click, Command.Hover)
 
 --- The unique id of the doodad a server line names by its link, where it is a WMO
--- Furnish has sets for and the map placed it with a set beyond its base, so that importing
--- it spawns something. The number after the name in the link is the object's gameobject
+-- Furnish has sets for, still on the map, and the map placed it with a set beyond its base, so
+-- that importing it spawns something. The number after the name in the link is the object's gameobject
 -- entry, and the data answers for it; the name is never read, since many a WMO's
 -- name has no `.wmo` in it. A select line names its map, and a near line's doodads stand on
 -- the player's. The first such line loads the data.
 function Command.PlacedWmo(line)
-	local uid, entry, map = Furnish.Commands.DoodadLink(line)
-	local file = uid and Furnish.Sets.OfEntry(entry)
+	local uid, entry, map, removed = Furnish.Commands.DoodadLink(line)
+	-- One taken off the map, by a delete, an import or a replace, cannot be imported.
+	local file = uid and not removed and Furnish.Sets.OfEntry(entry)
 	if not file then
 		return nil
 	end

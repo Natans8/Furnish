@@ -1049,6 +1049,15 @@ def test_a_doodad_the_map_placed_with_only_its_base_set_gets_no_button(tmp_path:
     assert shown_line(lua, unknown) == unknown
 
 
+def test_a_doodad_off_the_map_gets_no_button(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    # Imported or replaced, the server links it apart and says how, and refuses an import.
+    replaced = WMO_LINE.replace("|Hdoodad_uid:", "|Hdoodad_deleted_uid:").replace(
+        "]|h (UID", "]|h (Replaced) (UID"
+    )
+    assert shown_line(lua, replaced) == replaced
+
+
 def test_a_near_line_takes_the_map_the_player_stands_on(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     near = "|Hdoodad_uid:4242:0|h[6dr_draenei_house2 - 817579]|h"

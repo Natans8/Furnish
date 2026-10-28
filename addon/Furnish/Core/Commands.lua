@@ -140,16 +140,22 @@ function Commands.Imported(messages)
 	return nil
 end
 
+--- The links a server line names a doodad by, and whether each is one taken off the map: by a
+-- delete, or by an import or a replace, which put an object in its place.
+local DOODAD_LINKS = { doodad_uid = false, doodad_deleted_uid = true }
+
 --- What a doodad link in a server line names: the doodad's unique id, the gameobject entry the
--- number after its name is, and the map the line says it stands on, nil for a line that names
--- none, as a near line does; or nil for a line with no doodad link. The server colours the map's
--- number, so it is read off the line scrubbed.
+-- number after its name is, the map the line says it stands on, nil for a line that names none,
+-- as a near line does, and whether it is off the map; or nil for a line with no doodad link. The
+-- server colours the map's number, so it is read off the line scrubbed.
 function Commands.DoodadLink(line)
-	local uid, entry = line:match("|Hdoodad_uid:(%d+):[^|]*|h%[.- %- (%d+)%]|h")
-	if not uid then
+	local link, uid, entry = line:match("|H(doodad_%a*_?uid):(%d+):[^|]*|h%[.- %- (%d+)%]|h")
+	local removed = DOODAD_LINKS[link]
+	if removed == nil then
 		return nil
 	end
-	return tonumber(uid), tonumber(entry), tonumber(Commands.Plain(line):match(" on map (%d+)"))
+	local map = tonumber(Commands.Plain(line):match(" on map (%d+)"))
+	return tonumber(uid), tonumber(entry), map, removed
 end
 
 --- The gameobject entry a gob's selection or spawn line names, a spawn selecting what it makes;
@@ -161,18 +167,27 @@ function Commands.GobLine(line)
 end
 
 --- What a doodad selection's line names, the line `.doodad select` prints and no addon message
--- carries: { uid, entry, name, map }, the doodad's unique id, the entry after its name, its name
--- as the line spells it and the map it stands on; or nil for any other line.
+-- carries: { uid, entry, name, map, removed, status }, the doodad's unique id, the entry after its
+-- name, its name as the line spells it, the map it stands on, whether it is off the map, and if
+-- so the word the line says how in, lower case, as "replaced"; or nil for any other line.
 function Commands.SelectedDoodad(line)
 	if not line:find("Selected doodad", 1, true) then
 		return nil
 	end
-	local uid, entry, map = Commands.DoodadLink(line)
+	local uid, entry, map, removed = Commands.DoodadLink(line)
 	if not (uid and map) then
 		return nil
 	end
-	local name = line:match("|Hdoodad_uid:[^|]*|h%[(.-) %- %d+%]|h")
-	return { uid = uid, entry = entry, name = name, map = map }
+	local name = line:match("|Hdoodad_%a*_?uid:[^|]*|h%[(.-) %- %d+%]|h")
+	local status = removed and Commands.Plain(line):match("%] %((%a+)%)") or nil
+	return {
+		uid = uid,
+		entry = entry,
+		name = name,
+		map = map,
+		removed = removed,
+		status = status and status:lower(),
+	}
 end
 
 --- A reply with its colour codes and link wrappers removed, for quoting in a message.

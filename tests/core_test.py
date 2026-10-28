@@ -279,12 +279,39 @@ SELECTED_DOODAD = (
 )
 
 
+#: The same selection once the doodad is off the map: an import replaced it with a gob.
+REPLACED_DOODAD = SELECTED_DOODAD.replace("|Hdoodad_uid:", "|Hdoodad_deleted_uid:").replace(
+    "]|h|r (UID", "]|h|r (Replaced) (UID"
+)
+
+
+def test_a_doodad_off_the_map_is_read_and_says_how(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    link = lua.eval("Furnish.Commands.DoodadLink")
+    assert link(SELECTED_DOODAD) == (10059564, 326022, 1116, False)
+    assert link(REPLACED_DOODAD) == (10059564, 326022, 1116, True)
+    doodad = lua.eval("Furnish.Commands.SelectedDoodad")(REPLACED_DOODAD)
+    assert (doodad.uid, doodad.name, doodad.removed, doodad.status) == (
+        10059564,
+        "draenei jug",
+        True,
+        "replaced",
+    )
+    standing = lua.eval("Furnish.Commands.SelectedDoodad")(SELECTED_DOODAD)
+    assert (standing.removed, standing.status) == (False, None)
+
+
 def test_a_doodad_link_names_the_map_its_line_colours(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
-    assert lua.eval("Furnish.Commands.DoodadLink")(SELECTED_DOODAD) == (10059564, 326022, 1116)
+    assert lua.eval("Furnish.Commands.DoodadLink")(SELECTED_DOODAD) == (
+        10059564,
+        326022,
+        1116,
+        False,
+    )
     # A near line names no map; its doodads stand on the player's.
     near = "|Hdoodad_uid:4242:0|h[house.wmo - 817579]|h (UID: 4242)"
-    assert lua.eval("Furnish.Commands.DoodadLink")(near) == (4242, 817579, None)
+    assert lua.eval("Furnish.Commands.DoodadLink")(near) == (4242, 817579, None, False)
 
 
 def test_an_angle_is_level_on_either_side_of_nought(tmp_path: Path) -> None:

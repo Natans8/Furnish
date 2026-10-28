@@ -556,10 +556,13 @@ local function updateDoodad()
 		return
 	end
 	local count = #doodad.sets > 0 and Chat.Count(#doodad.sets, "set") or "No sets"
-	panel.Detail:SetText(count .. (doodad.imported and ", imported" or ""))
+	local state = doodad.status or doodad.imported and "imported"
+	panel.Detail:SetText(count .. (state and ", " .. state or ""))
 	panel.UseSource:SetEnabled(not run and #doodad.sets > 0)
-	-- Held while an import waits for its gob, so a second click sends nothing twice.
-	panel.Import:SetEnabled(not run and not doodad.imported and not Console.Busy())
+	-- Held while an import waits for its gob, so a second click sends nothing twice, and for one
+	-- the server has off the map, whose import it refuses.
+	local importable = not (doodad.imported or doodad.removed)
+	panel.Import:SetEnabled(not run and importable and not Console.Busy())
 end
 
 local function update()
@@ -1135,7 +1138,14 @@ local function importLines()
 			text = "Turn the doodad into a gob, which becomes the selected gob. The gob draws only its base set, so while Source follows the selection, the doodad's other sets come chosen.",
 		},
 	}
-	if doodad and doodad.imported then
+	if doodad and doodad.removed then
+		lines[#lines + 1] = {
+			text = ("The server lists the doodad as %s, so it cannot be imported."):format(
+				doodad.status or "off the map"
+			),
+			colour = GREY,
+		}
+	elseif doodad and doodad.imported then
 		lines[#lines + 1] = {
 			text = "Imported already: the doodad is hidden on the map and stays selected.",
 			colour = GREY,
