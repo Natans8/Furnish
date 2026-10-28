@@ -24,8 +24,11 @@ and the data it reads describes content that is not ours.
                                           library embedded in an addon and forbids redistributing
                                           it on its own
        addon/Furnish/Libs/LibStub/       LibStub — placed in the public domain by its authors
+       tests/lua/LibDeflate.lua          LibDeflate 1.0.2 — Haoqian He — zlib licence, its text in
+                                          the file's own header; used by the tests alone, never
+                                          shipped in the addon
 
-   Each library's own notice travels in its folder, unchanged.
+   Each library's own notice travels in its folder, or its file, unchanged.
 
 
 3. NOT LICENSED BY US — described, not owned
