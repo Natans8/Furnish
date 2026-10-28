@@ -1830,9 +1830,10 @@ local function followPointer()
 end
 
 --- Say in a tooltip at the pointer what the piece under it is, enough to place it by hand, set out
--- as the window's boxes are: its model and its set; its position and its rotation, each a row of
--- numbers under its axis words in their colours, as `.gob spawn` takes them; its scale where it is
--- not its model's own; and the command that spawns it. Nil takes the tooltip down.
+-- as the window's boxes are: its model, its set and the display it spawns by; its position and its
+-- rotation, each a row of numbers under its axis words in their colours, as `.gob spawn` takes
+-- them; its scale where it is not its model's own; and what a click on it does. Nil takes the
+-- tooltip down.
 local function showHovered(piece)
 	if not piece then
 		if pieceTip then
@@ -1856,9 +1857,12 @@ local function showHovered(piece)
 		4
 	)
 	grid:SetCellTextColor(line, 1, unpack(colours.title))
+	-- Its set, and beside it the display it spawns by, as `.gob spawn` takes it.
 	line = grid:AddLine()
-	grid:SetCell(line, 1, piece.set, nil, "LEFT", 4)
+	grid:SetCell(line, 1, piece.set, nil, "LEFT", 3)
 	grid:SetCellTextColor(line, 1, unpack(colours.label))
+	grid:SetCell(line, 4, tostring(-piece.display))
+	grid:SetCellTextColor(line, 4, unpack(colours.label))
 	local roll, pitch, turn =
 		Transform.ToAngles({ x = piece.qx, y = piece.qy, z = piece.qz, w = piece.qw })
 	local pose = { x = piece.x, y = piece.y, z = piece.z, roll = roll, pitch = pitch, turn = turn }
@@ -1881,10 +1885,6 @@ local function showHovered(piece)
 		line = grid:AddLine("Scale", scale)
 		grid:SetCellTextColor(line, 1, unpack(colours.label))
 	end
-	line = grid:AddLine()
-	local typed = "Typed: " .. Commands.Typed(Commands.SpawnHere(-piece.display))
-	grid:SetCell(line, 1, typed, nil, "LEFT", 4)
-	grid:SetCellTextColor(line, 1, unpack(colours.label))
 	line = grid:AddLine()
 	grid:SetCell(line, 1, "Click: spawn this piece where the set would put it", nil, "LEFT", 4)
 	grid:SetCellTextColor(line, 1, unpack(colours.click))
