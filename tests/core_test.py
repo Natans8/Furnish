@@ -737,7 +737,10 @@ FRAME = {
     local actor
     actor = recorder(told, {
       SetOnModelLoadedCallback = function(_, fn) told.loaded = fn end,
-      GetActiveBoundingBox = function() return -1, -1, -1, 1, 1, 1 end,
+      GetActiveBoundingBox = function(self)
+        if self.source and self.source.flat then return -4, -4, -0.25, 4, 4, 0.25 end
+        return -1, -1, -1, 1, 1, 1
+      end,
     })
     told.actor = actor
     return actor
@@ -1122,10 +1125,38 @@ def test_a_bands_pieces_come_in_the_order_drawn_whatever_loaded_first(tmp_path: 
     assert chosen(lua) == [7, 8]
 
 
-def core_scene_choosing(tmp_path: Path, *more: str, backwards: bool = False) -> lua51.LuaRuntime:
-    """A scene of a cube at the origin, and any more given, projected as the scene's own lens
-    would, the pointer on the first cube, counting how often what is chosen is told; the models
-    load in the order drawn, or the last first."""
+def test_the_lowest_standing_piece_leads_and_the_widest_among_those_level(
+    tmp_path: Path,
+) -> None:
+    # A cube above the floor, a wide flat piece sunk a little below a cube beside it, chosen top
+    # first: the flat piece leads, since the cube's bottom lies within its height and it covers
+    # more ground, and the rest follow in the order drawn.
+    lua = core_scene_choosing(
+        tmp_path,
+        "{ file = 8, display = 8, x = 0, y = 6, z = -1, qx = 0, qy = 0, qz = 0, qw = 1,"
+        " scale = 1, flat = true },",
+        piece_at(9, (0, -6, 0), 1),
+        floor=(0, 0, 3),
+    )
+    lua.execute("""
+        SHIFT = true
+        for _, i in ipairs({ 1, 3, 2 }) do
+          SCENE:Choose(SCENE.boxes[i].actor, true)
+        end
+    """)
+    assert chosen(lua) == [8, 7, 9]
+
+
+def core_scene_choosing(
+    tmp_path: Path,
+    *more: str,
+    backwards: bool = False,
+    floor: tuple[float, float, float] = (0, 0, 0),
+) -> lua51.LuaRuntime:
+    """A scene of a cube at the floor, the origin unless given, and any more given, projected as
+    the scene's own lens would, the pointer on the first cube, counting how often what is chosen
+    is told; the models load in the order drawn, or the last first. A piece marked flat is a
+    wide slab, a quarter high."""
     lua = lua_core(tmp_path)
     lua.execute(RECORDING_SCENE)
     lua.execute(WIDER_LENS)
@@ -1138,7 +1169,7 @@ def core_scene_choosing(tmp_path: Path, *more: str, backwards: bool = False) -> 
         f"""
         TOLD_CHOSEN = 0
         SCENE = Furnish.Scene.New(FRAME, SAID, nil, function() TOLD_CHOSEN = TOLD_CHOSEN + 1 end)
-        SCENE:Draw({{ {piece_at(7, (0, 0, 0), 1)} {"".join(more)} }})
+        SCENE:Draw({{ {piece_at(7, floor, 1)} {"".join(more)} }})
         {loads}
         SCENE:Tick(0)
         PRESS = {{ FRAME:Project3DPointTo2D(unpack(SCENE.boxes[1].centre)) }}

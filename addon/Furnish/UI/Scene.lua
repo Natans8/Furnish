@@ -14,7 +14,8 @@
 --
 -- A click chooses the piece under the pointer, a shift-click chooses it too, and a shift-drag
 -- chooses every piece whose middle its band holds, as it is drawn; what is chosen stays lit as the
--- pointed piece is, in the order chosen, and the scene says when that changes.
+-- pointed piece is, and the scene says when that changes. Chosen lists them as they would spawn,
+-- the lowest-standing piece first, so that it leads the group they form.
 
 local _, Furnish = ...
 local Scene = {}
@@ -395,6 +396,7 @@ function Scene:Hold(actor)
 		centre = { offset[1] + mx, offset[2] + my, offset[3] + mz },
 	}
 	self.boxes[#self.boxes + 1] = box
+	actor.box = box
 	local low = self.low or { math.huge, math.huge, math.huge }
 	local high = self.high or { -math.huge, -math.huge, -math.huge }
 	for axis = 1, 3 do
@@ -697,8 +699,7 @@ function Scene:Choose(actor, more)
 end
 
 --- Choose what a shift press kept and every loaded piece whose middle its band holds now, in
--- that order, the band's pieces in the order they were drawn, their sets' own, so which of them
--- leads does not hang on which model loaded first. Read afresh each frame the band is stretched,
+-- that order, the band's pieces in the order they were drawn. Read afresh each frame the band is stretched,
 -- so a piece lights as the band reaches it and goes out as the band leaves it. The band's far
 -- corner is in screen pixels, as the pointer is read, and the middles are where the scene draws
 -- them, those behind the camera left out.
@@ -736,11 +737,61 @@ function Scene:Banded(pressed, x1, y1)
 	self:Settle(chosen)
 end
 
---- The pieces chosen, as Draw was given them, in the order chosen.
+--- The ground a held box covers: its footprint, square to the scene.
+local function footprint(box)
+	return (box.outerHigh[1] - box.outerLow[1]) * (box.outerHigh[2] - box.outerLow[2])
+end
+
+--- Which chosen piece leads the group they form: the lowest-standing piece's box, bottom to top,
+-- is the ground they stand on, and of the pieces whose bottom lies within it the one covering
+-- most ground leads, the one drawn first among those alike. Level is read off the boxes rather
+-- than as one height, since a chair's lowest vertex and a carpet's are never the same to the
+-- last digit. So a table leads what is on it, a carpet leads the chairs on it, a floor piece
+-- leads what hangs above it, and a group led from the ground sits on the ground when it is moved
+-- there.
+local function leader(actors)
+	local lowest
+	for _, actor in ipairs(actors) do
+		if not lowest or actor.box.outerLow[3] < lowest.box.outerLow[3] then
+			lowest = actor
+		end
+	end
+	local ground = lowest.box.outerHigh[3]
+	local leads
+	for _, actor in ipairs(actors) do
+		if
+			actor.box.outerLow[3] <= ground
+			and (
+				not leads
+				or footprint(actor.box) > footprint(leads.box)
+				or footprint(actor.box) == footprint(leads.box) and actor.order < leads.order
+			)
+		then
+			leads = actor
+		end
+	end
+	return leads
+end
+
+--- The pieces chosen, as Draw was given them, in the order they would spawn: the one that leads
+-- first, as leader says it, then the rest in the order drawn.
 function Scene:Chosen()
 	local pieces = {}
-	for index, actor in ipairs(self.chosen) do
-		pieces[index] = actor.source
+	if self.chosen[1] then
+		local leads = leader(self.chosen)
+		local rest = {}
+		for _, actor in ipairs(self.chosen) do
+			if actor ~= leads then
+				rest[#rest + 1] = actor
+			end
+		end
+		table.sort(rest, function(a, b)
+			return a.order < b.order
+		end)
+		pieces[1] = leads.source
+		for _, actor in ipairs(rest) do
+			pieces[#pieces + 1] = actor.source
+		end
 	end
 	return pieces
 end

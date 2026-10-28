@@ -1911,7 +1911,7 @@ local function showHovered(piece)
 end
 
 --- Spawn the pieces chosen in the Preview pane where a run of their sets would put them, one
--- alone and several as a group led by the first chosen, the destination first held where it is:
+-- alone and several as a group led by the lowest-standing, the destination first held where it is:
 -- the server selects what it spawns and a run's end selects its group, and a destination that
 -- followed the selection would carry the next pieces off from where their sets put them. What was
 -- chosen is let go, so a second click spawns nothing twice.
@@ -1935,7 +1935,7 @@ local function spawnChosenLines()
 	if #pieces > 1 then
 		lines[#lines + 1] = { label = "Leads", value = pieceName(pieces[1]) }
 		lines[#lines + 1] = {
-			text = "The first chosen leads; a band's pieces follow their sets' order.",
+			text = "The lowest-standing piece leads, the one covering most ground among those level.",
 			colour = GREY,
 		}
 	end
