@@ -432,10 +432,7 @@ local function warnings()
 	-- wherever they were taken.
 	local onto = not spotPinned and Console.Selected()
 	if onto and onto.wmo and onto.file ~= shown.file and not Sets.Same(onto.file, shown.file) then
-		local text = ("These sets are %s's, not %s's, so they may not fit."):format(
-			shown.name,
-			onto.name
-		)
+		local text = ("%s's sets may not fit %s."):format(shown.name, onto.name)
 		said[#said + 1] = { text = text, colour = WARN }
 	end
 	-- A reminder, not a warning: whether highlighting is on is the player's call.
@@ -609,7 +606,7 @@ local function request()
 end
 
 _G.StaticPopupDialogs[JOIN] = {
-	text = "%s is in a group already. The %s join that group, and moving the group moves them too.",
+	text = "%s is in a group already, so the %s join it.",
 	button1 = "Spawn",
 	button2 = _G.CANCEL,
 	OnAccept = function(_, data)
@@ -958,10 +955,9 @@ local function rowEnter(button)
 	local set = button:GetElementData()
 	local lines = setLines(set)
 	if baked(set) then
-		lines[#lines + 1] =
-			{ text = "The WMO draws this set already, as part of its model.", colour = GREEN }
+		lines[#lines + 1] = { text = "The WMO draws it already.", colour = GREEN }
 	elseif set.placed then
-		lines[#lines + 1] = { text = "The doodad drew this set.", colour = GREEN }
+		lines[#lines + 1] = { text = "The doodad drew it.", colour = GREEN }
 	end
 	if Console.ModelsNamed() then
 		local held, unnamed = holds(set)
@@ -989,7 +985,7 @@ local function rowEnter(button)
 			end
 		end)
 	end
-	lines[#lines + 1] = { text = "Click: choose this set alone", colour = GREEN }
+	lines[#lines + 1] = { text = "Click: choose only this set", colour = GREEN }
 	lines[#lines + 1] = { text = "Ctrl- or shift-click: add or remove this set", colour = GREEN }
 	tip(button, set.name, lines)
 end
@@ -1034,8 +1030,7 @@ local function resultEnter(button)
 		{ label = "File", value = wmo.file },
 	}
 	if wmo.blank then
-		lines[#lines + 1] =
-			{ text = "It comes unfurnished: it draws none of its sets itself.", colour = GREY }
+		lines[#lines + 1] = { text = "Unfurnished: it draws none of its sets.", colour = GREY }
 	end
 	lines[#lines + 1] = { text = "Click: show its sets", colour = GREEN }
 	tip(button, wmo.name, lines)
@@ -1134,20 +1129,17 @@ end
 --- What the Import doodad tooltip says: what importing does, and whether it has been.
 local function importLines()
 	local lines = {
-		{
-			text = "Turn the doodad into a gob, which becomes the selected gob. The gob draws only its base set, so while Source follows the selection, the doodad's other sets come chosen.",
-		},
+		{ text = "Turn the doodad into a gob and select it." },
+		{ text = "The sets it drew come chosen.", colour = GREY },
 	}
 	if doodad and doodad.removed then
 		lines[#lines + 1] = {
-			text = ("The server lists the doodad as %s, so it cannot be imported."):format(
-				doodad.status or "off the map"
-			),
+			text = ("Listed as %s, so it can't be imported."):format(doodad.status or "removed"),
 			colour = GREY,
 		}
 	elseif doodad and doodad.imported then
 		lines[#lines + 1] = {
-			text = "Imported already: the doodad is hidden on the map and stays selected.",
+			text = "Imported already.",
 			colour = GREY,
 		}
 	end
@@ -1159,8 +1151,7 @@ local function drawnEnter(button)
 	local set = button:GetElementData()
 	local lines = setLines(set)
 	if set.draws then
-		local text = set.placed and "The doodad draws this set on the map."
-			or "The doodad draws this set as part of its model."
+		local text = set.placed and "The doodad draws it on the map." or "Its model draws it."
 		lines[#lines + 1] = { text = text, colour = GREEN }
 	end
 	tip(button, set.name, lines)
@@ -1434,8 +1425,8 @@ local function buildSource()
 	frame.SourceFollow.Label:SetText("Follow selection")
 	frame.SourceFollow:SetScript("OnClick", Client.Guarded(followSource))
 	hint(frame.SourceFollow, nil, {
-		{ text = "Ticked, the sets are those of the selected WMO." },
-		{ text = "Unticked, they stay this WMO's whatever gob is selected." },
+		{ text = "Ticked: follows the selected WMO." },
+		{ text = "Unticked: stays as it is." },
 	})
 	-- Typed in and left, by Enter or a click away, the ID takes; Escape puts back the one shown.
 	local id = frame.SourceID
@@ -1449,8 +1440,8 @@ local function buildSource()
 	id:HookScript("OnEditFocusGained", id.HighlightText)
 	id:HookScript("OnEditFocusLost", Client.Guarded(idChanged))
 	hint(id, "ID", {
-		{ text = "The gob entry whose WMO the sets come from." },
-		{ text = "Type one to keep that WMO whatever gob is selected." },
+		{ text = "The gob entry of the source's WMO." },
+		{ text = "Type one to keep that WMO." },
 	})
 	listOf(list, provider, "FurnishSetRowTemplate", initRow)
 	list.ScrollBox:RegisterCallback(
@@ -1479,38 +1470,28 @@ end
 local function leadLines(choice)
 	local turns = { text = "A group moves, turns and scales about its leader.", colour = GREY }
 	if choice.word == "nogroup" then
-		return { { text = "Each object stands alone, in no group." } }
+		return { { text = "Each object stands alone." } }
 	elseif choice.word == "pivot" then
 		return {
-			{
-				text = "An invisible object at the destination leads the group, so the set turns about that point. One extra object spawns.",
-			},
+			{ text = "An invisible object at the destination leads." },
+			{ text = "One extra object spawns.", colour = GREY },
 			turns,
 		}
 	elseif choice.word == "first" then
 		return {
-			{ text = "The first object spawned leads the group. No extra object spawns." },
+			{ text = "The first object spawned leads." },
 			turns,
 		}
 	end
 	local lines
 	local selected = selection()
 	if selected and selected.group then
-		lines = {
-			{
-				text = "The objects join the selected group, so moving the group moves them too. No pivot spawns.",
-			},
-		}
+		lines = { { text = "The objects join the selected group." } }
 	else
-		lines = {
-			{
-				text = "The selected gob leads the group, so moving it moves everything. No pivot spawns.",
-			},
-		}
+		lines = { { text = "The selected gob leads." } }
 		if selected and (selected.groupLeader or 0) ~= 0 then
 			lines[#lines + 1] = {
-				text = selected.name
-					.. " is in a group already, so the objects join that group; Spawn asks first.",
+				text = selected.name .. " is in a group already; the objects join it.",
 				colour = WARN,
 			}
 		end
@@ -1558,9 +1539,9 @@ local function buildDestination()
 	frame.DestinationFollow:SetScript("OnClick", Client.Guarded(followDestination))
 	hint(frame.DestinationFollow, nil, {
 		{
-			text = "Ticked, the destination is the selected gob's position, or, with none selected, where you stood when it was read. Here reads it again.",
+			text = "Ticked: follows the selected gob.",
 		},
-		{ text = "Unticked, the destination stays as it is whatever gob is selected." },
+		{ text = "Unticked: stays as it is." },
 	})
 	for order, number in ipairs(NUMBERS) do
 		local box = frame[number.box]
@@ -1597,24 +1578,18 @@ local function buildDestination()
 			fillDestination(from and Pose.Copy(from))
 		end)
 	)
-	hint(
-		frame.Here,
-		nil,
-		{ { text = "Fill the destination with where you stand and the way you face, once." } },
-		"<set> here"
-	)
+	hint(frame.Here, nil, { { text = "Fill in where you stand and face, once." } }, "<set> here")
 	hint(frame.UseSelected, nil, function()
 		local from = selection()
 		if from and from.group then
 			return {
 				{
-					text = "Fill the destination with the selected group's position and facing, once.",
+					text = "Fill in the selected group's position, once.",
 				},
-				{ text = "A group has no roll or pitch of its own, so the destination is level." },
-				{ text = "With Selected group as the group leader, the objects join that group." },
+				{ text = "Level, since a group has no roll or pitch.", colour = GREY },
 			}
 		end
-		return { { text = "Fill the destination with the selected gob's position, once." } }
+		return { { text = "Fill in the selected gob's position, once." } }
 	end)
 
 	buildLeader()
@@ -1640,11 +1615,10 @@ local function buildDoodad()
 	panel.Import:SetScript("OnClick", Client.Guarded(importDoodad))
 	hint(panel.UseSource, nil, {
 		{
-			text = "Show the sets of the doodad's WMO as the source, kept whatever gob is selected, with the sets the doodad drew beyond its base chosen.",
+			text = "Keep the doodad's WMO as the source, the sets it drew chosen.",
 		},
-		{ text = "The destination stays as it is." },
 	})
-	hint(panel.Import, nil, importLines, "import")
+	hint(panel.Import, nil, importLines)
 end
 
 local function buildOffer()
@@ -1689,8 +1663,8 @@ local function buildFooter()
 	frame.Highlight:SetText("Highlighting")
 	frame.Highlight:SetScript("OnClick", Client.Guarded(Console.ToggleHighlight))
 	hint(frame.Highlight, nil, {
-		{ text = "The client's outline on selected objects, on or off." },
-		{ text = Chat.HIGHLIGHT .. ", so you may want it off before a big spawn." },
+		{ text = "Outline selected objects, on or off." },
+		{ text = Chat.HIGHLIGHT .. ".", colour = GREY },
 	})
 	frame.Notice:SetScript(
 		"OnEnter",
@@ -1707,7 +1681,7 @@ local function buildFooter()
 			Console.Stop(true, WAYS)
 		end)
 	)
-	hint(frame.DeleteButton, nil, { { text = "Stop, then delete everything this run spawned." } })
+	hint(frame.DeleteButton, nil, { { text = "Stop, then delete what this run spawned." } })
 end
 
 local function build()

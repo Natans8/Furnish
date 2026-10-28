@@ -32,12 +32,12 @@ for _, grouping in ipairs(Console.GROUPS) do
 	end
 end
 for _, each in ipairs({
-	{ word = "base", field = "base", value = true, hint = "spawn the base set as well" },
+	{ word = "base", field = "base", value = true, hint = "the base set as well" },
 	{
 		word = "quiet",
 		field = "quiet",
 		value = true,
-		hint = "leave the progress counts out of chat, saying only how the run began and ended",
+		hint = "no progress counts in chat",
 	},
 }) do
 	Command.WORDS[#Command.WORDS + 1] = each
@@ -236,7 +236,11 @@ function Command.Hover(words, tooltip)
 	if kind == "import" then
 		return Console.DescribeImport(tooltip)
 	elseif kind == "list" then
-		return Chat.Tip(tooltip, Furnish.NAME, { { text = "List this WMO's doodad sets" } })
+		return Chat.Tip(
+			tooltip,
+			Furnish.NAME,
+			{ { text = "Click: list this WMO's sets", colour = Chat.TIP.click } }
+		)
 	elseif kind == "word" and WORD[value] then
 		return Chat.Tip(tooltip, value, { { text = WORD[value].hint } })
 	end

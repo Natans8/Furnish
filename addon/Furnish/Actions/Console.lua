@@ -55,16 +55,16 @@ Console.GROUPS = {
 		word = "nogroup",
 		group = Group.None,
 		lead = "ungrouped",
-		hint = "spawn every object ungrouped",
+		hint = "every object stands alone",
 	},
 	{ word = "pivot", group = Group.Pivot, lead = "led by a pivot, one extra invisible object" },
 	{
 		word = "first",
 		group = Group.First,
 		lead = "led by the set's first object",
-		hint = "the first object spawned leads the group, so no pivot spawns",
+		hint = "the first object spawned leads, no pivot",
 	},
-	{ word = "merge", hint = "merge the set into the selected gob's group, so no pivot spawns" },
+	{ word = "merge", hint = "join the selected gob's group, no pivot" },
 }
 
 --- The grouping a request that names none gets, which is why the help gives it no word.
@@ -904,8 +904,8 @@ function Console.Describe(request, tooltip)
 	Chat.Tip(tooltip, setName(set), {
 		{ text = about, colour = tip.label },
 		#said > 0 and { text = "with " .. table.concat(said, " and "), colour = tip.label } or {},
-		{ text = "Click: spawn the set onto the selected gob", colour = tip.click },
-		{ text = "Ctrl-click: spawn the set at your feet", colour = tip.click },
+		{ text = "Click: spawn on the selected gob", colour = tip.click },
+		{ text = "Ctrl-click: spawn at your feet", colour = tip.click },
 	})
 end
 
@@ -913,7 +913,7 @@ end
 -- @param tooltip a tooltip owned and empty
 function Console.DescribeImport(tooltip)
 	Chat.Tip(tooltip, Furnish.NAME, {
-		{ text = "Import this WMO and spawn the sets it shows now, grouped on it" },
+		{ text = "Click: import this WMO and spawn its sets on it", colour = Chat.TIP.click },
 	})
 end
 

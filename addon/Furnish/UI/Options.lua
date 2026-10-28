@@ -71,8 +71,8 @@ pace:SetValueStep(1)
 pace:SetObeyStepOnDrag(true)
 pace.Low:SetText(FEWEST)
 pace.High:SetText(MOST)
-pace.tooltipText = "How many commands a run sends before the first is answered. More is faster where"
-	.. " the server is slow to answer; Stop takes back nothing already sent."
+pace.tooltipText = "Commands sent ahead of the server's replies. More is faster; Stop can't take back"
+	.. " what is sent."
 local function paceText(value)
 	pace.Text:SetText(("Commands in flight: %d"):format(value))
 end

@@ -183,7 +183,7 @@ def test_the_help_names_every_command_and_word(tmp_path: Path) -> None:
     lua.eval("Furnish.Command.Hover")("word:merge", lua.eval("FAKE"))
     assert list(lua.eval("TIP").values()) == [
         "merge",
-        "merge the set into the selected gob's group, so no pivot spawns",
+        "join the selected gob's group, no pivot",
     ]
 
 
@@ -828,8 +828,8 @@ def test_resting_on_a_link_says_the_set_and_the_clicks(tmp_path: Path) -> None:
         "Full",
         "Set_Full, set 1 of house, 2 objects",
         "with base",
-        "Click: spawn the set onto the selected gob",
-        "Ctrl-click: spawn the set at your feet",
+        "Click: spawn on the selected gob",
+        "Ctrl-click: spawn at your feet",
     ]
 
 
