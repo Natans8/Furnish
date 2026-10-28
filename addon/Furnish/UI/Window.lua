@@ -1920,6 +1920,10 @@ local function showHovered(piece)
 		line = grid:AddLine("Scale", shownNumber(piece.scale))
 		grid:SetCellTextColor(line, 1, unpack(colours.label))
 	end
+	-- The two clicks a piece answers most; the rest are on the control bar's help.
+	line = grid:AddLine()
+	grid:SetCell(line, 1, "Click: choose. Right-click: spawn.", nil, "LEFT", 4)
+	grid:SetCellTextColor(line, 1, unpack(colours.click))
 	followPointer()
 	grid:Show()
 end
