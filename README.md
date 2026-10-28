@@ -123,8 +123,8 @@ the WMO's origin as `.gob spawn` takes them, in Destination's colours, and its s
 not one. Choosing follows the grammar of the 3D editors: a click chooses a piece alone; a
 shift-click adds one or lets it go; a shift-drag adds every piece in its band as it is drawn,
 and a ctrl-drag takes them away; a ctrl-click makes a piece lead; a right-click spawns the piece
-under the pointer alone. The chosen glow pale cyan, the
-leader white, the pointed piece yellow, and a line beside Spawn counts them and names the
+under the pointer alone. The chosen glow sky blue, the
+leader pale green, the pointed piece yellow, and a line beside Spawn counts them and names the
 leader; Spawn,
 at the pane's foot, spawns them where a run of their sets would put them at Destination, one
 alone and several as a group led by the piece standing lowest, the one covering most ground among

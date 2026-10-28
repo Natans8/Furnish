@@ -17,7 +17,7 @@
 -- shift-drag adds every piece whose middle its band holds, as it is drawn, while a ctrl-drag lets
 -- go of every piece its band holds. A ctrl-click makes a piece lead, choosing it too. A right-click
 -- spawns the pointed piece alone.
--- What is chosen glows cyan, the piece that leads white, the pointed piece yellow, and the scene says
+-- What is chosen glows blue, the piece that leads green, the pointed piece yellow, and the scene says
 -- when that changes. Chosen lists them as they would spawn, the piece that leads first: the
 -- lowest-standing one, unless a ctrl-click has made another lead.
 
@@ -82,12 +82,11 @@ local LENS_STEP = 0.1
 
 --- The kits that light the piece under the pointer and the pieces chosen: a steady pale yellow
 -- glow along the edges, the nearest a scene draws to the outline `.gob select` puts on a gob,
--- which a scene does not draw; the same glow in pale cyan for a chosen piece, judged in game
--- against other pale tones; and in white, the brightest of that family, for the one that leads, as
--- the editors mark the active object by brightness within the selection's colour rather than by
--- another hue, which would say it stands outside the selection. A chosen piece under the pointer
--- keeps its colour.
-local GLOW_KIT, CHOSEN_KIT, LEADER_KIT = 87979, 154655, 88026
+-- which a scene does not draw; the same glow in sky blue for a chosen piece; and in pale green for
+-- the one that leads, a hue of its own as the lead object has in an editor's selection. Both were
+-- judged in game beside the yellow and each other. A chosen piece under the pointer keeps its
+-- colour.
+local GLOW_KIT, CHOSEN_KIT, LEADER_KIT = 87979, 117557, 137834
 
 --- The corners of a box, as which of its two ends each axis takes.
 local CORNERS = {}
