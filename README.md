@@ -78,7 +78,7 @@ is the group. The group a run selects when it ends still stands for the WMO the 
 doodad `.doodad select` picks is a selection of its own, held beside the gob's: it never changes
 Source or Destination, and while there is one a panel stands against the window's right edge with
 its name and the sets of the WMO it is, those it draws already marked baked. Every pick takes
-the panel, the window open or not, and a doodad with no sets Furnish knows of empties it. Use as source keeps
+the panel, the window open or not, and a doodad with no sets Furnish knows of shows there saying so. Use as source keeps
 that WMO as the source, with the sets the doodad drew beyond its base chosen. Import doodad turns
 it into a gob that is selected like any other; while Source follows the selection, the same sets
 come chosen on it, and either block kept as it is stays so. The doodad is

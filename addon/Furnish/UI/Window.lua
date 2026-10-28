@@ -105,6 +105,9 @@ local ROW = 22
 -- its scroll bar takes on the right while it shows.
 local LIST_INSET, BAR_ROOM = 8, 22
 
+--- The room an empty list's line saying why takes, its margins in FurnishListTemplate.
+local EMPTY_ROOM = 40
+
 --- The smallest the window may be drawn, which is the size its layout was made for; it may grow
 -- to twice that.
 local MIN_WIDTH, MIN_HEIGHT = 400, 628
@@ -557,9 +560,9 @@ local function updateDoodad()
 	if not (doodad and doodad.sets) then
 		return
 	end
-	local count = Chat.Count(#doodad.sets, "set")
+	local count = #doodad.sets > 0 and Chat.Count(#doodad.sets, "set") or "No sets"
 	panel.Detail:SetText(count .. (doodad.imported and ", imported" or ""))
-	panel.UseSource:SetEnabled(not run)
+	panel.UseSource:SetEnabled(not run and #doodad.sets > 0)
 	-- Held while an import waits for its gob, so a second click sends nothing twice.
 	panel.Import:SetEnabled(not run and not doodad.imported and not Console.Busy())
 end
@@ -1078,7 +1081,7 @@ local function searchChanged(box, typed)
 	frame.Results.Empty:SetText(("No WMO with sets is named like %s."):format(text))
 	frame.Results.Empty:SetShown(#wmos == 0)
 	local rows = math.min(#wmos, RESULT_ROWS) * ROW + 2 * LIST_INSET
-	frame.Results:SetHeight(rows + (#wmos == 0 and 40 or 0))
+	frame.Results:SetHeight(rows + (#wmos == 0 and EMPTY_ROOM or 0))
 	frame.Results:Show()
 end
 
@@ -1168,19 +1171,23 @@ end
 
 --- Fill the doodad panel with the doodad's name and the sets of the WMO it is, its list as tall
 -- as its sets up to a point, past which it scrolls. A doodad not yet read is read here, each set
--- marked where the doodad draws it, as part of its model or as the map chose; one that is no WMO
--- Furnish has sets for empties the slot, since it is still what `.doodad select` picked.
+-- marked where the doodad draws it, as part of its model or as the map chose. One that is no WMO
+-- Furnish has sets for keeps the slot, its list saying so, since it is still what
+-- `.doodad select` picked and a panel that stayed shut would say nothing at all.
 local function fillDoodad()
 	drawn:Flush()
 	if doodad and not doodad.sets then
 		local of = Console.Source({ entry = doodad.entry, placement = doodad })
+		doodad.name = Client.ModelName(doodad.name)
 		if of then
 			for _, set in ipairs(of.sets) do
 				set.draws = set.placed or Sets.DrawnByRoot(of.file, set)
 			end
-			doodad.name, doodad.sets = Client.ModelName(doodad.name), of.sets
+			doodad.sets = of.sets
 		else
-			doodad = nil
+			local loaded, missing = Reader.Load()
+			doodad.sets = {}
+			doodad.missing = loaded and "Not a WMO Furnish has sets for." or missing
 		end
 	end
 	if not doodad then
@@ -1188,8 +1195,11 @@ local function fillDoodad()
 	end
 	panel.Name:SetText(doodad.name)
 	drawn:InsertTable(doodad.sets)
+	local empty = #doodad.sets == 0
+	panel.Sets.Empty:SetText(doodad.missing or "")
+	panel.Sets.Empty:SetShown(empty)
 	local rows = math.min(#doodad.sets, DOODAD_ROWS)
-	panel:SetHeight(72 + rows * ROW + 2 * LIST_INSET + 82)
+	panel:SetHeight(72 + rows * ROW + 2 * LIST_INSET + (empty and EMPTY_ROOM or 0) + 82)
 end
 
 --- Keep the doodad's WMO as the source whatever is selected, with the sets the doodad drew
