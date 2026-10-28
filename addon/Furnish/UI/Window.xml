@@ -324,12 +324,20 @@
 					<Anchor point="TOPLEFT" x="25" y="-114"/>
 				</Anchors>
 			</EditBox>
-			<!-- The source's WMO itself, spawned at the destination; as wide as its words, which
+			<!-- The source's WMO itself, spawned where the player stands; as wide as its words, which
 			     Window.lua sets. -->
 			<Button parentKey="SpawnSource" inherits="UIPanelButtonTemplate">
 				<Size y="22"/>
 				<Anchors>
 					<Anchor point="LEFT" relativeKey="$parent.SourceID" relativePoint="RIGHT" x="8" y="0"/>
+				</Anchors>
+			</Button>
+			<!-- The chosen sets laid out, in the pane against the window's left edge; on the ID's row,
+			     at its right. -->
+			<Button parentKey="PreviewButton" inherits="UIPanelButtonTemplate">
+				<Size y="22"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-20" y="-113"/>
 				</Anchors>
 			</Button>
 
@@ -470,6 +478,56 @@
 			     gives the window, its sets to the source and itself, as a gob, to the destination. Its
 			     height follows its list, set by Window.lua: the list hangs from the top, and the two
 			     buttons stand on the bottom. -->
+			<!-- The chosen sets laid out, without the WMO, which no model frame can draw: a pane against
+			     the window's left edge, shown by the Preview button. The scene fills it under the
+			     names, and a line under the scene says how to move it. -->
+			<Frame parentKey="Preview" enableMouse="true" hidden="true">
+				<Size x="440" y="460"/>
+				<Anchors>
+					<Anchor point="TOPRIGHT" relativePoint="TOPLEFT" x="-5" y="0"/>
+				</Anchors>
+				<Layers>
+					<Layer level="ARTWORK">
+						<FontString parentKey="Label" inherits="GameFontNormal" justifyH="LEFT">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="16" y="-16"/>
+							</Anchors>
+						</FontString>
+						<FontString parentKey="Name" inherits="GameFontHighlightMedium" justifyH="LEFT" wordwrap="false">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="16" y="-34"/>
+								<Anchor point="TOPRIGHT" x="-16" y="-34"/>
+							</Anchors>
+						</FontString>
+						<FontString parentKey="Detail" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false">
+							<Anchors>
+								<Anchor point="TOPLEFT" x="16" y="-54"/>
+								<Anchor point="TOPRIGHT" x="-16" y="-54"/>
+							</Anchors>
+						</FontString>
+						<FontString parentKey="Hint" inherits="GameFontDisableSmall" justifyH="CENTER">
+							<Anchors>
+								<Anchor point="BOTTOM" x="0" y="16"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Frames>
+					<Frame parentKey="Border" inherits="DialogBorderTranslucentTemplate"/>
+					<Button parentKey="CloseButton" inherits="UIPanelCloseButton">
+						<Anchors>
+							<Anchor point="TOPRIGHT" x="-5" y="-5"/>
+						</Anchors>
+					</Button>
+					<ModelScene parentKey="Scene" inherits="ModelSceneMixinTemplate">
+						<Anchors>
+							<Anchor point="TOPLEFT" x="12" y="-72"/>
+							<Anchor point="BOTTOMRIGHT" x="-12" y="36"/>
+						</Anchors>
+					</ModelScene>
+				</Frames>
+			</Frame>
+
 			<Frame parentKey="Doodad" enableMouse="true" hidden="true">
 				<Size x="300" y="300"/>
 				<Anchors>

@@ -35,6 +35,7 @@ local Chat = Furnish.Chat
 local Names = Furnish.Names
 local Commands = Furnish.Commands
 local Previews = Furnish.Previews
+local Scene = Furnish.Scene
 
 --- The border a list wears, ObjectMover's: a tooltip's edge over a dark shade.
 local PANEL = {
@@ -165,6 +166,10 @@ local NUMBER_ROWS, NUMBER_GAP, NUMBER_ART = { 170, 144 }, 8, 5
 --- A button's caps either side of its words.
 local CAPS = 24
 
+--- How many pieces the Preview pane draws at most, the first of each chosen set in its own order
+-- past it: a few hundred are measured smooth, and thousands are not measured.
+local MOST_PIECES = 1000
+
 --- How many of a doodad's sets its panel shows before its list scrolls.
 local DOODAD_ROWS = 10
 
@@ -172,6 +177,7 @@ local frame = _G.FurnishFrame
 local list = frame.Sets
 local panel = frame.Doodad
 local offer = frame.Blueprint
+local preview = frame.Preview
 local provider, found, drawn =
 	_G.CreateDataProvider(), _G.CreateDataProvider(), _G.CreateDataProvider()
 
@@ -210,6 +216,10 @@ local lead = Console.GROUPED
 --- The run going on, as Console holds it: { total, done, started, deleting }, read as it is
 -- told; and the last run's result the bar has said.
 local run, told
+
+--- The scene the Preview pane draws in, made as the window is built; and what it last drew, as
+-- its source and chosen sets, so it is drawn again only when they change.
+local stage, previewed
 
 --- The search match Enter takes, by its place in the list.
 local picked = 1
@@ -599,6 +609,46 @@ local function updateDoodad()
 	panel.Import:SetEnabled(not run and importable and not Console.Busy())
 end
 
+--- Draw the chosen sets in the Preview pane, while it shows and only when what is chosen changed.
+local function updatePreview()
+	if not preview:IsShown() then
+		return
+	end
+	local indexes = chosenSets()
+	local key = shown and (shown.file .. ":" .. table.concat(indexes, ",")) or ""
+	if key == previewed then
+		return
+	end
+	previewed = key
+	local pieces, names, total = {}, {}, 0
+	for _, set in ipairs(shown and shown.sets or {}) do
+		if chosen[set.index] then
+			names[#names + 1] = set.name
+			for _, piece in ipairs(Rows.Pieces(set.id) or {}) do
+				total = total + 1
+				if #pieces < MOST_PIECES then
+					pieces[#pieces + 1] = piece
+				end
+			end
+		end
+	end
+	stage:Draw(pieces)
+	preview.Name:SetText(shown and shown.name or "No sets")
+	local detail
+	if #names == 0 then
+		detail = "Choose a set to see it laid out."
+	elseif total > #pieces then
+		detail = ("%s, the first %s of %s"):format(
+			table.concat(names, ", "),
+			thousands(#pieces),
+			objects(total)
+		)
+	else
+		detail = ("%s, %s"):format(table.concat(names, ", "), objects(total))
+	end
+	preview.Detail:SetText(detail)
+end
+
 local function update()
 	for _, control in ipairs(CONTROLS) do
 		control:SetEnabled(not run)
@@ -623,6 +673,7 @@ local function update()
 	frame.SpawnSource:SetEnabled(
 		not run and shownEntry ~= nil and Client.CanSpawn(true) and not Console.Busy()
 	)
+	updatePreview()
 	local delete = frame.DeleteButton
 	delete:SetShown(run ~= nil)
 	if run then
@@ -1311,8 +1362,14 @@ end
 
 --- Size each button to its words and its caps.
 local function fitButtons()
-	local buttons =
-		{ frame.Here, frame.UseSelected, frame.SpawnSource, frame.Highlight, offer.Paste }
+	local buttons = {
+		frame.Here,
+		frame.UseSelected,
+		frame.SpawnSource,
+		frame.PreviewButton,
+		frame.Highlight,
+		offer.Paste,
+	}
 	for _, button in ipairs(buttons) do
 		fit(button)
 	end
@@ -1479,6 +1536,16 @@ local function buildSource()
 			} or {},
 		}
 	end)
+	frame.PreviewButton:SetText("Preview")
+	frame.PreviewButton:SetScript(
+		"OnClick",
+		Client.Guarded(function()
+			preview:SetShown(not preview:IsShown())
+			previewed = nil
+			updatePreview()
+		end)
+	)
+	hint(frame.PreviewButton, nil, { { text = "Show the chosen sets laid out, without the WMO." } })
 	listOf(list, provider, "FurnishSetRowTemplate", initRow)
 	list.ScrollBox:RegisterCallback(
 		_G.BaseScrollBoxEvents.OnScroll,
@@ -1659,6 +1726,18 @@ local function buildDoodad()
 	hint(panel.Import, nil, importLines, "import")
 end
 
+local function buildPreview()
+	preview.Label:SetText("Preview")
+	preview.Hint:SetText("Drag to turn, wheel to zoom.")
+	stage = Scene.New(preview.Scene)
+	preview.CloseButton:SetScript(
+		"OnClick",
+		Client.Guarded(function()
+			preview:Hide()
+		end)
+	)
+end
+
 local function buildOffer()
 	offer.Title:SetText(Console.OFFER.title)
 	offer.Why:SetText(Console.OFFER.why)
@@ -1750,6 +1829,7 @@ local function build()
 	buildDoodad()
 	buildFooter()
 	buildOffer()
+	buildPreview()
 	Client.OnSystemLine(doodadSelected)
 	Client.OnSystemLine(importHeard)
 	-- Heard always, as the doodad slot is: an import is done when the server names its gob.

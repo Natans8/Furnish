@@ -686,6 +686,62 @@ def test_a_set_holds_each_model_it_draws_once_with_its_count(tmp_path: Path) -> 
     assert ([m.file for m in models.values()], unknown) == ([1002], 1)
 
 
+def test_a_sets_pieces_are_its_placements_by_the_file_each_draws(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    pieces = lua.eval("Furnish.Rows.Pieces(Furnish.Sets.Pick(900, 1).id)")
+    drawn = sorted((p.file, p.x, p.y, p.z, p.qw, p.scale) for p in pieces.values())
+    assert drawn == [(1001, 1.5, -2.0, 0.25, 1.0, 1.0), (1002, 0.0, 0.0, 3.0, 1.0, 0.5)]
+
+
+#: A model scene that keeps what each actor and the camera were last told, by method.
+RECORDING_SCENE = """
+ACTORS, CAMERA = {}, {}
+local function recorder(into)
+  return setmetatable({}, { __index = function(_, method)
+    return function(_, ...) into[method] = { ... } end
+  end })
+end
+FRAME = {
+  SetCameraNearClip = function() end, SetCameraFarClip = function() end,
+  CreateCameraFromScene = function() end, EnableMouse = function() end,
+  EnableMouseWheel = function() end, SetScript = function() end,
+  GetActiveCamera = function() return recorder(CAMERA) end,
+  CreateActor = function() local told = {} ACTORS[#ACTORS + 1] = told return recorder(told) end,
+}
+"""
+
+
+def test_a_scene_lays_each_piece_about_the_centre_in_its_own_scale(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute(RECORDING_SCENE)
+    lua.execute(
+        """
+        SCENE = Furnish.Scene.New(FRAME)
+        SCENE:Draw({
+          { file = 1, x = 10, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 0.5 },
+          { file = 2, x = 0, y = 2, z = 0, qx = 0, qy = 0, qz = 0.70710678, qw = 0.70710678,
+            scale = 1 },
+        })
+        """
+    )
+    first, second = lua.eval("ACTORS[1]"), lua.eval("ACTORS[2]")
+    # The centre is (5, 1, 0), and an actor stands in its own scaled space.
+    assert tuple(first.SetPosition.values()) == (10.0, -2.0, 0.0)
+    assert tuple(second.SetPosition.values()) == (-5.0, 1.0, 0.0)
+    assert (first.SetModelByFileID[1], first.SetScale[1]) == (1, 0.5)
+    # A quarter turn about the vertical, read as `.gob spawn` reads it.
+    assert second.SetYaw[1] == pytest.approx(math.pi / 2)
+    # Framed at the widest extent, ten yards, a third again.
+    assert lua.eval("CAMERA.SetZoomDistance[1]") == pytest.approx(13)
+    # Drawn again with less, the rest are emptied and hidden.
+    lua.execute(
+        "SCENE:Draw({ { file = 3, x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1,"
+        " scale = 1 } })"
+    )
+    assert lua.eval("ACTORS[2].Hide") is not None
+    assert len(lua.eval("ACTORS")) == 2
+
+
 def test_rows_from_two_sets_spawn_as_one_collection(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     sent = fake_server(lua)

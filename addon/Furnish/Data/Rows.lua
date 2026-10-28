@@ -54,6 +54,35 @@ function Rows.Models(id)
 	return models, unknown
 end
 
+--- A set's placements with the model file each draws, for a scene of the set: each { file, x, y,
+-- z, qx, qy, qz, qw, scale }, about the WMO's origin as the rows are. Those drawing a display the
+-- data names no file for are left out. Nil and the reason where the set is not in the data.
+-- @param id a set id, as Sets.OfFile or Sets.OfPlacement give it
+function Rows.Pieces(id)
+	local rows, reason = Rows.OfSet(id)
+	if not rows then
+		return nil, reason
+	end
+	local pieces = {}
+	for _, row in ipairs(rows) do
+		local file = Reader.ModelFile(row.display)
+		if file then
+			pieces[#pieces + 1] = {
+				file = file,
+				x = row.x,
+				y = row.y,
+				z = row.z,
+				qx = row.qx,
+				qy = row.qy,
+				qz = row.qz,
+				qw = row.qw,
+				scale = row.scale,
+			}
+		end
+	end
+	return pieces
+end
+
 --- Every row of every list given, in the order given.
 function Rows.Union(...)
 	local out = {}

@@ -10,8 +10,9 @@ ROOT = Path(__file__).parents[1]
 FORBIDDEN = re.compile("build" + "ing", re.IGNORECASE)
 
 #: The game's word for a unit picked to act on. A gob is selected, and where a set goes is its
-#: destination, so Furnish never says it; a Blizzard file path that holds it is the client's own.
-UNIT_PICK = re.compile(r"(?<![\\/])" + "tar" + "get", re.IGNORECASE)
+#: destination, so Furnish never says it. A Blizzard file path that holds it is the client's own,
+#: and so is the method that points a model scene's camera, which Furnish cannot rename.
+UNIT_PICK = re.compile(r"(?<![\\/])(?<!Set)" + "tar" + "get", re.IGNORECASE)
 
 WRITTEN = [
     "README.md",
