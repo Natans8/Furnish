@@ -130,13 +130,13 @@ end
 -- @param dx, dy, dz its direction, whose share along the view is one, so its distances are depths
 -- @param low the box's least corner, { x, y, z }
 -- @param high the box's greatest corner
-local function meets(ox, oy, oz, dx, dy, dz, low, high)
-	local near, far = slab(ox, dx, low[1], high[1], -math.huge, math.huge)
+local function meets(ox, oy, oz, dx, dy, dz, lx, ly, lz, hx, hy, hz)
+	local near, far = slab(ox, dx, lx, hx, -math.huge, math.huge)
 	if near then
-		near, far = slab(oy, dy, low[2], high[2], near, far)
+		near, far = slab(oy, dy, ly, hy, near, far)
 	end
 	if near then
-		near, far = slab(oz, dz, low[3], high[3], near, far)
+		near, far = slab(oz, dz, lz, hz, near, far)
 	end
 	return near, far
 end
@@ -339,13 +339,14 @@ end
 -- turned one, so a ray that leaves it before the camera draws is turned off at that, the cheaper
 -- test.
 local function entersBox(ox, oy, oz, dx, dy, dz, box)
-	local _, far = meets(ox, oy, oz, dx, dy, dz, box.outerLow, box.outerHigh)
+	local _, far =
+		meets(ox, oy, oz, dx, dy, dz, box.olx, box.oly, box.olz, box.ohx, box.ohy, box.ohz)
 	if not far or far <= NEAR then
 		return nil
 	end
 	local px, py, pz = into(box, ox, oy, oz, true)
 	local qx, qy, qz = into(box, dx, dy, dz, false)
-	local near = meets(px, py, pz, qx, qy, qz, box.low, box.high)
+	local near = meets(px, py, pz, qx, qy, qz, box.lx, box.ly, box.lz, box.hx, box.hy, box.hz)
 	if near and near > NEAR then
 		return near
 	end
@@ -355,13 +356,12 @@ end
 --- Whether a point in the scene's axes lies within a held box, turned as its piece is.
 local function holds(box, x, y, z)
 	local px, py, pz = into(box, x, y, z, true)
-	local low, high = box.low, box.high
-	return px >= low[1]
-		and px <= high[1]
-		and py >= low[2]
-		and py <= high[2]
-		and pz >= low[3]
-		and pz <= high[3]
+	return px >= box.lx
+		and px <= box.hx
+		and py >= box.ly
+		and py <= box.hy
+		and pz >= box.lz
+		and pz <= box.hz
 end
 
 --- Take in a loaded actor's box, turned, scaled and placed as its piece stands: kept as the model's
@@ -375,8 +375,8 @@ function Scene:Hold(actor)
 	end
 	local piece = actor.piece
 	local turn, offset, scale = piece.turn, piece.offset, piece.scale
-	local outerLow = { math.huge, math.huge, math.huge }
-	local outerHigh = { -math.huge, -math.huge, -math.huge }
+	local olx, oly, olz = math.huge, math.huge, math.huge
+	local ohx, ohy, ohz = -math.huge, -math.huge, -math.huge
 	for _, corner in ipairs(CORNERS) do
 		local tx, ty, tz = Transform.Turned(
 			turn,
@@ -385,9 +385,9 @@ function Scene:Hold(actor)
 			(corner[3] and z2 or z1) * scale
 		)
 		local x, y, z = offset[1] + tx, offset[2] + ty, offset[3] + tz
-		outerLow[1], outerHigh[1] = math.min(outerLow[1], x), math.max(outerHigh[1], x)
-		outerLow[2], outerHigh[2] = math.min(outerLow[2], y), math.max(outerHigh[2], y)
-		outerLow[3], outerHigh[3] = math.min(outerLow[3], z), math.max(outerHigh[3], z)
+		olx, ohx = math.min(olx, x), math.max(ohx, x)
+		oly, ohy = math.min(oly, y), math.max(ohy, y)
+		olz, ohz = math.min(olz, z), math.max(ohz, z)
 	end
 	-- The matrix's columns are the scene's axes carried into the model's, each the length of one
 	-- model unit: the turn undone, then the scale divided out.
@@ -401,10 +401,19 @@ function Scene:Hold(actor)
 		actor = actor,
 		offset = offset,
 		undo = { ax, bx, cx, ay, by, cy, az, bz, cz },
-		low = { x1, y1, z1 },
-		high = { x2, y2, z2 },
-		outerLow = outerLow,
-		outerHigh = outerHigh,
+		-- The model's own box, in its own axes; and the box square to the scene around it.
+		lx = x1,
+		ly = y1,
+		lz = z1,
+		hx = x2,
+		hy = y2,
+		hz = z2,
+		olx = olx,
+		oly = oly,
+		olz = olz,
+		ohx = ohx,
+		ohy = ohy,
+		ohz = ohz,
 		volume = (x2 - x1) * (y2 - y1) * (z2 - z1) * scale ^ 3,
 		centre = { offset[1] + mx, offset[2] + my, offset[3] + mz },
 	}
@@ -412,10 +421,9 @@ function Scene:Hold(actor)
 	actor.box = box
 	local low = self.low or { math.huge, math.huge, math.huge }
 	local high = self.high or { -math.huge, -math.huge, -math.huge }
-	for axis = 1, 3 do
-		low[axis] = math.min(low[axis], outerLow[axis])
-		high[axis] = math.max(high[axis], outerHigh[axis])
-	end
+	low[1], low[2], low[3] = math.min(low[1], olx), math.min(low[2], oly), math.min(low[3], olz)
+	high[1], high[2], high[3] =
+		math.max(high[1], ohx), math.max(high[2], ohy), math.max(high[3], ohz)
 	self.low, self.high = low, high
 end
 
@@ -665,7 +673,7 @@ end
 
 --- The ground a held box covers: its footprint, square to the scene.
 local function footprint(box)
-	return (box.outerHigh[1] - box.outerLow[1]) * (box.outerHigh[2] - box.outerLow[2])
+	return (box.ohx - box.olx) * (box.ohy - box.oly)
 end
 
 --- Which chosen piece leads the group they form: the lowest-standing piece's box, from its bottom
@@ -679,15 +687,15 @@ end
 local function leader(actors)
 	local lowest
 	for _, actor in ipairs(actors) do
-		if not lowest or actor.box.outerLow[3] < lowest.box.outerLow[3] then
+		if not lowest or actor.box.olz < lowest.box.olz then
 			lowest = actor
 		end
 	end
-	local ground = (lowest.box.outerLow[3] + lowest.box.outerHigh[3]) / 2
+	local ground = (lowest.box.olz + lowest.box.ohz) / 2
 	local leads
 	for _, actor in ipairs(actors) do
 		if
-			actor.box.outerLow[3] <= ground
+			actor.box.olz <= ground
 			and (
 				not leads
 				or footprint(actor.box) > footprint(leads.box)
