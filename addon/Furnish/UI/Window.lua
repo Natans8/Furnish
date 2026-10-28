@@ -569,12 +569,19 @@ local function updateDoodad()
 	panel.Import:SetEnabled(not run and importable and not Console.Busy())
 end
 
+--- What to call a piece: its model's name, or its model's file.
+local function pieceName(piece)
+	return Client.FileName(piece.file) or ("model %d"):format(piece.file)
+end
+
 --- Say in the Preview pane how many pieces are chosen in it, and offer to spawn them while any
 -- are and nothing runs.
 local function updateChosen()
 	local count = stage:Count()
 	local detail = previewedDetail or ""
-	if count > 0 then
+	if count > 1 then
+		detail = ("%s, %d chosen, %s leads"):format(detail, count, pieceName(stage:Leader()))
+	elseif count > 0 then
 		detail = ("%s, %d chosen"):format(detail, count)
 	end
 	preview.Detail:SetText(detail)
@@ -1829,12 +1836,8 @@ local PIECE_CLICKS = {
 	"Click: choose it alone",
 	"Shift-click: choose it too",
 	"Shift-drag: choose a band of them",
+	"Ctrl-click: choose it and make it lead",
 }
-
---- What to call a piece: its model's name, or its model's file.
-local function pieceName(piece)
-	return Client.FileName(piece.file) or ("model %d"):format(piece.file)
-end
 
 --- Stand the piece's tooltip just off the pointer, as the client's own does at the pointer.
 local function followPointer()
@@ -1933,9 +1936,11 @@ local function spawnChosenLines()
 	local pieces = stage:Chosen()
 	local lines = { { text = "Where their sets would put them." } }
 	if #pieces > 1 then
-		lines[#lines + 1] = { label = "Leads", value = pieceName(pieces[1]) }
+		local leads, made = stage:Leader()
+		lines[#lines + 1] = { label = "Leads", value = pieceName(leads) }
 		lines[#lines + 1] = {
-			text = "The lowest-standing piece leads, the one covering most ground among those level.",
+			text = made and "Made to lead by a ctrl-click."
+				or "The lowest-standing piece leads, the one covering most ground among those level.",
 			colour = GREY,
 		}
 	end

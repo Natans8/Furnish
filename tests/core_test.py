@@ -714,6 +714,7 @@ GetCursorPosition = function() return 100, 50 end
 HELD = {}
 IsMouseButtonDown = function(button) return HELD[button] end
 IsShiftKeyDown = function() return SHIFT end
+IsControlKeyDown = function() return CTRL end
 local function recorder(into, own)
   return setmetatable(own or {}, { __index = function(_, method)
     return function(_, ...) into[method] = { ... } end
@@ -1145,6 +1146,23 @@ def test_the_lowest_standing_piece_leads_and_the_widest_among_those_level(
         end
     """)
     assert chosen(lua) == [8, 7, 9]
+
+
+def test_a_ctrl_click_makes_a_piece_lead_until_it_is_let_go(tmp_path: Path) -> None:
+    # Three alike cubes on one floor, so the first drawn leads by rule; a ctrl-click on the
+    # third chooses it too and makes it lead, told though the set did not change; letting it go
+    # with a shift-click gives the lead back to the rule.
+    lua = core_scene_choosing(tmp_path, piece_at(8, (0, 6, 0), 1), piece_at(9, (0, -6, 0), 1))
+    lua.execute("SCENE:Choose(SCENE.boxes[1].actor) SCENE:Choose(SCENE.boxes[2].actor, true)")
+    assert chosen(lua) == [7, 8] and lua.eval("TOLD_CHOSEN") == 2
+    x, y = lua.eval("{ FRAME:Project3DPointTo2D(unpack(SCENE.boxes[3].centre)) }").values()
+    lua.execute(f"GetCursorPosition = function() return {x}, {y} end SCENE:Tick(0) CTRL = true")
+    click(lua)
+    assert chosen(lua) == [9, 7, 8] and lua.eval("TOLD_CHOSEN") == 3
+    assert lua.eval("select(2, SCENE:Leader())") is True
+    lua.execute("CTRL, SHIFT = nil, true")
+    click(lua)
+    assert chosen(lua) == [7, 8] and lua.eval("select(2, SCENE:Leader())") is False
 
 
 def core_scene_choosing(

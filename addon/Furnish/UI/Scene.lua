@@ -15,7 +15,8 @@
 -- A click chooses the piece under the pointer, a shift-click chooses it too, and a shift-drag
 -- chooses every piece whose middle its band holds, as it is drawn; what is chosen stays lit as the
 -- pointed piece is, and the scene says when that changes. Chosen lists them as they would spawn,
--- the lowest-standing piece first, so that it leads the group they form.
+-- the lowest-standing piece first, so that it leads the group they form, unless a ctrl-click has
+-- made another lead.
 
 local _, Furnish = ...
 local Scene = {}
@@ -181,7 +182,7 @@ function Scene.New(frame, onLoad, onHover, onChoose)
 		if button == "LeftButton" then
 			local x, y = _G.GetCursorPosition()
 			local more = _G.IsShiftKeyDown()
-			self.pressed = { x = x, y = y, more = more }
+			self.pressed = { x = x, y = y, more = more, lead = _G.IsControlKeyDown() }
 			-- With shift held, the press draws a band rather than turning the camera, and what
 			-- is chosen as it is pressed stays chosen under the band.
 			if more then
@@ -655,7 +656,7 @@ function Scene:Settle(chosen)
 		end
 	end
 	if same then
-		return
+		return false
 	end
 	for _, actor in ipairs(was) do
 		actor.chosen = nil
@@ -664,6 +665,10 @@ function Scene:Settle(chosen)
 		actor.chosen = true
 	end
 	self.chosen = chosen
+	-- A piece made to lead leads only while it is chosen.
+	if self.lead and self.lead.chosen ~= true then
+		self.lead = nil
+	end
 	for _, actor in ipairs(was) do
 		self:Paint(actor)
 	end
@@ -673,29 +678,38 @@ function Scene:Settle(chosen)
 	if self.onChoose then
 		self.onChoose()
 	end
+	return true
 end
 
 --- Choose the piece an actor draws alone, in place of what was chosen, or too, which toggles it;
--- nil alone chooses none.
+-- nil alone chooses none. Made to lead, it is chosen too and leads the group in place of the
+-- piece the rule would pick, until it is let go.
 -- @param actor the piece's actor, or nil
 -- @param more true to keep what was chosen
-function Scene:Choose(actor, more)
+-- @param lead true to make the piece lead
+function Scene:Choose(actor, more, lead)
 	local chosen = {}
-	if more then
+	local led = self.lead
+	if more or (lead and actor) then
 		for _, each in ipairs(self.chosen) do
 			if each ~= actor then
 				chosen[#chosen + 1] = each
 			end
 		end
 	end
-	if actor and not (more and actor.chosen == true) then
+	if lead and actor then
+		chosen[#chosen + 1] = actor
+		self.lead = actor
+	elseif actor and not (more and actor.chosen == true) then
 		chosen[#chosen + 1] = actor
 	elseif actor then
 		-- Let go under the pointer, the piece goes dark until the pointer leaves it, or the light
 		-- it keeps as the pointed piece would hide that it was let go.
 		self.dimmed = actor
 	end
-	self:Settle(chosen)
+	if not self:Settle(chosen) and self.lead ~= led and self.onChoose then
+		self.onChoose()
+	end
 end
 
 --- Choose what a shift press kept and every loaded piece whose middle its band holds now, in
@@ -779,12 +793,22 @@ function Scene:Count()
 	return #self.chosen
 end
 
+--- The piece that leads, as Draw was given it: the one a ctrl-click made lead, or the one the
+-- rule picks; and whether it was made to. Nil where none is chosen.
+function Scene:Leader()
+	if not self.chosen[1] then
+		return nil
+	end
+	local made = self.lead
+	return (made or leader(self.chosen)).source, made ~= nil
+end
+
 --- The pieces chosen, as Draw was given them, in the order they would spawn: the one that leads
--- first, as leader says it, then the rest in the order drawn.
+-- first, as Leader says it, then the rest in the order drawn.
 function Scene:Chosen()
 	local pieces = {}
 	if self.chosen[1] then
-		local leads = leader(self.chosen)
+		local leads = self.lead or leader(self.chosen)
 		local rest = {}
 		for _, actor in ipairs(self.chosen) do
 			if actor ~= leads then
@@ -815,7 +839,7 @@ function Scene:Release(button)
 	self.band:Hide()
 	local x, y = _G.GetCursorPosition()
 	if wandered(self.frame, pressed, x, y) <= CLICK_SLOP then
-		self:Choose(self.hovered, pressed.more)
+		self:Choose(self.hovered, pressed.more, pressed.lead)
 	elseif pressed.more then
 		self:Banded(pressed, x, y)
 	end
@@ -948,7 +972,7 @@ function Scene:Draw(pieces)
 	for _, actor in ipairs(self.chosen) do
 		actor.chosen = nil
 	end
-	self.chosen = {}
+	self.chosen, self.lead = {}, nil
 	self.loaded, self.took, self.started = 0, nil, Client.Now()
 	local function loaded(actor)
 		if self.drawing == drawing and actor.drawing ~= drawing then
