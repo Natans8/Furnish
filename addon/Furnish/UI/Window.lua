@@ -1795,10 +1795,29 @@ local function buildPreviewGrip()
 	end)
 end
 
+--- Name the piece under the pointer in a tooltip at the pointer, with its scale where it is not
+-- its model's own; nil takes the tooltip down.
+local function showHovered(piece)
+	local scene = preview.Scene
+	if not piece then
+		if _G.GameTooltip:IsOwned(scene) then
+			_G.GameTooltip:Hide()
+		end
+		return
+	end
+	local lines = {}
+	if piece.scale ~= 1 then
+		lines[1] = { label = "Scale", value = shownNumber(piece.scale) }
+	end
+	_G.GameTooltip:SetOwner(scene, "ANCHOR_CURSOR")
+	Chat.Tip(_G.GameTooltip, Client.FileName(piece.file) or ("Model %d"):format(piece.file), lines)
+	_G.GameTooltip:Show()
+end
+
 local function buildPreview()
 	preview.Label:SetText("Preview")
 	preview.Hint:SetText("Drag to turn, right-drag to pan, wheel to zoom.")
-	stage = Scene.New(preview.Scene, showLoading)
+	stage = Scene.New(preview.Scene, showLoading, showHovered)
 	buildControls()
 	buildPreviewGrip()
 	preview.CloseButton:SetScript(

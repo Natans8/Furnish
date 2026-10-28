@@ -692,7 +692,7 @@ def test_a_sets_pieces_are_its_placements_by_the_file_each_draws(tmp_path: Path)
 #: narrower, with a tangent of 0.5. Every model is a two-yard cube about its origin, and loads only
 #: when LOAD calls it in, as the client calls back.
 RECORDING_SCENE = """
-ACTORS, CAMERA, TOLD, SCRIPTS, NOW = {}, {}, {}, {}, 10
+ACTORS, CAMERA, TOLD, SCRIPTS, HOOKED, NOW = {}, {}, {}, {}, {}, 10
 GetTime = function() return NOW end
 -- The pointer rests on the scene's middle unless a test moves it.
 GetCursorPosition = function() return 100, 50 end
@@ -704,7 +704,8 @@ end
 FRAME = {
   SetCameraNearClip = function() end, SetCameraFarClip = function() end,
   CreateCameraFromScene = function() end, EnableMouse = function() end,
-  EnableMouseWheel = function() end, HookScript = function() end,
+  EnableMouseWheel = function() end,
+  HookScript = function(_, name, fn) HOOKED[name] = fn end,
   SetScript = function(_, name, fn) SCRIPTS[name] = fn end,
   GetCameraFieldOfView = function() return 2 * math.atan(0.5) end,
   GetWidth = function() return 200 end, GetHeight = function() return 100 end,
@@ -865,6 +866,35 @@ def test_the_wheel_grabs_the_piece_under_the_pointer_at_its_depth(tmp_path: Path
         tuple(-a * reach for a in ahead)
     )
     assert lua.eval("CAMERA.SetZoomDistance[1]") == pytest.approx((framed - reach) * 0.88)
+
+
+def test_the_piece_under_the_pointer_is_outlined_and_named(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute(RECORDING_SCENE)
+    lua.execute(
+        """
+        HOVERS = {}
+        SCENE = Furnish.Scene.New(FRAME, SAID, function(piece)
+          HOVERS[#HOVERS + 1] = piece and piece.file or false
+        end)
+        SCENE:Draw({ { file = 7, x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 } })
+        LOAD(1) SCENE:Tick(0)
+        """
+    )
+    # Not looked for until the pointer is on the scene.
+    assert lua.eval("ACTORS[1].SetSpellVisualKit") is None
+    # On the scene's middle the pointer is on the cube, which takes the outline and is named.
+    lua.execute("HOOKED.OnEnter() SCENE:Tick(0)")
+    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (90111, False)
+    assert lua.eval("HOVERS[#HOVERS]") == 7
+    # Off the cube, the outline comes off and the name goes.
+    lua.execute("GetCursorPosition = function() return 0, 100 end SCENE:Tick(0)")
+    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (0,)
+    assert lua.eval("HOVERS[#HOVERS]") is False
+    # Back on it, then off the scene altogether.
+    lua.execute("GetCursorPosition = function() return 100, 50 end SCENE:Tick(0) HOOKED.OnLeave()")
+    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (0,)
+    assert lua.eval("HOVERS[#HOVERS]") is False
 
 
 def test_a_held_rotate_button_turns_and_reset_reframes(tmp_path: Path) -> None:

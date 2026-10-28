@@ -47,6 +47,10 @@ local YAW, PITCH = math.rad(225), math.rad(35)
 --- How far the camera tilts up or down, short of looking straight down the vertical.
 local STEEPEST = 1.45
 
+--- The kit that outlines the piece under the pointer: the outline Gilded Claws draws, judged the
+-- same as the glow `.gob select` puts on a gob.
+local HOVER_KIT = 90111
+
 --- The corners of a box, as which of its two ends each axis takes.
 local CORNERS = {}
 for i = 0, 7 do
@@ -94,13 +98,16 @@ end
 --- A scene over a ModelScene frame, made from ModelSceneMixinTemplate.
 -- @param onLoad called as the models load, with how many have, how many there are, and the
 --   seconds since the drawing began
+-- @param onHover called when the piece under the pointer changes, with that piece as Draw was
+--   given it, or nil where there is none
 -- @return the scene, which Draw fills
-function Scene.New(frame, onLoad)
+function Scene.New(frame, onLoad, onHover)
 	local self = setmetatable({
 		frame = frame,
 		actors = {},
 		boxes = {},
 		onLoad = onLoad,
+		onHover = onHover,
 		yaw = YAW,
 		pitch = PITCH,
 		zoom = 1,
@@ -133,6 +140,16 @@ function Scene.New(frame, onLoad)
 		"OnUpdate",
 		Client.Guarded(function(_, elapsed)
 			self:Tick(elapsed)
+		end)
+	)
+	frame:HookScript("OnEnter", function()
+		self.pointed = true
+	end)
+	frame:HookScript(
+		"OnLeave",
+		Client.Guarded(function()
+			self.pointed = false
+			self:Hover(nil)
 		end)
 	)
 	return self
@@ -169,6 +186,8 @@ function Scene:Aim()
 	camera:SetZoomDistance(self.distance * self.zoom)
 	camera:SnapAllInterpolatedValues()
 	camera:SynchronizeCamera()
+	-- What lies under a pointer that has not moved may have.
+	self.looked = nil
 end
 
 --- Stand back far enough that the sphere around everything loaded fits the narrower of the
@@ -226,6 +245,7 @@ function Scene:Hold(actor)
 			box[axis], box[axis + 3] = math.min(box[axis], value), math.max(box[axis + 3], value)
 		end
 	end
+	box.actor = actor
 	self.boxes[#self.boxes + 1] = box
 	local low = self.low or { math.huge, math.huge, math.huge }
 	local high = self.high or { -math.huge, -math.huge, -math.huge }
@@ -299,15 +319,14 @@ function Scene:Drag(action, button, pointed)
 	self.dragged = { x = x, y = y, button = button, action = action }
 end
 
---- Move what the camera turns about and zooms toward to the nearest piece under the pointer, at
--- that piece's depth, the camera staying where it stands: zooming and panning then go at the pace
--- of what is pointed at rather than of the middle of the set. Nothing there leaves it be.
-function Scene:Grab()
+--- The nearest loaded piece under the pointer, by its box: the box, which names its actor, how
+-- deep along the view it lies, and where the camera stands. Nil where the pointer is on none.
+function Scene:Pick()
 	local frame = self.frame
 	local scale = frame:GetEffectiveScale()
 	local half = frame:GetHeight() * scale / 2
 	if not self.boxes[1] or half <= 0 then
-		return
+		return nil
 	end
 	local x, y = _G.GetCursorPosition()
 	local cx, cy = frame:GetCenter()
@@ -323,20 +342,43 @@ function Scene:Grab()
 		fy + ry * across + uy * upward,
 		fz + rz * across + uz * upward,
 	}
-	local nearest
+	local nearest, picked
 	for _, box in ipairs(self.boxes) do
 		local depth = enters(origin, ray, box)
 		if depth and (not nearest or depth < nearest) then
-			nearest = depth
+			nearest, picked = depth, box
 		end
 	end
-	if nearest then
-		self.centre = {
-			origin[1] + fx * nearest,
-			origin[2] + fy * nearest,
-			origin[3] + fz * nearest,
-		}
-		self.zoom = nearest / self.distance
+	return picked, nearest, origin
+end
+
+--- Move what the camera turns about and zooms toward to the nearest piece under the pointer, at
+-- that piece's depth, the camera staying where it stands: zooming and panning then go at the pace
+-- of what is pointed at rather than of the middle of the set. Nothing there leaves it be.
+function Scene:Grab()
+	local picked, depth, origin = self:Pick()
+	if picked then
+		local fx, fy, fz = forwardOf(self.yaw, self.pitch)
+		self.centre = { origin[1] + fx * depth, origin[2] + fy * depth, origin[3] + fz * depth }
+		self.zoom = depth / self.distance
+	end
+end
+
+--- Outline the piece under the pointer and say which it is, taking the outline off the last.
+-- @param actor the piece's actor, or nil for none
+function Scene:Hover(actor)
+	if actor == self.hovered then
+		return
+	end
+	if self.hovered then
+		self.hovered:SetSpellVisualKit(0)
+	end
+	self.hovered = actor
+	if actor then
+		actor:SetSpellVisualKit(HOVER_KIT, false)
+	end
+	if self.onHover then
+		self.onHover(actor and actor.piece)
 	end
 end
 
@@ -368,6 +410,17 @@ function Scene:Tick(elapsed)
 		else
 			self.yaw = self.yaw + self.spin * SPIN * (elapsed or 0)
 			self:Aim()
+		end
+	end
+	-- The piece under the pointer is looked for again when the pointer or the camera has moved,
+	-- and not while a drag holds the view.
+	if self.pointed and not self.dragged then
+		local x, y = _G.GetCursorPosition()
+		local looked = self.looked
+		if not (looked and looked[1] == x and looked[2] == y) then
+			self.looked = { x, y }
+			local box = self:Pick()
+			self:Hover(box and box.actor)
 		end
 	end
 	if self.arrived then
@@ -425,7 +478,7 @@ function Scene:Draw(pieces)
 			end
 			local offset = { piece.x - cx, piece.y - cy, piece.z - cz }
 			local turn = { x = piece.qx, y = piece.qy, z = piece.qz, w = piece.qw }
-			actor.piece = { offset = offset, turn = turn, scale = scale }
+			actor.piece = { file = piece.file, offset = offset, turn = turn, scale = scale }
 			actor:ClearModel()
 			actor:SetUseCenterForOrigin(false, false, false)
 			actor:SetPosition(offset[1] / scale, offset[2] / scale, offset[3] / scale)
@@ -443,6 +496,8 @@ function Scene:Draw(pieces)
 		self.actors[index]:ClearModel()
 		self.actors[index]:Hide()
 	end
+	self:Hover(nil)
+	self.looked = nil
 	self.total = placed
 	self:Tell()
 end
