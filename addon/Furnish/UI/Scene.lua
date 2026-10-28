@@ -371,7 +371,8 @@ function Scene:Hover(actor)
 		return
 	end
 	if self.hovered then
-		self.hovered:SetSpellVisualKit(0)
+		-- Nil takes a kit off, as the client's own actors are cleared; nought leaves it on.
+		self.hovered:SetSpellVisualKit(nil)
 	end
 	self.hovered = actor
 	if actor then

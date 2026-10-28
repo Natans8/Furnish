@@ -890,11 +890,11 @@ def test_the_piece_under_the_pointer_is_marked_and_named(tmp_path: Path) -> None
     assert lua.eval("HOVERS[#HOVERS]") == 7
     # Off the cube, the glow comes off and the name goes.
     lua.execute("GetCursorPosition = function() return 0, 100 end SCENE:Tick(0)")
-    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (0,)
+    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == ()
     assert lua.eval("HOVERS[#HOVERS]") is False
     # Back on it, then off the scene altogether.
     lua.execute("GetCursorPosition = function() return 100, 50 end SCENE:Tick(0) HOOKED.OnLeave()")
-    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (0,)
+    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == ()
     assert lua.eval("HOVERS[#HOVERS]") is False
 
 
