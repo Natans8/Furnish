@@ -1838,14 +1838,6 @@ local OFF_POINTER = 16
 --- The hovered piece's tooltip, drawn by LibQTip as a grid; nil while none shows.
 local pieceTip
 
---- What the clicks on a piece do, as its tooltip says them.
-local PIECE_CLICKS = {
-	"Click: choose it alone",
-	"Shift-click: choose it too",
-	"Shift-drag: choose a band of them",
-	"Ctrl-click: choose it and make it lead",
-}
-
 --- Stand the piece's tooltip just off the pointer, as the client's own does at the pointer.
 local function followPointer()
 	if not pieceTip then
@@ -1911,22 +1903,15 @@ local function showHovered(piece)
 		line = grid:AddLine("Scale", shownNumber(piece.scale))
 		grid:SetCellTextColor(line, 1, unpack(colours.label))
 	end
-	for _, click in ipairs(PIECE_CLICKS) do
-		line = grid:AddLine()
-		grid:SetCell(line, 1, click, nil, "LEFT", 4)
-		grid:SetCellTextColor(line, 1, unpack(colours.click))
-	end
 	followPointer()
 	grid:Show()
 end
 
---- Spawn the pieces chosen in the Preview pane where a run of their sets would put them, one
--- alone and several as a group led by the lowest-standing, the destination first held where it is:
--- the server selects what it spawns and a run's end selects its group, and a destination that
--- followed the selection would carry the next pieces off from where their sets put them. What was
--- chosen is let go, so a second click spawns nothing twice.
-local function spawnChosen()
-	local pieces = stage:Chosen()
+--- Spawn pieces of the Preview pane where a run of their sets would put them, one alone and
+-- several as a group led by the first given, the destination first held where it is: the server
+-- selects what it spawns and a run's end selects its group, and a destination that followed the
+-- selection would carry the next pieces off from where their sets put them.
+local function spawnPieces(pieces)
 	if run or not spot or #pieces == 0 then
 		return
 	end
@@ -1934,11 +1919,31 @@ local function spawnChosen()
 	local what = #pieces == 1 and pieceName(pieces[1])
 		or ("%d pieces of %s"):format(#pieces, shown.name)
 	Console.SpawnPieces(pieces, what, Pose.Copy(spot), WAYS)
-	stage:Choose(nil)
 	update()
 end
 
---- What the pane's Spawn offers: where the pieces go, and that the destination is held there.
+--- Spawn the pieces chosen, the one that leads first, and let them go, so a second click spawns
+-- nothing twice.
+local function spawnChosen()
+	spawnPieces(stage:Chosen())
+	stage:Choose(nil)
+end
+
+--- Spawn the piece right-clicked alone, whatever is chosen.
+local function spawnHovered(piece)
+	spawnPieces({ piece })
+end
+
+--- How pieces are chosen in the pane, as the Spawn tooltip ends: the grammar the 3D editors
+-- share.
+local CHOOSING = {
+	"Click chooses a piece; shift-click adds one, makes a chosen one lead, or lets the leader go.",
+	"Shift-drag adds a band of pieces, ctrl-drag takes one away; ctrl-click adds or lets go of one.",
+	"Right-click spawns the piece under the pointer alone.",
+}
+
+--- What the pane's Spawn offers: where the pieces go, that the destination is held there, and
+-- how pieces are chosen.
 local function spawnChosenLines()
 	local pieces = stage:Chosen()
 	local lines = { { text = "Where their sets would put them." } }
@@ -1946,7 +1951,7 @@ local function spawnChosenLines()
 		local leads, made = stage:Leader()
 		lines[#lines + 1] = { label = "Leads", value = pieceName(leads) }
 		lines[#lines + 1] = {
-			text = made and "Made to lead by a ctrl-click."
+			text = made and "Made to lead by a shift-click."
 				or "The lowest-standing piece leads, the one covering most ground among those level.",
 			colour = GREY,
 		}
@@ -1957,13 +1962,18 @@ local function spawnChosenLines()
 			colour = GREY,
 		}
 	end
+	for _, way in ipairs(CHOOSING) do
+		lines[#lines + 1] = { text = way, colour = GREY }
+	end
 	return lines
 end
 
 local function buildPreview()
 	preview.Label:SetText("Preview")
-	preview.Hint:SetText("Drag turns, right-drag pans, wheel zooms; click chooses.")
-	stage = Scene.New(preview.Scene, showLoading, showHovered, updateChosen)
+	preview.Hint:SetText(
+		"Drag turns, wheel zooms, right-drag pans; click chooses, right-click spawns."
+	)
+	stage = Scene.New(preview.Scene, showLoading, showHovered, updateChosen, spawnHovered)
 	preview.Scene:HookScript("OnUpdate", Client.Guarded(followPointer))
 	buildControls()
 	buildPreviewGrip()

@@ -1060,8 +1060,12 @@ def test_a_shift_click_chooses_a_piece_too_and_again_lets_it_go(tmp_path: Path) 
     lua.execute(f"GetCursorPosition = function() return {x}, {y} end SCENE:Tick(0)")
     click(lua)
     assert chosen(lua) == [7, 8]
-    # Shift-clicked again, a chosen piece is let go, the first keeping its place; under the
-    # pointer still, it turns back from blue to the pointed yellow, so the letting go shows.
+    # Shift-clicked again, a chosen piece is made to lead, and glows cyan; shift-clicked as the
+    # leader, it is let go, the first keeping its place, and under the pointer still it turns
+    # back to the pointed yellow, so the letting go shows.
+    click(lua)
+    assert chosen(lua) == [8, 7]
+    assert tuple(lua.eval("ACTORS[2].SetSpellVisualKit").values()) == (154655, False)
     click(lua)
     assert chosen(lua) == [7]
     assert tuple(lua.eval("ACTORS[2].SetSpellVisualKit").values()) == (87979, False)
@@ -1148,24 +1152,51 @@ def test_the_lowest_standing_piece_leads_and_the_widest_among_those_level(
     assert chosen(lua) == [8, 7, 9]
 
 
-def test_a_ctrl_click_makes_a_piece_lead_until_it_is_let_go(tmp_path: Path) -> None:
-    # Three alike cubes on one floor, so the first drawn leads by rule; a ctrl-click on the
-    # third chooses it too and makes it lead, told though the set did not change; letting it go
-    # with a shift-click gives the lead back to the rule.
+def test_a_ctrl_click_adds_a_piece_or_lets_it_go(tmp_path: Path) -> None:
+    # Three alike cubes on one floor, so the first drawn leads by rule: a ctrl-click on the third
+    # adds it, the rule still leading, and another lets it go.
     lua = core_scene_choosing(tmp_path, piece_at(8, (0, 6, 0), 1), piece_at(9, (0, -6, 0), 1))
     lua.execute("SCENE:Choose(SCENE.boxes[1].actor) SCENE:Choose(SCENE.boxes[2].actor, true)")
     assert chosen(lua) == [7, 8] and lua.eval("TOLD_CHOSEN") == 2
     x, y = lua.eval("{ FRAME:Project3DPointTo2D(unpack(SCENE.boxes[3].centre)) }").values()
     lua.execute(f"GetCursorPosition = function() return {x}, {y} end SCENE:Tick(0) CTRL = true")
     click(lua)
-    assert chosen(lua) == [9, 7, 8] and lua.eval("TOLD_CHOSEN") == 3
-    # The lead's glow moves with it: the third cube cyan, the first back to the chosen blue.
-    assert tuple(lua.eval("ACTORS[3].SetSpellVisualKit").values()) == (154655, False)
-    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (117557, False)
-    assert lua.eval("select(2, SCENE:Leader())") is True
-    lua.execute("CTRL, SHIFT = nil, true")
+    assert chosen(lua) == [7, 8, 9] and lua.eval("select(2, SCENE:Leader())") is False
+    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (154655, False)
     click(lua)
-    assert chosen(lua) == [7, 8] and lua.eval("select(2, SCENE:Leader())") is False
+    assert chosen(lua) == [7, 8]
+
+
+def test_a_ctrl_drag_lets_go_of_every_piece_its_band_holds(tmp_path: Path) -> None:
+    lua = core_scene_choosing(tmp_path, piece_at(8, (0, 6, 0), 1), piece_at(9, (0, -6, 0), 1))
+    lua.execute("for i = 1, 3 do SCENE:Choose(SCENE.boxes[i].actor, true) end")
+    assert chosen(lua) == [7, 8, 9]
+    # A ctrl press just short of the second cube's middle, dragged just past it, takes the second
+    # away as it goes and leaves the others.
+    x, y = lua.eval("{ FRAME:Project3DPointTo2D(unpack(SCENE.boxes[2].centre)) }").values()
+    lua.execute(
+        f"""
+        CTRL, HELD.LeftButton = true, true
+        GetCursorPosition = function() return {x - 3}, {y - 3} end
+        SCRIPTS.OnMouseDown(FRAME, 'LeftButton')
+        GetCursorPosition = function() return {x + 3}, {y + 3} end
+        SCENE:Tick(0)
+        """
+    )
+    assert chosen(lua) == [7, 9]
+    lua.execute("HELD.LeftButton = nil SCENE:Tick(0)")
+    assert chosen(lua) == [7, 9] and lua.eval("SCENE.pressed") is None
+
+
+def test_a_right_click_spawns_the_pointed_piece_and_a_right_drag_does_not(tmp_path: Path) -> None:
+    lua = core_scene_choosing(tmp_path)
+    lua.execute("SCRIPTS.OnMouseDown(FRAME, 'RightButton') SCRIPTS.OnMouseUp(FRAME, 'RightButton')")
+    assert lua.eval("SPAWNED") == 7 and chosen(lua) == []
+    lua.execute(
+        "SPAWNED = nil SCRIPTS.OnMouseDown(FRAME, 'RightButton')"
+        " GetCursorPosition = function() return 0, 100 end SCRIPTS.OnMouseUp(FRAME, 'RightButton')"
+    )
+    assert lua.eval("SPAWNED") is None
 
 
 def core_scene_choosing(
@@ -1189,7 +1220,8 @@ def core_scene_choosing(
     lua.execute(
         f"""
         TOLD_CHOSEN = 0
-        SCENE = Furnish.Scene.New(FRAME, SAID, nil, function() TOLD_CHOSEN = TOLD_CHOSEN + 1 end)
+        SCENE = Furnish.Scene.New(FRAME, SAID, nil, function() TOLD_CHOSEN = TOLD_CHOSEN + 1 end,
+          function(piece) SPAWNED = piece.file end)
         SCENE:Draw({{ {piece_at(7, floor, 1)} {"".join(more)} }})
         {loads}
         SCENE:Tick(0)

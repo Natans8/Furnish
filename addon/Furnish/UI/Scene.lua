@@ -12,12 +12,14 @@
 -- The client's own scene script moves the camera every frame; the scene only says where it looks
 -- from.
 --
--- A click chooses the piece under the pointer, a shift-click chooses it too, and a shift-drag
--- chooses every piece whose middle its band holds, as it is drawn; what is chosen glows blue, the
--- piece that leads cyan, the pointed piece yellow, and the scene says when that changes. Chosen
--- lists them as they would spawn,
--- the lowest-standing piece first, so that it leads the group they form, unless a ctrl-click has
--- made another lead.
+-- Choosing follows the grammar the 3D editors share. A click chooses the piece under the pointer
+-- alone, and on nothing chooses none. Shift adds: a shift-click adds a piece, or, on a chosen piece,
+-- makes it lead, or, on the leader, lets it go; a shift-drag adds every piece whose middle its band
+-- holds, as it is drawn. Ctrl takes away: a ctrl-click lets a chosen piece go, or adds one, and a
+-- ctrl-drag lets go of every piece its band holds. A right-click spawns the pointed piece alone.
+-- What is chosen glows blue, the piece that leads cyan, the pointed piece yellow, and the scene says
+-- when that changes. Chosen lists them as they would spawn, the piece that leads first: the
+-- lowest-standing one, unless a shift-click has made another lead.
 
 local _, Furnish = ...
 local Scene = {}
@@ -149,8 +151,9 @@ end
 -- @param onHover called when the piece under the pointer changes, with that piece as Draw was
 --   given it, or nil where there is none
 -- @param onChoose called when the pieces chosen change, which Chosen then lists
+-- @param onSpawn called when a piece is right-clicked, with that piece as Draw was given it
 -- @return the scene, which Draw fills
-function Scene.New(frame, onLoad, onHover, onChoose)
+function Scene.New(frame, onLoad, onHover, onChoose, onSpawn)
 	local self = setmetatable({
 		frame = frame,
 		actors = {},
@@ -159,6 +162,7 @@ function Scene.New(frame, onLoad, onHover, onChoose)
 		onLoad = onLoad,
 		onHover = onHover,
 		onChoose = onChoose,
+		onSpawn = onSpawn,
 		yaw = YAW,
 		pitch = PITCH,
 		zoom = 1,
@@ -182,18 +186,19 @@ function Scene.New(frame, onLoad, onHover, onChoose)
 	-- its own way; its per-frame script stays, since it is what moves the camera, and a drag is
 	-- read beside it.
 	frame:SetScript("OnMouseDown", function(_, button)
+		local x, y = _G.GetCursorPosition()
+		local pressed = { button = button, x = x, y = y }
+		self.pressed = pressed
 		if button == "LeftButton" then
-			local x, y = _G.GetCursorPosition()
-			local more = _G.IsShiftKeyDown()
-			self.pressed = { x = x, y = y, more = more, lead = _G.IsControlKeyDown() }
-			-- With shift held, the press draws a band rather than turning the camera, and what
-			-- is chosen as it is pressed stays chosen under the band.
-			if more then
+			pressed.more, pressed.less = _G.IsShiftKeyDown(), _G.IsControlKeyDown()
+			-- With shift or ctrl held, the press draws a band rather than turning the camera,
+			-- shift's adding to what was chosen as it was pressed and ctrl's taking away from it.
+			if pressed.more or pressed.less then
 				local kept = {}
 				for index, actor in ipairs(self.chosen) do
 					kept[index] = actor
 				end
-				self.pressed.kept = kept
+				pressed.kept = kept
 				return
 			end
 		end
@@ -742,26 +747,29 @@ function Scene:Settle(chosen)
 	return true
 end
 
---- Choose the piece an actor draws alone, in place of what was chosen, or too, which toggles it;
--- nil alone chooses none. Made to lead, it is chosen too and leads the group in place of the
--- piece the rule would pick, until it is let go.
+--- Choose the piece an actor draws: alone, in place of what was chosen, nil alone choosing none.
+-- With more, as shift says, it is added to what is chosen; chosen already, it is made to lead the
+-- group in place of the piece the rule picks, until it is let go; leading already, or chosen
+-- alone, it is let go. With less, as ctrl says, a chosen piece is let go and another is added.
 -- @param actor the piece's actor, or nil
--- @param more true to keep what was chosen
--- @param lead true to make the piece lead
-function Scene:Choose(actor, more, lead)
+-- @param more true to add, as shift says
+-- @param less true to take away, as ctrl says
+function Scene:Choose(actor, more, less)
 	local chosen = {}
 	local led = self.lead
-	if more or (lead and actor) then
+	if more or less then
 		for _, each in ipairs(self.chosen) do
 			if each ~= actor then
 				chosen[#chosen + 1] = each
 			end
 		end
 	end
-	if lead and actor then
-		chosen[#chosen + 1] = actor
-		self.lead = actor
-	elseif actor and not (more and actor.chosen == true) then
+	if actor and more and actor.chosen == true then
+		if actor ~= self.leading and self.chosen[2] then
+			chosen[#chosen + 1] = actor
+			self.lead = actor
+		end
+	elseif actor and not (less and actor.chosen == true) then
 		chosen[#chosen + 1] = actor
 	end
 	if not self:Settle(chosen) and self.lead ~= led then
@@ -772,11 +780,12 @@ function Scene:Choose(actor, more, lead)
 	end
 end
 
---- Choose what a shift press kept and every loaded piece whose middle its band holds now, in
--- that order, the band's pieces in the order they were drawn. Read afresh each frame the band is stretched,
--- so a piece lights as the band reaches it and goes out as the band leaves it. The band's far
--- corner is in screen pixels, as the pointer is read, and the middles are where the scene draws
--- them, those behind the camera left out.
+--- Choose what the band of a shift or ctrl press makes of what the press kept: shift's adds every
+-- loaded piece whose middle the band holds now, after the kept in the order they were drawn, and
+-- ctrl's takes every such piece away. Read afresh each frame the band is stretched, so a piece
+-- lights as the band reaches it and goes out as the band leaves it. The band's far corner is in
+-- screen pixels, as the pointer is read, and the middles are where the scene draws them, those
+-- behind the camera left out.
 function Scene:Banded(pressed, x1, y1)
 	local frame = self.frame
 	local scale = frame:GetEffectiveScale()
@@ -790,7 +799,7 @@ function Scene:Banded(pressed, x1, y1)
 	end
 	for _, box in ipairs(self.boxes) do
 		local actor, middle = box.actor, box.centre
-		if not kept[actor] then
+		if (kept[actor] == true) == (pressed.less == true) then
 			local depth = (middle[1] - eye[1]) * fx
 				+ (middle[2] - eye[2]) * fy
 				+ (middle[3] - eye[3]) * fz
@@ -802,11 +811,24 @@ function Scene:Banded(pressed, x1, y1)
 			end
 		end
 	end
-	table.sort(within, function(a, b)
-		return a.order < b.order
-	end)
-	for _, actor in ipairs(within) do
-		chosen[#chosen + 1] = actor
+	if pressed.less then
+		local gone, stays = {}, {}
+		for _, actor in ipairs(within) do
+			gone[actor] = true
+		end
+		for _, actor in ipairs(chosen) do
+			if not gone[actor] then
+				stays[#stays + 1] = actor
+			end
+		end
+		chosen = stays
+	else
+		table.sort(within, function(a, b)
+			return a.order < b.order
+		end)
+		for _, actor in ipairs(within) do
+			chosen[#chosen + 1] = actor
+		end
 	end
 	self:Settle(chosen)
 end
@@ -850,21 +872,32 @@ function Scene:Chosen()
 	return pieces
 end
 
---- A press let go. The left button's, let go where it was made, is a click, which chooses the
--- piece under the pointer alone or, with shift, too; dragged with shift, its band chose as it
--- went and is read once more where it was let go; dragged without, it turned the camera.
+--- A press let go where it was made is a click: the left button's chooses the piece under the
+-- pointer, as shift and ctrl say, and the right button's spawns it. A left press dragged with
+-- shift or ctrl drew a band, which chose as it went and is read once more where it was let go;
+-- dragged without, it turned the camera, as the right button's panned it.
 function Scene:Release(button)
 	self.dragged = nil
 	local pressed = self.pressed
+	if not pressed or pressed.button ~= button then
+		return
+	end
 	self.pressed = nil
-	if button ~= "LeftButton" or not pressed then
+	local x, y = _G.GetCursorPosition()
+	local clicked = wandered(self.frame, pressed, x, y) <= CLICK_SLOP
+	if button == "RightButton" then
+		if clicked and self.hovered and self.onSpawn then
+			self.onSpawn(self.hovered.source)
+		end
+		return
+	end
+	if button ~= "LeftButton" then
 		return
 	end
 	self.band:Hide()
-	local x, y = _G.GetCursorPosition()
-	if wandered(self.frame, pressed, x, y) <= CLICK_SLOP then
-		self:Choose(self.hovered, pressed.more, pressed.lead)
-	elseif pressed.more then
+	if clicked then
+		self:Choose(self.hovered, pressed.more, pressed.less)
+	elseif pressed.kept then
 		self:Banded(pressed, x, y)
 	end
 end
@@ -917,7 +950,7 @@ end
 function Scene:Tick(elapsed)
 	-- A press let go off the scene is not heard by it, so the button is read as it is.
 	local pressed = self.pressed
-	local banding = pressed and pressed.more
+	local banding = pressed and pressed.kept ~= nil
 	if banding then
 		if _G.IsMouseButtonDown("LeftButton") then
 			self:Stretch(pressed)
