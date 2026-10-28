@@ -24,17 +24,34 @@ function Transform.Multiply(a, b)
 	}
 end
 
+--- The three numbers of a vector turned by a quaternion, for a caller that keeps vectors as
+-- numbers rather than tables, as one testing many boxes a frame does.
+function Transform.Turned(q, x, y, z)
+	-- q * v * conj(q), with the middle product written out for a pure vector.
+	local tx = 2 * (q.y * z - q.z * y)
+	local ty = 2 * (q.z * x - q.x * z)
+	local tz = 2 * (q.x * y - q.y * x)
+	return x + q.w * tx + (q.y * tz - q.z * ty),
+		y + q.w * ty + (q.z * tx - q.x * tz),
+		z + q.w * tz + (q.x * ty - q.y * tx)
+end
+
 --- A vector turned by a quaternion.
 function Transform.Rotate(q, v)
-	-- q * v * conj(q), with the middle product written out for a pure vector.
-	local tx = 2 * (q.y * v.z - q.z * v.y)
-	local ty = 2 * (q.z * v.x - q.x * v.z)
-	local tz = 2 * (q.x * v.y - q.y * v.x)
-	return {
-		x = v.x + q.w * tx + (q.y * tz - q.z * ty),
-		y = v.y + q.w * ty + (q.z * tx - q.x * tz),
-		z = v.z + q.w * tz + (q.x * ty - q.y * tx),
-	}
+	local x, y, z = Transform.Turned(q, v.x, v.y, v.z)
+	return { x = x, y = y, z = z }
+end
+
+--- The quaternion that undoes another: a placement's turn is a unit quaternion, whose inverse is
+-- its conjugate.
+function Transform.Inverse(q)
+	return { x = -q.x, y = -q.y, z = -q.z, w = q.w }
+end
+
+--- A placement's own turn as a quaternion, from the four numbers a row carries.
+-- @param row { qx, qy, qz, qw, ... } as the reader gives a placement
+function Transform.TurnOf(row)
+	return { x = row.qx, y = row.qy, z = row.qz, w = row.qw }
 end
 
 --- The quaternion for roll about X, then pitch about Y, then turn about Z, in degrees.
@@ -95,8 +112,8 @@ function Transform.Placer(position, rotation, scale)
 	return function(row)
 		local offset =
 			Transform.Rotate(anchor, { x = row.x * scale, y = row.y * scale, z = row.z * scale })
-		local own = { x = row.qx, y = row.qy, z = row.qz, w = row.qw }
-		local roll, pitch, turn = Transform.ToAngles(Transform.Multiply(anchor, own))
+		local roll, pitch, turn =
+			Transform.ToAngles(Transform.Multiply(anchor, Transform.TurnOf(row)))
 		return {
 			x = position.x + offset.x,
 			y = position.y + offset.y,

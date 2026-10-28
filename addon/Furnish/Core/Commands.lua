@@ -39,12 +39,19 @@ function Commands.IsUnit(scale)
 	return math.abs(scale - 1) < 0.0005
 end
 
+--- What `.gob spawn` takes for a display: the display as a negative number, where a positive one
+-- is a gameobject entry.
+-- @param display the gameobject display id, as the data holds it, positive
+function Commands.OfDisplay(display)
+	return -display
+end
+
 --- The spawn command for a display at a world pose, saying only what differs from a plain
 -- spawn: scale 1, a level rotation and a northward turn each cost no word.
 -- @param display the gameobject display id, as the data holds it, positive
 -- @param pose { x, y, z, roll, pitch, turn, scale }, what Transform.Place answers
 function Commands.Spawn(display, pose)
-	return Commands.SpawnObject(-display, pose)
+	return Commands.SpawnObject(Commands.OfDisplay(display), pose)
 end
 
 --- The spawn command for what `.gob spawn` takes, where the player stands and the way they face,

@@ -12,11 +12,36 @@ local _, Furnish = ...
 local Chat = {}
 Furnish.Chat = Chat
 
---- The colours lines are drawn in: gold for a command and a number, white for a name, the
--- client's link blue for what a click acts on, grey for what is said in passing, red for a
--- fault, and the blue of the prefix.
-Chat.GOLD, Chat.WHITE, Chat.BLUE, Chat.GREY, Chat.RED, Chat.PREFIX =
-	"|cffffd100", "|cffffffff", "|cff71d5ff", "|cff9d9d9d", "|cffff2020", "|cff66ccff"
+--- A tooltip's colours: the title, a label beside its value, a plain line, what a click does,
+-- a warning and a refusal.
+Chat.TIP = {
+	title = { 1, 0.82, 0 },
+	label = { 0.62, 0.62, 0.62 },
+	text = { 1, 1, 1 },
+	click = { 0.25, 1, 0.25 },
+	warning = { 1, 0.5, 0.5 },
+	refusal = { 1, 0.13, 0.13 },
+}
+
+--- The escape that colours what follows it in a line, up to Chat.END.
+-- @param colour { r, g, b }, each 0 to 1
+function Chat.Escape(colour)
+	return ("|cff%02x%02x%02x"):format(
+		math.floor(colour[1] * 255 + 0.5),
+		math.floor(colour[2] * 255 + 0.5),
+		math.floor(colour[3] * 255 + 0.5)
+	)
+end
+
+--- The colours lines are drawn in, as escapes: the tooltip's own gold for a command and a number,
+-- white for a name, grey for what is said in passing and red for a fault, with the client's link
+-- blue for what a click acts on and the blue of the prefix.
+Chat.GOLD, Chat.WHITE, Chat.GREY, Chat.RED =
+	Chat.Escape(Chat.TIP.title),
+	Chat.Escape(Chat.TIP.text),
+	Chat.Escape(Chat.TIP.label),
+	Chat.Escape(Chat.TIP.refusal)
+Chat.BLUE, Chat.PREFIX = "|cff71d5ff", "|cff66ccff"
 Chat.END = "|r"
 
 --- A count with its thousands set apart.
@@ -58,17 +83,6 @@ end
 --- The risk a player is reminded of before a big spawn. Whether highlighting is on stays the
 -- player's to decide, so Furnish only says this and never turns it off.
 Chat.HIGHLIGHT = "Highlighting too many objects can crash the game"
-
---- A tooltip's colours: the title, a label beside its value, a plain line, what a click does,
--- a warning and a refusal.
-Chat.TIP = {
-	title = { 1, 0.82, 0 },
-	label = { 0.62, 0.62, 0.62 },
-	text = { 1, 1, 1 },
-	click = { 0.25, 1, 0.25 },
-	warning = { 1, 0.5, 0.5 },
-	refusal = { 1, 0.13, 0.13 },
-}
 
 --- Fill a tooltip that is owned already: a gold title, then each line, a { label, value } pair
 -- drawn as two columns, or a { text, colour } line of its own, wrapped. Every tooltip Furnish

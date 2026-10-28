@@ -168,7 +168,8 @@ def test_a_refused_command_is_said_once_with_the_prefix(tmp_path: Path) -> None:
 def test_the_help_names_every_command_and_word(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lines = run(lua, "help")
-    assert lines[0] == "|cffffd100Furnish|r|cff9d9d9d spawns a WMO's doodad sets as objects|r"
+    gold, grey = lua.eval("Furnish.Chat.GOLD"), lua.eval("Furnish.Chat.GREY")
+    assert lines[0] == f"{gold}Furnish|r{grey} spawns a WMO's doodad sets as objects|r"
     assert lines[1] == "  |cffffd100/furn|r: the window"
     assert lines[2] == "  |cffffd100/furn list [<entry>]|r: a WMO's sets, as buttons"
     # The words share one line, each a link whose tooltip says what it does.

@@ -39,18 +39,11 @@ function Rows.Pieces(id)
 	for _, row in ipairs(rows) do
 		local file = Reader.ModelFile(row.display)
 		if file then
-			pieces[#pieces + 1] = {
-				display = row.display,
-				file = file,
-				x = row.x,
-				y = row.y,
-				z = row.z,
-				qx = row.qx,
-				qy = row.qy,
-				qz = row.qz,
-				qw = row.qw,
-				scale = row.scale,
-			}
+			local piece = { file = file }
+			for key, value in pairs(row) do
+				piece[key] = value
+			end
+			pieces[#pieces + 1] = piece
 		end
 	end
 	return pieces
