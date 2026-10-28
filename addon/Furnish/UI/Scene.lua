@@ -13,13 +13,13 @@
 -- from.
 --
 -- Choosing follows the grammar the 3D editors share. A click chooses the piece under the pointer
--- alone, and on nothing chooses none. Shift adds: a shift-click adds a piece, or, on a chosen piece,
--- makes it lead, or, on the leader, lets it go; a shift-drag adds every piece whose middle its band
--- holds, as it is drawn. Ctrl takes away: a ctrl-click lets a chosen piece go, or adds one, and a
--- ctrl-drag lets go of every piece its band holds. A right-click spawns the pointed piece alone.
--- What is chosen glows blue, the piece that leads cyan, the pointed piece yellow, and the scene says
+-- alone, and on nothing chooses none. A shift-click adds a piece or lets a chosen one go, and a
+-- shift-drag adds every piece whose middle its band holds, as it is drawn, while a ctrl-drag lets
+-- go of every piece its band holds. A ctrl-click makes a piece lead, choosing it too. A right-click
+-- spawns the pointed piece alone.
+-- What is chosen glows cyan, the piece that leads blue, the pointed piece yellow, and the scene says
 -- when that changes. Chosen lists them as they would spawn, the piece that leads first: the
--- lowest-standing one, unless a shift-click has made another lead.
+-- lowest-standing one, unless a ctrl-click has made another lead.
 
 local _, Furnish = ...
 local Scene = {}
@@ -82,10 +82,10 @@ local LENS_STEP = 0.1
 
 --- The kits that light the piece under the pointer and the pieces chosen: a steady pale yellow
 -- glow along the edges, the nearest a scene draws to the outline `.gob select` puts on a gob,
--- which a scene does not draw, and the same glow in sky blue for a chosen piece and pale cyan for
+-- which a scene does not draw, and the same glow in pale cyan for a chosen piece and sky blue for
 -- the one that leads, both judged in game against other pale tones. A chosen piece under the
 -- pointer keeps its colour.
-local GLOW_KIT, CHOSEN_KIT, LEADER_KIT = 87979, 117557, 154655
+local GLOW_KIT, CHOSEN_KIT, LEADER_KIT = 87979, 154655, 117557
 
 --- The corners of a box, as which of its two ends each axis takes.
 local CORNERS = {}
@@ -748,28 +748,26 @@ function Scene:Settle(chosen)
 end
 
 --- Choose the piece an actor draws: alone, in place of what was chosen, nil alone choosing none.
--- With more, as shift says, it is added to what is chosen; chosen already, it is made to lead the
--- group in place of the piece the rule picks, until it is let go; leading already, or chosen
--- alone, it is let go. With less, as ctrl says, a chosen piece is let go and another is added.
+-- With more, as shift says, it is added to what is chosen, or let go where it was chosen. Made to
+-- lead, as ctrl says, it is chosen too and leads the group in place of the piece the rule picks,
+-- until it is let go.
 -- @param actor the piece's actor, or nil
--- @param more true to add, as shift says
--- @param less true to take away, as ctrl says
-function Scene:Choose(actor, more, less)
+-- @param more true to add or let go, as shift says
+-- @param lead true to make the piece lead, as ctrl says
+function Scene:Choose(actor, more, lead)
 	local chosen = {}
 	local led = self.lead
-	if more or less then
+	if more or (lead and actor) then
 		for _, each in ipairs(self.chosen) do
 			if each ~= actor then
 				chosen[#chosen + 1] = each
 			end
 		end
 	end
-	if actor and more and actor.chosen == true then
-		if actor ~= self.leading and self.chosen[2] then
-			chosen[#chosen + 1] = actor
-			self.lead = actor
-		end
-	elseif actor and not (less and actor.chosen == true) then
+	if lead and actor then
+		chosen[#chosen + 1] = actor
+		self.lead = actor
+	elseif actor and not (more and actor.chosen == true) then
 		chosen[#chosen + 1] = actor
 	end
 	if not self:Settle(chosen) and self.lead ~= led then
@@ -874,7 +872,8 @@ end
 
 --- A press let go where it was made is a click: the left button's chooses the piece under the
 -- pointer, as shift and ctrl say, and the right button's spawns it. A left press dragged with
--- shift or ctrl drew a band, which chose as it went and is read once more where it was let go;
+-- shift or ctrl drew a band, adding or taking away, which chose as it went and is read once more
+-- where it was let go;
 -- dragged without, it turned the camera, as the right button's panned it.
 function Scene:Release(button)
 	self.dragged = nil

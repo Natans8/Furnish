@@ -561,8 +561,9 @@ local function start(rows, destination, group, about)
 		say(("spawning %s %s, %s"):format(about.what, about.where, about.lead))
 	end
 	-- A run ends by selecting its group, and highlighting too many objects can crash the client.
-	-- Whether it is on is the player's to decide, so the first run of a session only reminds them.
-	if not reminded then
+	-- Whether it is on is the player's to decide, so the first such run of a session only reminds
+	-- them; a run forming no group selects nothing and needs no reminder.
+	if not reminded and group ~= Group.None then
 		reminded = true
 		say(
 			("%s; %s turns it off"):format(

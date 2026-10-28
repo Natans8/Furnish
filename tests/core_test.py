@@ -1030,13 +1030,13 @@ def test_a_click_chooses_the_piece_under_the_pointer_alone(tmp_path: Path) -> No
     lua = core_scene_choosing(tmp_path)
     click(lua)
     assert chosen(lua) == [7] and lua.eval("TOLD_CHOSEN") == 1
-    # Chosen, the cube turns from the pointed yellow to the chosen blue, the yellow cleared first,
-    # and stays blue once the pointer leaves it.
-    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (117557, False)
+    # Chosen, the cube turns from the pointed yellow to the chosen cyan, the yellow cleared first,
+    # and stays cyan once the pointer leaves it.
+    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (154655, False)
     assert lua.eval("ACTORS[1].ClearAllEffects") is not None
     lua.execute("ACTORS[1].ClearAllEffects = nil")
     lua.execute("GetCursorPosition = function() return 0, 100 end SCENE:Tick(0)")
-    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (117557, False)
+    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (154655, False)
     assert lua.eval("ACTORS[1].ClearAllEffects") is None
     # A click on nothing chooses none, and the light goes out.
     click(lua)
@@ -1060,12 +1060,8 @@ def test_a_shift_click_chooses_a_piece_too_and_again_lets_it_go(tmp_path: Path) 
     lua.execute(f"GetCursorPosition = function() return {x}, {y} end SCENE:Tick(0)")
     click(lua)
     assert chosen(lua) == [7, 8]
-    # Shift-clicked again, a chosen piece is made to lead, and glows cyan; shift-clicked as the
-    # leader, it is let go, the first keeping its place, and under the pointer still it turns
-    # back to the pointed yellow, so the letting go shows.
-    click(lua)
-    assert chosen(lua) == [8, 7]
-    assert tuple(lua.eval("ACTORS[2].SetSpellVisualKit").values()) == (154655, False)
+    # Shift-clicked again, a chosen piece is let go, the first keeping its place, and under the
+    # pointer still it turns back to the pointed yellow, so the letting go shows.
     click(lua)
     assert chosen(lua) == [7]
     assert tuple(lua.eval("ACTORS[2].SetSpellVisualKit").values()) == (87979, False)
@@ -1107,7 +1103,7 @@ def test_a_shift_drag_chooses_every_piece_whose_middle_its_band_holds(tmp_path: 
     # Let go, the band is read once more where it ends.
     lua.execute("BAND.Hide = nil HELD.LeftButton = nil SCENE:Tick(0)")
     assert chosen(lua) == [7, 8] and lua.eval("BAND.Hide") is not None
-    assert tuple(lua.eval("ACTORS[2].SetSpellVisualKit").values()) == (117557, False)
+    assert tuple(lua.eval("ACTORS[2].SetSpellVisualKit").values()) == (154655, False)
     assert lua.eval("ACTORS[3].SetSpellVisualKit") is None
 
 
@@ -1152,19 +1148,27 @@ def test_the_lowest_standing_piece_leads_and_the_widest_among_those_level(
     assert chosen(lua) == [8, 7, 9]
 
 
-def test_a_ctrl_click_adds_a_piece_or_lets_it_go(tmp_path: Path) -> None:
-    # Three alike cubes on one floor, so the first drawn leads by rule: a ctrl-click on the third
-    # adds it, the rule still leading, and another lets it go.
+def test_a_ctrl_click_makes_a_piece_lead_until_it_is_let_go(tmp_path: Path) -> None:
+    # Three alike cubes on one floor, so the first drawn leads by rule; a ctrl-click on the
+    # third chooses it too and makes it lead, told though the set did not change; letting it go
+    # with a shift-click gives the lead back to the rule.
     lua = core_scene_choosing(tmp_path, piece_at(8, (0, 6, 0), 1), piece_at(9, (0, -6, 0), 1))
     lua.execute("SCENE:Choose(SCENE.boxes[1].actor) SCENE:Choose(SCENE.boxes[2].actor, true)")
     assert chosen(lua) == [7, 8] and lua.eval("TOLD_CHOSEN") == 2
     x, y = lua.eval("{ FRAME:Project3DPointTo2D(unpack(SCENE.boxes[3].centre)) }").values()
     lua.execute(f"GetCursorPosition = function() return {x}, {y} end SCENE:Tick(0) CTRL = true")
     click(lua)
-    assert chosen(lua) == [7, 8, 9] and lua.eval("select(2, SCENE:Leader())") is False
+    assert chosen(lua) == [9, 7, 8] and lua.eval("TOLD_CHOSEN") == 3
+    # The lead's glow moves with it: the third cube blue, the first back to the chosen cyan.
+    assert tuple(lua.eval("ACTORS[3].SetSpellVisualKit").values()) == (117557, False)
     assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (154655, False)
+    assert lua.eval("select(2, SCENE:Leader())") is True
+    # Ctrl-clicked again, it leads still; shift-clicked, it is let go and the rule leads.
     click(lua)
-    assert chosen(lua) == [7, 8]
+    assert chosen(lua) == [9, 7, 8]
+    lua.execute("CTRL, SHIFT = nil, true")
+    click(lua)
+    assert chosen(lua) == [7, 8] and lua.eval("select(2, SCENE:Leader())") is False
 
 
 def test_a_ctrl_drag_lets_go_of_every_piece_its_band_holds(tmp_path: Path) -> None:

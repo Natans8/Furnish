@@ -1937,8 +1937,8 @@ end
 --- How pieces are chosen in the pane, as the Spawn tooltip ends: the grammar the 3D editors
 -- share.
 local CHOOSING = {
-	"Click chooses a piece; shift-click adds one, makes a chosen one lead, or lets the leader go.",
-	"Shift-drag adds a band of pieces, ctrl-drag takes one away; ctrl-click adds or lets go of one.",
+	"Click chooses a piece; shift-click adds one or lets it go; ctrl-click makes one lead.",
+	"Shift-drag adds a band of pieces, ctrl-drag takes one away.",
 	"Right-click spawns the piece under the pointer alone.",
 }
 
@@ -1951,7 +1951,7 @@ local function spawnChosenLines()
 		local leads, made = stage:Leader()
 		lines[#lines + 1] = { label = "Leads", value = pieceName(leads) }
 		lines[#lines + 1] = {
-			text = made and "Made to lead by a shift-click."
+			text = made and "Made to lead by a ctrl-click."
 				or "The lowest-standing piece leads, the one covering most ground among those level.",
 			colour = GREY,
 		}
