@@ -1,0 +1,37 @@
+Furnish — licensing notice
+Copyright (C) 2026 Nataari <https://github.com/Natans8>
+
+This distribution holds material under more than one licence. A single licence over the whole
+tree would over-claim: two of the files Furnish ships are redistributed under their own terms,
+and the data it reads describes content that is not ours.
+
+
+1. COVERED BY THE AGPL — the work Furnish's author wrote
+
+       addon/Furnish/        except addon/Furnish/Libs/
+       addon/Furnish_Data/   the reader's side; Data.lua is generated, see section 3
+       src/                  tests/          README.md
+       and the repository's configuration files
+
+   Licensed under the GNU Affero General Public License, version 3 or (at your option) any later
+   version. Full text in LICENSE.
+
+
+2. THIRD-PARTY CODE — redistributed under its own licence, as its authors ship it
+
+       addon/Furnish/Libs/LibQTip-1.0/   LibQTip-1.0 — the LibQTip Development Team — BSD-style
+                                          licence in that folder's LICENSE.txt, which allows the
+                                          library embedded in an addon and forbids redistributing
+                                          it on its own
+       addon/Furnish/Libs/LibStub/       LibStub — placed in the public domain by its authors
+
+   Each library's own notice travels in its folder, unchanged.
+
+
+3. NOT LICENSED BY US — described, not owned
+
+   Data.lua, which the build writes into addon/Furnish_Data, and furnish.sqlite hold ids, names,
+   positions and numbers read out of World of Warcraft's and Epsilon's own files: which doodad
+   sets a WMO has and where each model stands in it. Those facts describe Blizzard's and
+   Epsilon's content and are redistributed under no claim of ours; no model, world model,
+   texture or other asset file is shipped.

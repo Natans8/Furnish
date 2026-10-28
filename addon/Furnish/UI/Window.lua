@@ -648,7 +648,7 @@ local function request()
 		label = shown.name,
 		at = Pose.Copy(spot),
 		group = grouped(),
-		quiet = true,
+		watched = true,
 		ways = WAYS,
 	}
 end
@@ -1229,7 +1229,7 @@ end
 -- selected, so it stays in its slot. It counts as imported once the server names the gob it
 -- made, since the gob is selected by the GUID that names it.
 local function importDoodad()
-	Console.Import({ uid = doodad.uid, quiet = true, ways = WAYS })
+	Console.Import({ uid = doodad.uid, watched = true, ways = WAYS })
 	update()
 end
 

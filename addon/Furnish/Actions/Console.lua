@@ -20,7 +20,9 @@
 --           group of whatever is selected when the spawn runs, gob or group
 --   group   a word from Console.GROUPS; nil is Console.GROUPED
 --   base    true to lay the root's base set under the sets, unless it is one of them
---   quiet   true when a window shows the run's progress, so the chat leaves it out
+--   quiet   true to leave the run's progress counts out of chat, as the typed word asks
+--   watched true when a window draws the run, its start, progress, end and offer, so the chat
+--           carries only what was refused, which the window points at
 --   ways    how the door the request came through names a way out, as a line suggests one:
 --           { stop(), list(entry), from(), here() }, each a function answering the words, list's
 --           entry nil for the selected WMO's; a way the door does not offer goes unsaid
@@ -421,9 +423,9 @@ end
 
 --- Report a finished run, how long it took, and select its group so the next group
 -- command acts on it, the group standing for the object the run was anchored on, if any. A
--- quiet run's ending is on the window's bar, so only what was refused is said, which the bar
+-- watched run's ending is on the window's bar, so only what was refused is said, which the bar
 -- points at.
-local function finish(result, started, anchor, quiet)
+local function finish(result, started, anchor, watched)
 	local ending = Console.Ending(result)
 	local spawned = ("%d of %d spawned%s in %s"):format(
 		result.placed,
@@ -446,7 +448,7 @@ local function finish(result, started, anchor, quiet)
 	else
 		ended = "done: " .. spawned
 	end
-	if not quiet then
+	if not watched then
 		say(ended)
 	end
 	for _, refusal in ipairs(result.refused) do
@@ -483,13 +485,14 @@ end
 
 local function hooks(about)
 	local told, cleaned, started = 0, 0, Client.Now()
+	local counted = not (about.quiet or about.watched)
 	return {
 		progress = function(done, total)
 			if current then
 				current.done = done
 			end
 			tell("progress", done, total)
-			if not about.quiet and done < total and done - told >= stride(total) then
+			if counted and done < total and done - told >= stride(total) then
 				told = done
 				say(("%d of %d"):format(done, total))
 			end
@@ -500,13 +503,13 @@ local function hooks(about)
 				current.deleting.done, current.deleting.total = done, total
 			end
 			tell("deleting", done, total)
-			if not about.quiet and done < total and done - cleaned >= stride(total) then
+			if counted and done < total and done - cleaned >= stride(total) then
 				cleaned = done
 				say(("deleted %d of %d"):format(done, total))
 			end
 		end,
 		finished = function(result)
-			finish(result, started, about.anchor, about.quiet)
+			finish(result, started, about.anchor, about.watched)
 			local offer = about.blueprint
 					and whole(result)
 					and {
@@ -518,7 +521,7 @@ local function hooks(about)
 			current, last =
 				nil, { result = result, seconds = Client.Now() - started, offer = offer }
 			-- A window draws its own offer; in chat, the name is a button.
-			if offer and not about.quiet then
+			if offer and not about.watched then
 				local words = OFFERED .. offer.leader .. ":" .. offer.name
 				say(Console.OFFER.title .. " " .. Chat.Link(words, offer.name))
 			end
@@ -534,14 +537,15 @@ local reminded = false
 -- @param destination the pose the rows are placed at
 -- @param about { what, the set as a line names it; where, "on <WMO>" or "at your feet";
 --   lead, how the group is led as groupOf says it; anchor, the selected object the run is
---   anchored on, or nil; quiet, true when a window shows the run's start, progress and end
---   instead of the chat; blueprint, the name to offer if the run ends whole, or nil }
+--   anchored on, or nil; quiet, true to leave the progress counts out of chat; watched, true
+--   when a window draws the run's start, progress, end and offer instead of the chat;
+--   blueprint, the name to offer if the run ends whole, or nil }
 local function start(rows, destination, group, about)
 	local send = sender()
 	if not send then
 		return
 	end
-	if not about.quiet then
+	if not about.watched then
 		say(("spawning %s %s, %s"):format(about.what, about.where, about.lead))
 	end
 	-- A run ends by selecting its group, and highlighting too many objects can crash the client.
@@ -1042,6 +1046,7 @@ local function spawnOn(request, destination, selected)
 		lead = lead,
 		anchor = selected and selected.guid and selected or nil,
 		quiet = request.quiet,
+		watched = request.watched,
 		blueprint = offered(request.group, destination, selected, label, chosen),
 	})
 end
@@ -1062,7 +1067,7 @@ function Console.SpawnPiece(row, name, at, ways)
 		what = name,
 		where = ("at %.1f, %.1f, %.1f"):format(spot.x, spot.y, spot.z),
 		lead = alone.lead,
-		quiet = true,
+		watched = true,
 	})
 end
 
@@ -1218,6 +1223,7 @@ function Console.Import(request)
 			lead = lead,
 			anchor = pose,
 			quiet = request.quiet,
+			watched = request.watched,
 			blueprint = offered(word, pose, pose, pose.name, chosen),
 		})
 	end

@@ -449,7 +449,7 @@ def test_a_run_from_chat_offers_its_blueprint_as_a_button_that_pastes(tmp_path: 
 
 def test_a_window_run_leaves_its_offer_to_the_window(tmp_path: Path) -> None:
     lua = on_the_house_at_scale_one(tmp_path)
-    spawn(lua, "{ index = 1, file = 900, label = 'house', quiet = true }")
+    spawn(lua, "{ index = 1, file = 900, label = 'house', watched = true }")
     assert not [line for line in printed(lua) if "blueprint" in line]
     assert offer(lua) == "house_set_full"
 
@@ -1050,10 +1050,10 @@ def test_an_import_of_a_placement_drawing_several_sets_spawns_every_one(tmp_path
 def test_an_import_spawns_the_sets_named_in_place_of_the_maps(tmp_path: Path) -> None:
     lua = command_lua(tmp_path, layered=True)
     lua.execute("IMPORT_UID = 4343")
-    lua.execute("Furnish.Console.Import({ indexes = { 2 }, group = 'nogroup', quiet = true })")
+    lua.execute("Furnish.Console.Import({ indexes = { 2 }, group = 'nogroup', watched = true })")
     spawns = [command for command in sent(lua) if command.startswith("gobject spawn")]
     assert len(spawns) == 1 and spawns[0].startswith("gobject spawn -22 ")
-    # Quiet, so the window's bar says the run's start and end, and the chat says nothing of them.
+    # Watched, so the window's bar says the run's start and end, and the chat says nothing of them.
     assert not [line for line in printed(lua) if "spawning" in line or "done:" in line]
 
 
@@ -1164,6 +1164,15 @@ def test_a_wmos_doodad_line_carries_a_button_that_imports_and_furnishes_it(
     lua.globals().HOOKS.SetItemRef("garrmission:furnish:import:4242")
     assert sent(lua)[:2] == ["doodad import 4242", "gobject select 500"]
     assert printed(lua)[-2] == (PREFIX + "spawning Full (set 1, 2 objects) on house, led by house")
+
+
+def test_a_typed_quiet_run_still_says_how_it_began_and_ended(tmp_path: Path) -> None:
+    lua = on_the_house_at_scale_one(tmp_path)
+    lines = run(lua, "1 quiet")
+    assert lines[0].startswith(PREFIX + "spawning ")
+    assert any(line.startswith(PREFIX + "done: ") for line in lines)
+    # From chat, so its blueprint is offered in chat, whatever the word.
+    assert lines[-1].startswith(PREFIX + "Save as a blueprint? ")
 
 
 def test_the_quiet_word_asks_a_run_to_leave_its_progress_counts_out(tmp_path: Path) -> None:
