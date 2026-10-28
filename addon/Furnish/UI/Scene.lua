@@ -82,11 +82,11 @@ local LENS_STEP = 0.1
 
 --- The kits that light the piece under the pointer and the pieces chosen: a steady pale yellow
 -- glow along the edges, the nearest a scene draws to the outline `.gob select` puts on a gob,
--- which a scene does not draw; the same glow in sky blue for a chosen piece; and in pale green for
--- the one that leads, a hue of its own as the lead object has in an editor's selection. Both were
--- judged in game beside the yellow and each other. A chosen piece under the pointer keeps its
--- colour.
-local GLOW_KIT, CHOSEN_KIT, LEADER_KIT = 87979, 117557, 137834
+-- which a scene does not draw; the same glow in azure for a chosen piece; and in green for the one
+-- that leads, a hue of its own as the lead object has in an editor's selection. The two were picked
+-- off the glows' own colours: of every steady edge glow, the pair nearest the yellow's lightness
+-- and farthest from it and from each other. A chosen piece under the pointer keeps its colour.
+local GLOW_KIT, CHOSEN_KIT, LEADER_KIT = 87979, 144558, 150261
 
 --- The corners of a box, as which of its two ends each axis takes.
 local CORNERS = {}
