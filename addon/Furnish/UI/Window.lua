@@ -220,6 +220,9 @@ local run, told
 -- its source and chosen sets, so it is drawn again only when they change.
 local stage, previewed
 
+--- What the pane's status line says of the drawing's loading, shown while nothing is chosen.
+local loadingLine = ""
+
 --- The search match Enter takes, by its place in the list.
 local picked = 1
 
@@ -573,17 +576,18 @@ local function pieceName(piece)
 	return Client.FileName(piece.file) or ("model %d"):format(piece.file)
 end
 
---- Say beside the Preview pane's Spawn how many pieces are chosen in it and which leads, and
--- offer to spawn them while any are and nothing runs.
+--- Say on the Preview pane's status line, beside Spawn, how many pieces are chosen in it and
+-- which leads, the loading line standing there while none is, and offer to spawn them while any
+-- are and nothing runs.
 local function updateChosen()
 	local count = stage:Count()
-	local line = ""
+	local line = loadingLine
 	if count > 1 then
 		line = ("%d chosen, %s leads"):format(count, pieceName(stage:Leader()))
 	elseif count > 0 then
 		line = "1 chosen"
 	end
-	preview.Chosen:SetText(line)
+	preview.Status:SetText(line)
 	preview.Spawn:SetText(count > 1 and ("Spawn %d"):format(count) or "Spawn")
 	preview.Spawn:SetEnabled(count > 0 and not run and spot ~= nil and not Console.Busy())
 end
@@ -1683,15 +1687,18 @@ local function placePreview()
 	end
 end
 
---- Say under the scene how far its models have loaded, and once they have, how long they took.
+--- Say under the scene how far its models have loaded, and once they have, how long they took,
+-- while nothing is chosen, whose count takes the line.
 local function showLoading(loaded, total, seconds)
-	local text = ""
+	loadingLine = ""
 	if loaded < total then
-		text = ("Loading %s of %s"):format(thousands(loaded), objects(total))
+		loadingLine = ("Loading %s of %s"):format(thousands(loaded), objects(total))
 	elseif total > 0 then
-		text = ("%s loaded in %.2f s"):format(objects(total), seconds)
+		loadingLine = ("%s loaded in %.2f s"):format(objects(total), seconds)
 	end
-	preview.Loading:SetText(text)
+	if stage:Count() == 0 then
+		preview.Status:SetText(loadingLine)
+	end
 end
 
 --- The Preview pane's model controls, as the game's dressing room draws its own: each button's icon
