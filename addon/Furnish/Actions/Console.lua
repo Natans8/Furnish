@@ -420,8 +420,10 @@ function Console.Ending(result)
 end
 
 --- Report a finished run, how long it took, and select its group so the next group
--- command acts on it, the group standing for the object the run was anchored on, if any.
-local function finish(result, started, anchor)
+-- command acts on it, the group standing for the object the run was anchored on, if any. A
+-- quiet run's ending is on the window's bar, so only what was refused is said, which the bar
+-- points at.
+local function finish(result, started, anchor, quiet)
 	local ending = Console.Ending(result)
 	local spawned = ("%d of %d spawned%s in %s"):format(
 		result.placed,
@@ -429,21 +431,23 @@ local function finish(result, started, anchor)
 		result.pivot and ", and the pivot," or "",
 		since(started)
 	)
+	local ended
 	if ending == "deleted" then
-		say(("stopped, and deleted the %s spawned"):format(objects(result.deleted)))
+		ended = ("stopped, and deleted the %s spawned"):format(objects(result.deleted))
 	elseif ending == "part deleted" then
-		say(
-			("stopped, and deleted %d of the %s spawned"):format(
-				result.deleted,
-				objects(#result.spawned)
-			)
+		ended = ("stopped, and deleted %d of the %s spawned"):format(
+			result.deleted,
+			objects(#result.spawned)
 		)
 	elseif ending == "refused" then
-		say("stopped, as the server would not add an object to the group: " .. spawned)
+		ended = "stopped, as the server would not add an object to the group: " .. spawned
 	elseif ending == "stopped" then
-		say("stopped: " .. spawned)
+		ended = "stopped: " .. spawned
 	else
-		say("done: " .. spawned)
+		ended = "done: " .. spawned
+	end
+	if not quiet then
+		say(ended)
 	end
 	for _, refusal in ipairs(result.refused) do
 		local what = refusal.pivot and "the pivot" or modelOf(refusal.display)
@@ -502,7 +506,7 @@ local function hooks(about)
 			end
 		end,
 		finished = function(result)
-			finish(result, started, about.anchor)
+			finish(result, started, about.anchor, about.quiet)
 			local offer = about.blueprint
 					and whole(result)
 					and {
@@ -530,14 +534,16 @@ local reminded = false
 -- @param destination the pose the rows are placed at
 -- @param about { what, the set as a line names it; where, "on <WMO>" or "at your feet";
 --   lead, how the group is led as groupOf says it; anchor, the selected object the run is
---   anchored on, or nil; quiet, true when a window shows the progress instead; blueprint, the
---   name to offer if the run ends whole, or nil }
+--   anchored on, or nil; quiet, true when a window shows the run's start, progress and end
+--   instead of the chat; blueprint, the name to offer if the run ends whole, or nil }
 local function start(rows, destination, group, about)
 	local send = sender()
 	if not send then
 		return
 	end
-	say(("spawning %s %s, %s"):format(about.what, about.where, about.lead))
+	if not about.quiet then
+		say(("spawning %s %s, %s"):format(about.what, about.where, about.lead))
+	end
 	-- A run ends by selecting its group, and highlighting too many objects can crash the client.
 	-- Whether it is on is the player's to decide, so the first run of a session only reminds them.
 	if not reminded then

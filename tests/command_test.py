@@ -295,10 +295,11 @@ def test_a_piece_spawns_alone_where_its_set_would_put_it(tmp_path: Path) -> None
           "chair", Furnish.Pose.At(10, 20, 30, 0), nil)
         """
     )
-    assert began(lua) == PREFIX + "spawning chair at 10.0, 20.0, 30.0, ungrouped"
-    # The chair the full set spawns at that destination, and nothing grouped or selected after it.
+    # The chair the full set spawns at that destination, nothing grouped or selected after it, and
+    # nothing said in chat, since the window's bar says it.
     assert sent(lua) == [SPAWN_CHAIR]
     assert shown(lua) == []
+    assert not [line for line in printed(lua) if line.startswith(PREFIX + "spawning")]
 
 
 MERGE_REFUSED = (
@@ -1050,10 +1051,10 @@ def test_an_import_spawns_the_sets_named_in_place_of_the_maps(tmp_path: Path) ->
     lua = command_lua(tmp_path, layered=True)
     lua.execute("IMPORT_UID = 4343")
     lua.execute("Furnish.Console.Import({ indexes = { 2 }, group = 'nogroup', quiet = true })")
-    assert printed(lua)[-2:] == [
-        PREFIX + "spawning Lights (set 2, 1 object) on house, ungrouped",
-        PREFIX + "done: 1 of 1 spawned in 0.0 s",
-    ]
+    spawns = [command for command in sent(lua) if command.startswith("gobject spawn")]
+    assert len(spawns) == 1 and spawns[0].startswith("gobject spawn -22 ")
+    # Quiet, so the window's bar says the run's start and end, and the chat says nothing of them.
+    assert not [line for line in printed(lua) if "spawning" in line or "done:" in line]
 
 
 def test_an_import_with_base_lays_the_base_set_the_map_did_not_name(tmp_path: Path) -> None:
