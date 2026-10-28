@@ -801,7 +801,8 @@ def test_once_the_wheel_has_turned_a_load_leaves_the_camera_be(tmp_path: Path) -
         """
     )
     framed = lua.eval("CAMERA.SetZoomDistance[1]")
-    lua.execute("SCRIPTS.OnMouseWheel(FRAME, 1)")
+    # The pointer rests where no piece is, so the step is of the framed distance.
+    lua.execute("GetCursorPosition = function() return 0, 100 end SCRIPTS.OnMouseWheel(FRAME, 1)")
     assert lua.eval("CAMERA.SetZoomDistance[1]") == pytest.approx(framed * 0.88)
     # The second, far piece loading would widen the frame, but the player has zoomed.
     lua.execute("LOAD(2) SCENE:Tick()")
@@ -838,6 +839,32 @@ def test_the_view_axes_are_square_and_right_is_east_looking_north(tmp_path: Path
     right, up = view_axes(lua)
     assert right == pytest.approx((0, -1, 0))
     assert up == pytest.approx((0, 0, 1))
+
+
+def test_the_wheel_grabs_the_piece_under_the_pointer_at_its_depth(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute(RECORDING_SCENE)
+    lua.execute(
+        """
+        SCENE = Furnish.Scene.New(FRAME, SAID)
+        SCENE:Draw({ { file = 1, x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 } })
+        LOAD(1) SCENE:Tick()
+        """
+    )
+    framed = lua.eval("CAMERA.SetZoomDistance[1]")
+    # Off the cube, nothing is grabbed: the camera turns about the same point, as far off.
+    lua.execute("GetCursorPosition = function() return 0, 100 end SCENE:Grab()")
+    assert (lua.eval("SCENE.zoom"), tuple(lua.eval("SCENE.centre").values())) == (1, (0, 0, 0))
+    # Through the middle of the view the ray meets the cube's corner faces first, nearest the
+    # camera along the view: the point the camera turns about moves there, and the step zooms from
+    # it.
+    lua.execute("GetCursorPosition = function() return 100, 50 end SCRIPTS.OnMouseWheel(FRAME, 1)")
+    ahead = forward(math.radians(225), math.radians(35))
+    reach = 1 / abs(ahead[0])
+    assert tuple(lua.eval("CAMERA.SetTarget").values()) == pytest.approx(
+        tuple(-a * reach for a in ahead)
+    )
+    assert lua.eval("CAMERA.SetZoomDistance[1]") == pytest.approx((framed - reach) * 0.88)
 
 
 def test_a_held_rotate_button_turns_and_reset_reframes(tmp_path: Path) -> None:
@@ -901,15 +928,14 @@ def test_a_right_or_middle_drag_pans_and_the_pieces_follow_the_pointer(tmp_path:
 def test_the_wheel_zooms_toward_the_point_under_the_pointer(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     lua.execute(RECORDING_SCENE)
+    # Nothing loaded, so there is no piece to grab and the camera stands as it began.
     lua.execute(
         """
         SCENE = Furnish.Scene.New(FRAME, SAID)
         SCENE:Draw({ { file = 1, x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 } })
-        LOAD(1) SCENE:Tick()
         """
     )
-    centre = tuple(lua.eval("CAMERA.SetTarget").values())
-    distance = lua.eval("CAMERA.SetZoomDistance[1]")
+    centre, distance = (0, 0, 0), lua.eval("SCENE.distance")
     # At the scene's middle the wheel zooms straight in.
     lua.execute("SCRIPTS.OnMouseWheel(FRAME, 1)")
     assert tuple(lua.eval("CAMERA.SetTarget").values()) == pytest.approx(centre)

@@ -57,6 +57,40 @@ local function clamp(value, least, most)
 	return math.max(least, math.min(most, value))
 end
 
+--- Where the client's orbit camera looks, from its turn and tilt.
+local function forwardOf(yaw, pitch)
+	return math.cos(pitch) * math.cos(yaw), math.cos(pitch) * math.sin(yaw), -math.sin(pitch)
+end
+
+--- How far in front of the camera a ray enters a box it starts outside of, as a depth along the
+-- view; nil where it misses the box or starts inside it.
+-- @param ray a direction whose share along the view is one, so its distances are depths
+-- @param box { low x, low y, low z, high x, high y, high z }
+local function enters(origin, ray, box)
+	local near, far = -math.huge, math.huge
+	for axis = 1, 3 do
+		local from, along, low, high = origin[axis], ray[axis], box[axis], box[axis + 3]
+		if along == 0 then
+			if from < low or from > high then
+				return nil
+			end
+		else
+			local a, b = (low - from) / along, (high - from) / along
+			if a > b then
+				a, b = b, a
+			end
+			near, far = math.max(near, a), math.min(far, b)
+			if near > far then
+				return nil
+			end
+		end
+	end
+	if near <= NEAR then
+		return nil
+	end
+	return near
+end
+
 --- A scene over a ModelScene frame, made from ModelSceneMixinTemplate.
 -- @param onLoad called as the models load, with how many have, how many there are, and the
 --   seconds since the drawing began
@@ -65,6 +99,7 @@ function Scene.New(frame, onLoad)
 	local self = setmetatable({
 		frame = frame,
 		actors = {},
+		boxes = {},
 		onLoad = onLoad,
 		yaw = YAW,
 		pitch = PITCH,
@@ -81,7 +116,7 @@ function Scene.New(frame, onLoad)
 	-- read beside it.
 	frame:SetScript("OnMouseDown", function(_, button)
 		if DRAGS[button] then
-			self:Drag(DRAGS[button], button)
+			self:Drag(DRAGS[button], button, true)
 		end
 	end)
 	frame:SetScript("OnMouseUp", function()
@@ -168,14 +203,14 @@ function Scene:Reset()
 	end
 end
 
---- Take in a loaded actor's box, turned, scaled and placed as its piece stands.
+--- Take in a loaded actor's box, turned, scaled and placed as its piece stands: kept, square to the
+-- scene's axes, for finding the piece under the pointer, and taken into the bounds framed.
 function Scene:Hold(actor)
 	local x1, y1, z1, x2, y2, z2 = actor:GetActiveBoundingBox()
 	if not (x1 and y1 and z1 and x2 and y2 and z2) then
 		return
 	end
-	local low = self.low or { math.huge, math.huge, math.huge }
-	local high = self.high or { -math.huge, -math.huge, -math.huge }
+	local box = { math.huge, math.huge, math.huge, -math.huge, -math.huge, -math.huge }
 	local piece, scale = actor.piece, actor.piece.scale
 	for _, corner in ipairs(CORNERS) do
 		local turned = Transform.Rotate(piece.turn, {
@@ -188,8 +223,14 @@ function Scene:Hold(actor)
 			piece.offset[2] + turned.y,
 			piece.offset[3] + turned.z,
 		}) do
-			low[axis], high[axis] = math.min(low[axis], value), math.max(high[axis], value)
+			box[axis], box[axis + 3] = math.min(box[axis], value), math.max(box[axis + 3], value)
 		end
+	end
+	self.boxes[#self.boxes + 1] = box
+	local low = self.low or { math.huge, math.huge, math.huge }
+	local high = self.high or { -math.huge, -math.huge, -math.huge }
+	for axis = 1, 3 do
+		low[axis], high[axis] = math.min(low[axis], box[axis]), math.max(high[axis], box[axis + 3])
 	end
 	self.low, self.high = low, high
 end
@@ -205,9 +246,8 @@ end
 -- Worked out here rather than read from the scene's GetCameraRight, which Blizzard's own panning
 -- adds where the model should follow the pointer, so as pointing to the view's left.
 function Scene:Axes()
-	local yaw, pitch = self.yaw, self.pitch
-	local fx, fy, fz =
-		math.cos(pitch) * math.cos(yaw), math.cos(pitch) * math.sin(yaw), -math.sin(pitch)
+	local yaw = self.yaw
+	local fx, fy, fz = forwardOf(yaw, self.pitch)
 	local rx, ry = math.sin(yaw), -math.cos(yaw)
 	return rx, ry, 0, ry * fz, -rx * fz, rx * fy - ry * fx
 end
@@ -231,6 +271,9 @@ end
 -- distance the step takes off. A button zooms straight in, its pointer being on the button.
 -- @param straight true to zoom toward the middle of the view, whatever is under the pointer
 function Scene:Zoom(steps, straight)
+	if not straight then
+		self:Grab()
+	end
 	local zoom = clamp(self.zoom * ZOOM_STEP ^ steps, NEAR / self.distance, FARTHEST)
 	if not straight then
 		local share = 1 - zoom / self.zoom
@@ -243,12 +286,58 @@ function Scene:Zoom(steps, straight)
 	self.moved = true
 end
 
---- Start dragging with a mouse button held: turning the camera, or panning it.
+--- Start dragging with a mouse button held: turning the camera, or panning it. A pan pressed on
+-- the scene grabs the piece under the pointer, which then follows the pointer.
 -- @param action "Turn" or "Pan"
 -- @param button the mouse button held, whose release ends the drag
-function Scene:Drag(action, button)
+-- @param pointed true where the press was on the scene itself, rather than on a button
+function Scene:Drag(action, button, pointed)
+	if action == "Pan" and pointed then
+		self:Grab()
+	end
 	local x, y = _G.GetCursorPosition()
 	self.dragged = { x = x, y = y, button = button, action = action }
+end
+
+--- Move what the camera turns about and zooms toward to the nearest piece under the pointer, at
+-- that piece's depth, the camera staying where it stands: zooming and panning then go at the pace
+-- of what is pointed at rather than of the middle of the set. Nothing there leaves it be.
+function Scene:Grab()
+	local frame = self.frame
+	local scale = frame:GetEffectiveScale()
+	local half = frame:GetHeight() * scale / 2
+	if not self.boxes[1] or half <= 0 then
+		return
+	end
+	local x, y = _G.GetCursorPosition()
+	local cx, cy = frame:GetCenter()
+	local spread = math.tan(frame:GetCameraFieldOfView() / 2) / half
+	local across, upward = (x - cx * scale) * spread, (y - cy * scale) * spread
+	local fx, fy, fz = forwardOf(self.yaw, self.pitch)
+	local rx, ry, rz, ux, uy, uz = self:Axes()
+	local distance, centre = self.distance * self.zoom, self.centre
+	local origin =
+		{ centre[1] - fx * distance, centre[2] - fy * distance, centre[3] - fz * distance }
+	local ray = {
+		fx + rx * across + ux * upward,
+		fy + ry * across + uy * upward,
+		fz + rz * across + uz * upward,
+	}
+	local nearest
+	for _, box in ipairs(self.boxes) do
+		local depth = enters(origin, ray, box)
+		if depth and (not nearest or depth < nearest) then
+			nearest = depth
+		end
+	end
+	if nearest then
+		self.centre = {
+			origin[1] + fx * nearest,
+			origin[2] + fy * nearest,
+			origin[3] + fz * nearest,
+		}
+		self.zoom = nearest / self.distance
+	end
 end
 
 --- Turn the camera on its own while the left mouse button stays down, as a held rotate button
@@ -314,6 +403,7 @@ function Scene:Draw(pieces)
 	local cx, cy, cz = (low[1] + high[1]) / 2, (low[2] + high[2]) / 2, (low[3] + high[3]) / 2
 	local drawing = (self.drawing or 0) + 1
 	self.drawing, self.low, self.high, self.zoom, self.moved = drawing, nil, nil, 1, false
+	self.boxes = {}
 	self.loaded, self.took, self.started = 0, nil, Client.Now()
 	local function loaded(actor)
 		if self.drawing == drawing and actor.drawing ~= drawing then
