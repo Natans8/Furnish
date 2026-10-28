@@ -8,6 +8,8 @@
 ## SavedVariables: FurnishSettings
 ## X-License: AGPL-3.0-or-later
 
+Libs\LibStub\LibStub.lua
+Libs\LibQTip-1.0\LibQTip-1.0.lua
 Settings.lua
 Core\Transform.lua
 Core\Commands.lua

@@ -25,8 +25,15 @@ LOADED = tuple(
 )
 #: The files that draw frames, which need a client and are tried in the simulator instead.
 DRAWN = {"UI/Window.lua", "UI/Options.lua"}
+#: The folder of libraries embedded as their authors ship them, loaded before the addon's own
+#: files and not Furnish's code: they need a client and are not held to its rules.
+LIBRARIES = "Libs/"
 #: The Lua files the core is tested with, in load order.
-FILES = tuple(name for name in LOADED if name.endswith(".lua") and name not in DRAWN)
+FILES = tuple(
+    name
+    for name in LOADED
+    if name.endswith(".lua") and name not in DRAWN and not name.startswith(LIBRARIES)
+)
 
 HOUSE = 900
 EMPTY_HOUSE = 777

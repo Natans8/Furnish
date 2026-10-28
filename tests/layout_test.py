@@ -7,10 +7,11 @@ from pathlib import PurePosixPath
 
 import pytest
 
-from tests.core_test import ADDON, LOADED
+from tests.core_test import ADDON, LIBRARIES, LOADED
 
-#: The layers in load order; the top folder holds what every layer reads.
-LAYERS = ("", "Core", "Data", "Client", "Actions", "UI", "Slash")
+#: The layers in load order: the embedded libraries, then the top folder, which holds what every
+#: layer reads.
+LAYERS = (LIBRARIES.rstrip("/"), "", "Core", "Data", "Client", "Actions", "UI", "Slash")
 #: The line every file opens with: the addon's table, as the client hands it to each file.
 NAMESPACE = "local _, Furnish = ..."
 #: The one file that makes the addon's table a global.
@@ -18,12 +19,13 @@ EXPORTER = "Settings.lua"
 
 DEFINES = re.compile(r"^(?:function\s+)?Furnish\.(\w+)\s*(?:=|\()", re.MULTILINE)
 READS = re.compile(r"\bFurnish\.(\w+)")
-SOURCES = tuple(name for name in LOADED if name.endswith(".lua"))
+#: The addon's own Lua files; the embedded libraries are their authors', not held to its rules.
+SOURCES = tuple(name for name in LOADED if name.endswith(".lua") and not name.startswith(LIBRARIES))
 
 
 def layer(name: str) -> int:
-    folder = PurePosixPath(name).parent.as_posix()
-    return LAYERS.index("" if folder == "." else folder)
+    folder = PurePosixPath(name).parts[0] if "/" in name else ""
+    return LAYERS.index(folder)
 
 
 def text(name: str) -> str:

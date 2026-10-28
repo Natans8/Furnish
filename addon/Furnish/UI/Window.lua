@@ -37,6 +37,7 @@ local Commands = Furnish.Commands
 local Transform = Furnish.Transform
 local Previews = Furnish.Previews
 local Scene = Furnish.Scene
+local QTip = _G.LibStub("LibQTip-1.0")
 
 --- The border a list wears, ObjectMover's: a tooltip's edge over a dark shade.
 local PANEL = {
@@ -1798,62 +1799,101 @@ local function buildPreviewGrip()
 	end)
 end
 
---- A word in a colour, for a tooltip line drawn in another.
-local function painted(word, colour)
-	return ("|cff%02x%02x%02x%s%s"):format(
-		math.floor(colour[1] * 255 + 0.5),
-		math.floor(colour[2] * 255 + 0.5),
-		math.floor(colour[3] * 255 + 0.5),
-		word,
-		Chat.END
+--- The parts of a pose the hovered piece's tooltip sets out, each a row of numbers under its
+-- axis words, as the window's boxes stand: the word before the row, and the boxes' part.
+local POSE_ROWS = {
+	{ word = "Position", part = "position" },
+	{ word = "Rotation", part = "rotation" },
+}
+
+--- How far a tooltip at the pointer stands off it, clear of the pointer's arrow.
+local OFF_POINTER = 16
+
+--- The hovered piece's tooltip, drawn by LibQTip as a grid; nil while none shows.
+local pieceTip
+
+--- Stand the piece's tooltip just off the pointer, as the client's own does at the pointer.
+local function followPointer()
+	if not pieceTip then
+		return
+	end
+	local x, y = _G.GetCursorPosition()
+	local scale = pieceTip:GetEffectiveScale()
+	pieceTip:ClearAllPoints()
+	pieceTip:SetPoint(
+		"BOTTOMLEFT",
+		_G.UIParent,
+		"BOTTOMLEFT",
+		x / scale + OFF_POINTER,
+		y / scale + OFF_POINTER
 	)
 end
 
---- Say in a tooltip at the pointer what the piece under it is, enough to place it by hand: its
--- model, its set, then a line for each number as the window's boxes word and colour it, where it
--- stands from the WMO's origin and how it is turned as `.gob spawn` takes them, and its scale where
--- it is not its model's own; then the command that spawns it. Every number has three places, so
--- the column of them lines up. Nil takes the tooltip down.
+--- Say in a tooltip at the pointer what the piece under it is, enough to place it by hand, set out
+-- as the window's boxes are: its model and its set; its position and its rotation, each a row of
+-- numbers under its axis words in their colours, as `.gob spawn` takes them; its scale where it is
+-- not its model's own; and the command that spawns it. Nil takes the tooltip down.
 local function showHovered(piece)
-	local scene = preview.Scene
 	if not piece then
-		if _G.GameTooltip:IsOwned(scene) then
-			_G.GameTooltip:Hide()
+		if pieceTip then
+			QTip:Release(pieceTip)
+			pieceTip = nil
 		end
 		return
 	end
+	local colours = Chat.TIP
+	local grid = pieceTip or QTip:Acquire("FurnishPiece", 4, "LEFT", "RIGHT", "RIGHT", "RIGHT")
+	pieceTip = grid
+	grid:Clear()
+	grid:SetFrameStrata("TOOLTIP")
+	local line = grid:AddHeader()
+	grid:SetCell(
+		line,
+		1,
+		Client.FileName(piece.file) or ("Model %d"):format(piece.file),
+		nil,
+		"LEFT",
+		4
+	)
+	grid:SetCellTextColor(line, 1, unpack(colours.title))
+	line = grid:AddLine()
+	grid:SetCell(line, 1, piece.set, nil, "LEFT", 4)
+	grid:SetCellTextColor(line, 1, unpack(colours.label))
 	local roll, pitch, turn =
 		Transform.ToAngles({ x = piece.qx, y = piece.qy, z = piece.qz, w = piece.qw })
-	local pose = {
-		x = piece.x,
-		y = piece.y,
-		z = piece.z,
-		roll = roll,
-		pitch = pitch,
-		turn = turn,
-		scale = piece.scale,
-	}
-	local lines = { { label = "Set", value = piece.set } }
-	for _, number in ipairs(NUMBERS) do
-		local value = ("%.3f"):format(pose[number.key])
-		-- A scale is stored as a float, so one that shows as one is the model's own.
-		if number.key ~= "scale" or value ~= "1.000" then
-			lines[#lines + 1] = { label = painted(number.box, number.colour), value = value }
+	local pose = { x = piece.x, y = piece.y, z = piece.z, roll = roll, pitch = pitch, turn = turn }
+	for _, row in ipairs(POSE_ROWS) do
+		local words, values = grid:AddLine(), grid:AddLine(row.word)
+		grid:SetCellTextColor(values, 1, unpack(colours.label))
+		local column = 1
+		for _, number in ipairs(NUMBERS) do
+			if number.part == row.part then
+				column = column + 1
+				grid:SetCell(words, column, number.box)
+				grid:SetCellTextColor(words, column, unpack(number.colour))
+				grid:SetCell(values, column, shownNumber(pose[number.key]))
+			end
 		end
 	end
-	lines[#lines + 1] = {
-		text = "Typed: " .. Commands.Typed(Commands.SpawnHere(-piece.display)),
-		colour = GREY,
-	}
-	_G.GameTooltip:SetOwner(scene, "ANCHOR_CURSOR")
-	Chat.Tip(_G.GameTooltip, Client.FileName(piece.file) or ("Model %d"):format(piece.file), lines)
-	_G.GameTooltip:Show()
+	-- A scale is stored as a float, so one that shows as one is the model's own.
+	local scale = shownNumber(piece.scale)
+	if scale ~= "1" then
+		line = grid:AddLine("Scale", scale)
+		grid:SetCellTextColor(line, 1, unpack(colours.label))
+	end
+	line = grid:AddLine()
+	local typed = "Typed: " .. Commands.Typed(Commands.SpawnHere(-piece.display))
+	grid:SetCell(line, 1, typed, nil, "LEFT", 4)
+	grid:SetCellTextColor(line, 1, unpack(colours.label))
+	followPointer()
+	grid:Show()
 end
 
 local function buildPreview()
 	preview.Label:SetText("Preview")
 	preview.Hint:SetText("Drag to turn, right-drag to pan, wheel to zoom.")
 	stage = Scene.New(preview.Scene, showLoading, showHovered)
+	preview.Scene:HookScript("OnUpdate", Client.Guarded(followPointer))
 	buildControls()
 	buildPreviewGrip()
 	preview.CloseButton:SetScript(

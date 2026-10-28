@@ -3,8 +3,9 @@
 # and fails in the game.
 std = "lua51"
 
-# Generated data is machine-written; there is nothing in it for a linter to find.
-exclude = ["addon/Furnish_Data/**", "tests/lua/**"]
+# Generated data is machine-written, and an embedded library is as its authors ship it; there
+# is nothing in either for this linter to find.
+exclude = ["addon/Furnish_Data/**", "addon/Furnish/Libs/**", "tests/lua/**"]
 
 [lints]
 # A client global is read as `_G.Name` on purpose: it marks every reach into the client.
