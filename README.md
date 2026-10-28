@@ -61,11 +61,11 @@ Source is the WMO a gob entry is, held in its ID box as Destination's numbers ar
 keeps it whatever gob is selected, or the lowest entry of a WMO searched by name, since every entry of one WMO reads
 the same sets. A search lists the WMOs with sets that the client's own catalogue names like it, the first
 lit so Enter takes it and Up and Down moving the light, and those that come unfurnished
-marked. A set the selected WMO draws already, as part of its model, is marked baked: its
-base set, unless it comes unfurnished. A click chooses one set and a
-ctrl- or shift-click adds or removes one, a strip at either end of the list counts the chosen sets
-scrolled out of view, and resting on a set names the models it holds, as the client's own
-catalogue names them once a walk of it, started when the window opens, has ended. Destination is
+marked. Where Glimpse and its WMO pictures are installed, the source's WMO shows as its picture
+beside these rows, read through the pictures' own door. A set the selected WMO draws already, as
+part of its model, is marked baked: its base set, unless it comes unfurnished. A click chooses one
+set and opens the Preview pane, a ctrl- or shift-click adds or removes one, and a strip at either
+end of the list counts the chosen sets scrolled out of view. Destination is
 numbers and nothing else: X, Y and Z, then the roll, pitch and turn about each in ObjectMover's
 colours, then the scale. Following the selected gob is one way to fill them, Here and Use
 selected gob fill them once, typing a number keeps what was typed, and while no gob is followed
@@ -106,6 +106,21 @@ selection: a suggested name, held to 225 bytes, and Paste to chat, which puts
 included, ends on the same offer as a button carrying the name, which pastes the command while the
 run's group is selected and otherwise says how to select it. Closed or overtaken by the next run,
 the offer goes. The window resizes from its corner, and the game keeps its size and place.
+
+Preview is a pane against the window's right edge, below the doodad panel and above the blueprint
+offer while they show, that any click on a set opens. It lays the chosen sets out in a model
+scene, every piece at its own place, tilt and scale, without the WMO, which no model frame can
+draw. The camera opens from a corner, framing the sphere around the models as they load, and a
+line under the scene counts them in and then says how long they took. Drag to turn, right- or
+middle-drag to pan, and turn the wheel to zoom, each about the piece under the pointer, so a zoom
+closes on what is pointed at and a pan carries it with the pointer; the game's own model controls
+stand over the scene, and Reset frames the sets as they opened. The pane's corner drags it wider
+and the window taller with it. Resting on a piece marks it with a glow and names it in a tooltip
+at the pointer: its model and the display it spawns by, its set, its position and rotation from
+the WMO's origin as `.gob spawn` takes them, in Destination's colours, and its scale where it is
+not one. A click spawns that piece alone, ungrouped, where a run of its set would put it at
+Destination, and unticks Destination's Follow selection, since the server selects what it spawns
+and a destination that followed would carry the next piece off; the piece stays selected.
 
 ## Build
 
@@ -230,15 +245,21 @@ which can open the window. Each file is handed the addon's table as
 | `Data/Reader.lua`     | the data addon's reader                                                                |
 | `Data/Names.lua`      | a set's name as a player reads it: `Set(name)`, and a blueprint's: `Blueprint`         |
 | `Data/Sets.lua`       | which: `OfFile`, `Pick`, `OfEntry`, `IsBlank`, `OfPlacement`, `Named`, `Same`          |
-| `Data/Rows.lua`       | what: `OfSet`, `Union`                                                                 |
+| `Data/Rows.lua`       | what: `OfSet`, `Pieces`, `Union`                                                       |
 | `Client/Client.lua`   | the one file naming EpsilonLib and `C_Epsilon`; it reads, and never selects            |
 | `Client/Pose.lua`     | where: `At`, `Copy`, `Here`, `Selected`, `OfRecord`                                    |
 | `Client/Chat.lua`     | the prefix, counts, the colours, every tooltip, a menu measured to chat, the links     |
+| `Client/Previews.lua` | Glimpse's doors: a preview peeked, and a WMO's picture                                 |
 | `Actions/Console.lua` | what the commands and the window do: `List`, `Spawn`, `Import`, `Stop`, `Run`, `Offer` |
+| `UI/Scene.lua`        | the Preview pane's scene: pieces as actors, the camera, the piece under the pointer    |
 | `UI/Window.xml`       | the window's layout, after ObjectMover's: a dark dialog of bordered panels             |
 | `UI/Window.lua`       | the window: reads `Selected`, `Busy` and `Watch`, spawns and stops through `Console`   |
 | `UI/Options.lua`      | the settings panel in the game's Options, writing into `Furnish.Settings`              |
 | `Slash/Command.lua`   | `/furnish` and `/furn`: what is typed, the help, the chat buttons, a link's click      |
+
+`addon/Furnish/Libs` holds LibQTip-1.0, which draws the piece tooltip as a grid, and LibStub,
+each as its authors ship it and under its own licence, which travels in its folder. `LICENSE` is
+the AGPL and `NOTICE` says what it covers and what it does not.
 
 ## Develop
 
