@@ -87,7 +87,7 @@ local running, stopping, waiting, anchored
 
 --- The run as a window draws it: { total, done, started } while one goes, and { result, seconds,
 -- offer } for the one that ended last, so a window opened in the middle of either can catch up.
--- The offer is { name, leader, seen }, or nil where the run offers no blueprint.
+-- The offer is { name, leader }, or nil where the run offers no blueprint.
 local current, last
 
 --- Who hears a run besides the chat, as a window registers: { started(total, what),
@@ -378,6 +378,17 @@ local function offered(word, destination, owner, label, chosen)
 	return Names.Blueprint(owner.name, sets, false)
 end
 
+--- What a blueprint offer says, in the window and in chat alike: the question, why it is worth
+-- it, and what a click on it does.
+Console.OFFER = {
+	title = "Save as a blueprint?",
+	why = "Spawn it again instantly with one command.",
+	click = "Click: put it in the chat box; Enter sends it",
+}
+
+--- What a chat line's blueprint button carries before the name.
+local OFFERED = "blueprint:"
+
 --- Whether a run ended whole: nothing stopped, refused, left out of the group or deleted.
 local function whole(result)
 	return not result.aborted
@@ -485,10 +496,14 @@ local function hooks(about)
 			finish(result, started, about.anchor)
 			local offer = about.blueprint
 					and whole(result)
-					and { name = about.blueprint, leader = tostring(result.leader), seen = false }
+					and { name = about.blueprint, leader = tostring(result.leader) }
 				or nil
 			current, last =
 				nil, { result = result, seconds = Client.Now() - started, offer = offer }
+			-- A window draws its own offer; in chat, the name is a button.
+			if offer and not about.quiet then
+				say(Console.OFFER.title .. " " .. Chat.Link(OFFERED .. offer.name, offer.name))
+			end
 			tell("finished", result, last.seconds)
 		end,
 	}
@@ -710,22 +725,54 @@ function Console.Run()
 end
 
 --- The blueprint name the last run offers, while that run's group is what is selected, since the
--- command that saves it saves the selection; or nil.
--- The offer waits for the group's selection to land and lapses for good once anything else is
--- selected after it, or when the next run starts.
+-- command that saves it saves the selection; or nil. It stands until it is dismissed or the next
+-- run starts, and shows again whenever the group is selected again: as a run settles, the
+-- selection passes through the objects it spawned before the group's own lands.
 function Console.Offer()
 	local offer = last and last.offer
-	if not offer then
-		return nil
-	end
-	if Client.SelectedGroup() == offer.leader then
-		offer.seen = true
+	if offer and Client.SelectedGroup() == offer.leader then
 		return offer.name
 	end
-	if offer.seen then
-		last.offer = nil
-	end
 	return nil
+end
+
+--- The command that saves the selected group as a blueprint under a name, as a player types it.
+function Console.OfferCommand(name)
+	return Commands.Typed(Commands.BlueprintNew(name))
+end
+
+--- The blueprint name a chat line's button carries, or nil for words no such button wrote.
+function Console.OfferIn(words)
+	return words:match("^" .. OFFERED .. "(.+)$")
+end
+
+--- Put the command that saves the last run's group as a blueprint in the chat box, while that
+-- group is what is selected, since the command saves the selection; sending it is the player's.
+function Console.PasteOffer(name)
+	local offer = last and last.offer
+	if not (offer and offer.name == name) then
+		return say("that blueprint offer has gone with a later run")
+	end
+	if Client.SelectedGroup() ~= offer.leader then
+		return say(
+			("%s saves the run's group, so select that group first, as with %s"):format(
+				name,
+				Commands.Typed(Commands.SelectGroup(offer.leader))
+			)
+		)
+	end
+	Chat.Paste(Console.OfferCommand(name))
+end
+
+--- Fill a tooltip for a chat line's blueprint button.
+-- @param tooltip a tooltip owned and empty
+function Console.DescribeOffer(name, tooltip)
+	local tip = Chat.TIP
+	Chat.Tip(tooltip, Console.OFFER.title, {
+		{ text = Console.OFFER.why, colour = tip.label },
+		{ text = Console.OfferCommand(name) },
+		{ text = Console.OFFER.click, colour = tip.click },
+	})
 end
 
 --- Let the last run's blueprint offer go.

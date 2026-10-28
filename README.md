@@ -99,11 +99,13 @@ or the reminder that highlighting too many objects can crash the game. During a 
 control holds still and Stop and delete stands beside Stop. It deletes what the run spawned one
 object at a time, at the pace the run spawned, while the bar empties; Stop while it deletes sends
 no more. Once the run ends, its group is yours to manage. A run that ends whole, at scale 1 with
-no roll or pitch, led by its pivot or merged into a WMO that stood alone and owns its sets, offers
-a blueprint at the window's bottom right while its group stays selected: a suggested name, held to
-225 bytes, and Paste to chat, which puts `.gobject blueprint new <name>` in the chat box for you to
-send. Closed, overtaken by the next run or left behind by another selection, the offer goes. The
-window resizes from its corner, and the game keeps its size and place.
+no roll or pitch, led by its pivot or merged into a WMO that stood where they were placed, alone
+and owning its sets, offers a blueprint at the window's bottom right whenever its group is the
+selection: a suggested name, held to 225 bytes, and Paste to chat, which puts
+`.gobject blueprint new <name>` in the chat box for you to send. A run from chat, an import
+included, ends on the same offer as a button carrying the name, which pastes the command while the
+run's group is selected and otherwise says how to select it. Closed or overtaken by the next run,
+the offer goes. The window resizes from its corner, and the game keeps its size and place.
 
 ## Build
 

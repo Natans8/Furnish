@@ -217,6 +217,10 @@ function Command.Click(words, modifier)
 	elseif kind == "list" then
 		return Console.List({ entry = tonumber(value), ways = Command.WAYS })
 	end
+	local offered = Console.OfferIn(words)
+	if offered then
+		return Console.PasteOffer(offered)
+	end
 	local request = Console.LinkRequest(words)
 	if request then
 		request.here = modifier == "ctrl"
@@ -235,6 +239,10 @@ function Command.Hover(words, tooltip)
 		return Chat.Tip(tooltip, Furnish.NAME, { { text = "List this WMO's doodad sets" } })
 	elseif kind == "word" and WORD[value] then
 		return Chat.Tip(tooltip, value, { { text = WORD[value].hint } })
+	end
+	local offered = Console.OfferIn(words)
+	if offered then
+		return Console.DescribeOffer(offered, tooltip)
 	end
 	local request = Console.LinkRequest(words)
 	if request then

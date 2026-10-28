@@ -103,6 +103,11 @@ def spawn(lua: lua51.LuaRuntime, request: str) -> None:
     lua.execute(f"Furnish.Console.Spawn({request})")
 
 
+def began(lua: lua51.LuaRuntime) -> str:
+    """The line the last run began with, however many lines its end printed after it."""
+    return [line for line in printed(lua) if line.startswith(PREFIX + "spawning ")][-1]
+
+
 # -- Reading what is typed ---------------------------------------------------------------
 
 
@@ -265,7 +270,7 @@ def test_a_set_spawns_at_a_pose_given_with_no_object_behind_it(tmp_path: Path) -
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 502")
     spawn(lua, "{ index = 1, file = 900, label = 'house', at = Furnish.Pose.At(1, 2, 3, 0) }")
-    assert printed(lua)[-2] == (
+    assert began(lua) == (
         PREFIX
         + "spawning house's Full (set 1, 2 objects) at 1.0, 2.0, 3.0, "
         + "led by a pivot, one extra invisible object"
@@ -375,22 +380,55 @@ def test_a_merge_is_offered_as_its_wmo_furnished_only_where_the_wmo_stands(
     assert offer(lua) == offered
 
 
-def test_the_offer_waits_for_its_group_and_lapses_once_anything_else_is_selected(
-    tmp_path: Path,
-) -> None:
+def test_the_offer_shows_whenever_its_group_is_selected(tmp_path: Path) -> None:
     lua = on_the_house_at_scale_one(tmp_path)
     run(lua, "1")
     leader = lua.eval("GROUP_LEADER")
-    # Something else selected before the group's selection is seen: the offer waits.
     lua.execute("SELECTED = 502")
     assert offer(lua) is None
     lua.execute(f'SELECTED, GROUP_LEADER = "group", {leader}')
     assert offer(lua) == "house_set_full"
-    # Seen, it lapses once anything else is selected, and stays lapsed.
+    # As a run settles the selection passes through what it spawned, so the offer comes back
+    # with its group rather than lapsing on the first other selection.
     lua.execute("SELECTED = 502")
     assert offer(lua) is None
     lua.execute(f'SELECTED, GROUP_LEADER = "group", {leader}')
+    assert offer(lua) == "house_set_full"
+    run(lua, "1 nogroup")
     assert offer(lua) is None
+
+
+def test_a_run_from_chat_offers_its_blueprint_as_a_button_that_pastes(tmp_path: Path) -> None:
+    lua = on_the_house_at_scale_one(tmp_path)
+    lua.execute("PASTED = {} function ChatFrame_OpenChat(text) PASTED[#PASTED + 1] = text end")
+    lines = run(lua, "1")
+    assert lines[-1] == (
+        PREFIX
+        + "Save as a blueprint? |cff71d5ff|Hgarrmission:furnish:blueprint:house_set_full|h"
+        + "[house_set_full]|h|r"
+    )
+    click = lua.globals().HOOKS.SetItemRef
+    leader = lua.eval("GROUP_LEADER")
+    # Pasted only while the run's group is selected, since the command saves the selection.
+    lua.execute("SELECTED = 502")
+    click("garrmission:furnish:blueprint:house_set_full")
+    assert printed(lua)[-1] == (
+        PREFIX + "house_set_full saves the run's group, so select that group first, as with "
+        f".gobject group select {leader}"
+    )
+    lua.execute(f'SELECTED, GROUP_LEADER = "group", {leader}')
+    click("garrmission:furnish:blueprint:house_set_full")
+    assert list(lua.eval("PASTED").values()) == [".gobject blueprint new house_set_full"]
+    run(lua, "1 nogroup")
+    click("garrmission:furnish:blueprint:house_set_full")
+    assert printed(lua)[-1] == PREFIX + "that blueprint offer has gone with a later run"
+
+
+def test_a_window_run_leaves_its_offer_to_the_window(tmp_path: Path) -> None:
+    lua = on_the_house_at_scale_one(tmp_path)
+    spawn(lua, "{ index = 1, file = 900, label = 'house', quiet = true }")
+    assert not [line for line in printed(lua) if "blueprint" in line]
+    assert offer(lua) == "house_set_full"
 
 
 def test_a_dismissed_offer_is_gone(tmp_path: Path) -> None:
@@ -415,6 +453,17 @@ def test_an_import_of_a_placement_drawing_several_sets_offers_the_wmo_furnished(
     lua.execute("RECORDS[500].scale = 1; IMPORT_UID = 4343")
     run(lua, "import")
     assert offer(lua) == "house_full_lights"
+    # Typed, the import ends on the blueprint's button in chat.
+    assert printed(lua)[-1].startswith(PREFIX + "Save as a blueprint? ")
+    assert "[house_full_lights]" in printed(lua)[-1]
+
+
+def test_an_import_of_a_tilted_or_scaled_placement_offers_nothing(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path, layered=True)
+    lua.execute("IMPORT_UID = 4343")
+    run(lua, "import")
+    assert offer(lua) is None
+    assert not [line for line in printed(lua) if "blueprint" in line]
 
 
 def test_numbers_given_merge_into_whatever_is_selected_not_what_they_were_read_off(
@@ -735,14 +784,14 @@ def test_a_click_spawns_on_the_selection_and_ctrl_at_the_feet(tmp_path: Path) ->
     click = lua.globals().HOOKS.SetItemRef
     click("garrmission:furnish:" + words)
     assert (
-        printed(lua)[-2]
+        began(lua)
         == PREFIX
         + "spawning Full (set 1, 2 objects) on house, led by a pivot, one extra invisible object"
     )
     lua.execute("MODIFIER = 'ctrl'")
     click("garrmission:furnish:" + words)
     assert (
-        printed(lua)[-2]
+        began(lua)
         == PREFIX
         + "spawning house's Full (set 1, 2 objects) at your feet, "
         + "led by a pivot, one extra invisible object"
@@ -909,7 +958,7 @@ def test_a_named_set_spawns_on_any_selected_object(tmp_path: Path) -> None:
     words = run(lua, "list 817579")[1].split("garrmission:furnish:")[2].split("|h")[0]
     lua.execute("SELECTED = 502")
     lua.globals().HOOKS.SetItemRef("garrmission:furnish:" + words)
-    assert printed(lua)[-2] == (
+    assert began(lua) == (
         PREFIX
         + "spawning object 817579's Full (set 1, 2 objects) on chair, "
         + "led by a pivot, one extra invisible object"

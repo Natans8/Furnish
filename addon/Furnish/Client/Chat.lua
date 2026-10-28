@@ -115,6 +115,11 @@ function Chat.Line(text)
 	print(text)
 end
 
+--- Put text in the chat box, for the player to send, or to change first.
+function Chat.Paste(text)
+	_G.ChatFrame_OpenChat(text)
+end
+
 local SPACER = "Interface/Common/Spacer"
 
 local function frame()

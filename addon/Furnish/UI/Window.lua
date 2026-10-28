@@ -246,11 +246,6 @@ local function brighten(text)
 	text:SetTextColor(shade, shade, shade)
 end
 
---- The command that saves the selected group as a blueprint under a name, as a player types it.
-local function blueprintCommand(name)
-	return Commands.Typed(Commands.BlueprintNew(name))
-end
-
 --- What is selected: the selected gob, or else a selected group, whose pose says group; nil when
 -- neither is. Use selected takes its numbers once, the destination never following a group by
 -- itself, and the Selected gob leader merges into its group.
@@ -845,7 +840,7 @@ local function pasteOffer()
 		return
 	end
 	offer.Name:ClearFocus()
-	_G.ChatFrame_OpenChat(blueprintCommand(name))
+	Chat.Paste(Console.OfferCommand(name))
 end
 
 --- Draw the run Console holds on the bar: how far it has got, or, once a stopped run deletes
@@ -1360,7 +1355,7 @@ end
 local function listen()
 	stops = {
 		Client.OnSelection(refresh),
-		-- The blueprint offer comes up once the run's group is selected and lapses with it.
+		-- The blueprint offer shows while the run's group is selected.
 		Client.OnSelection(Client.Guarded(showOffer)),
 		Client.OnPhaseChange(update),
 		Console.Watch({
@@ -1643,8 +1638,8 @@ local function buildDoodad()
 end
 
 local function buildOffer()
-	offer.Title:SetText("Save as a blueprint?")
-	offer.Why:SetText("Spawn it again instantly with one command.")
+	offer.Title:SetText(Console.OFFER.title)
+	offer.Why:SetText(Console.OFFER.why)
 	offer.Paste:SetText("Paste to chat")
 	offer.Name:SetMaxLetters(Names.BLUEPRINT)
 	offer.Name:SetMaxBytes(Names.BLUEPRINT)
@@ -1674,8 +1669,8 @@ local function buildOffer()
 	)
 	hint(offer.Paste, nil, function()
 		return {
-			{ text = blueprintCommand(offer.Name:GetText()) },
-			{ text = "Click: put it in the chat box; Enter sends it", colour = GREEN },
+			{ text = Console.OfferCommand(offer.Name:GetText()) },
+			{ text = Console.OFFER.click, colour = GREEN },
 		}
 	end)
 end
