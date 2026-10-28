@@ -1003,6 +1003,26 @@ local function spawnOn(request, destination, selected)
 	})
 end
 
+--- Spawn one placement of a set where a run of the set at the destination would put it, standing
+-- alone: what a click on a piece in a window's preview asks. The server selects what it spawns, and
+-- the run, forming no group, leaves that be.
+-- @param row a placement as Rows.Pieces gives it
+-- @param name what to call it, its model's name
+-- @param at the destination's pose
+-- @param ways the ways out of the door it came through, as a request carries them
+function Console.SpawnPiece(row, name, at, ways)
+	if not ready(ways) then
+		return
+	end
+	local alone, spot = GROUPING.nogroup, at.position
+	start({ row }, at, alone.group, {
+		what = name,
+		where = ("at %.1f, %.1f, %.1f"):format(spot.x, spot.y, spot.z),
+		lead = alone.lead,
+		quiet = true,
+	})
+end
+
 --- Spawn the one gob an entry names where the player stands, as a typed `.gob spawn` does, its
 -- reply shown as if typed; the server selects what it spawns.
 -- @param entry a gameobject entry, as a lookup line prints it

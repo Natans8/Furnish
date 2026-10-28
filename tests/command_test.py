@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from lupa import lua51
 
-from tests.core_test import CATALOGUE, fake_client, lua_core, printed
+from tests.core_test import CATALOGUE, SPAWN_CHAIR, fake_client, lua_core, printed
 
 PREFIX = "|cff66ccffFurnish:|r "
 
@@ -284,6 +284,21 @@ def test_a_set_spawns_at_a_pose_given_with_no_object_behind_it(tmp_path: Path) -
     assert printed(lua)[-1] == (
         PREFIX + "a position names no WMO; name the one whose sets to spawn"
     )
+
+
+def test_a_piece_spawns_alone_where_its_set_would_put_it(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute(
+        """
+        Furnish.Console.SpawnPiece(
+          { display = 20, x = 1.5, y = -2, z = 0.25, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 },
+          "chair", Furnish.Pose.At(10, 20, 30, 0), nil)
+        """
+    )
+    assert began(lua) == PREFIX + "spawning chair at 10.0, 20.0, 30.0, ungrouped"
+    # The chair the full set spawns at that destination, and nothing grouped or selected after it.
+    assert sent(lua) == [SPAWN_CHAIR]
+    assert shown(lua) == []
 
 
 MERGE_REFUSED = (

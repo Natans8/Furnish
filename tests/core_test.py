@@ -1008,6 +1008,34 @@ def test_the_pointer_is_read_through_the_scene_s_own_projection(tmp_path: Path) 
     assert lua.eval("SCENE.distance") == pytest.approx(radius / math.sin(math.atan(0.8)))
 
 
+def test_a_press_let_go_where_it_was_made_clicks_the_piece_under_the_pointer(
+    tmp_path: Path,
+) -> None:
+    lua = core_scene_with_click(tmp_path)
+    lua.execute("SCRIPTS.OnMouseDown(FRAME, 'LeftButton') SCRIPTS.OnMouseUp(FRAME, 'LeftButton')")
+    assert lua.eval("CLICKED") == 7
+    # A press dragged away before it is let go turns the camera, and clicks nothing.
+    lua.execute(
+        "CLICKED = nil SCRIPTS.OnMouseDown(FRAME, 'LeftButton')"
+        " GetCursorPosition = function() return 110, 50 end SCRIPTS.OnMouseUp(FRAME, 'LeftButton')"
+    )
+    assert lua.eval("CLICKED") is None
+
+
+def core_scene_with_click(tmp_path: Path) -> lua51.LuaRuntime:
+    """A scene of one cube with the pointer on it, noting the file of a piece clicked."""
+    lua = lua_core(tmp_path)
+    lua.execute(RECORDING_SCENE)
+    lua.execute(
+        f"""
+        SCENE = Furnish.Scene.New(FRAME, SAID, nil, function(piece) CLICKED = piece.file end)
+        SCENE:Draw({{ {piece_at(7, (0, 0, 0), 1)} }})
+        LOAD(1) SCENE:Tick(0) HOOKED.OnEnter() SCENE:Tick(0)
+        """
+    )
+    return lua
+
+
 def test_a_held_rotate_button_turns_and_reset_reframes(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     lua.execute(RECORDING_SCENE)

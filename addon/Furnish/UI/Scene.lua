@@ -34,6 +34,10 @@ local NEAR = 0.01
 -- pieces shrinking to a point.
 local FARTHEST = 4
 
+--- How far a press may wander, in the interface's own units, and still be a click rather than a
+-- drag: the system's own drag threshold.
+local CLICK_SLOP = 4
+
 --- What each button drags: the left turns the camera, the right and the middle pan it.
 local DRAGS = { LeftButton = "Turn", RightButton = "Pan", MiddleButton = "Pan" }
 
@@ -106,14 +110,17 @@ end
 --   seconds since the drawing began
 -- @param onHover called when the piece under the pointer changes, with that piece as Draw was
 --   given it, or nil where there is none
+-- @param onClick called when the piece under the pointer is clicked, a press let go where it was
+--   made, with that piece as Draw was given it
 -- @return the scene, which Draw fills
-function Scene.New(frame, onLoad, onHover)
+function Scene.New(frame, onLoad, onHover, onClick)
 	local self = setmetatable({
 		frame = frame,
 		actors = {},
 		boxes = {},
 		onLoad = onLoad,
 		onHover = onHover,
+		onClick = onClick,
 		yaw = YAW,
 		pitch = PITCH,
 		zoom = 1,
@@ -131,10 +138,27 @@ function Scene.New(frame, onLoad, onHover)
 		if DRAGS[button] then
 			self:Drag(DRAGS[button], button, true)
 		end
+		if button == "LeftButton" then
+			self.pressed = { _G.GetCursorPosition() }
+		end
 	end)
-	frame:SetScript("OnMouseUp", function()
-		self.dragged = nil
-	end)
+	frame:SetScript(
+		"OnMouseUp",
+		Client.Guarded(function(_, button)
+			self.dragged = nil
+			local pressed = self.pressed
+			self.pressed = nil
+			if button ~= "LeftButton" or not pressed then
+				return
+			end
+			local x, y = _G.GetCursorPosition()
+			local wandered = math.sqrt((x - pressed[1]) ^ 2 + (y - pressed[2]) ^ 2)
+			local hovered = self.hovered
+			if wandered / frame:GetEffectiveScale() <= CLICK_SLOP and hovered and self.onClick then
+				self.onClick(hovered.source)
+			end
+		end)
+	)
 	frame:SetScript(
 		"OnMouseWheel",
 		Client.Guarded(function(_, delta)

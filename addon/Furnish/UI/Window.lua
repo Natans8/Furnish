@@ -1885,14 +1885,37 @@ local function showHovered(piece)
 	local typed = "Typed: " .. Commands.Typed(Commands.SpawnHere(-piece.display))
 	grid:SetCell(line, 1, typed, nil, "LEFT", 4)
 	grid:SetCellTextColor(line, 1, unpack(colours.label))
+	line = grid:AddLine()
+	grid:SetCell(line, 1, "Click: spawn this piece where the set would put it", nil, "LEFT", 4)
+	grid:SetCellTextColor(line, 1, unpack(colours.click))
+	if not spotPinned then
+		line = grid:AddLine()
+		grid:SetCell(line, 1, "and untick the destination's Follow selection", nil, "LEFT", 4)
+		grid:SetCellTextColor(line, 1, unpack(colours.label))
+	end
 	followPointer()
 	grid:Show()
+end
+
+--- Spawn the piece clicked in the Preview pane alone, where a run of its set would put it, the
+-- destination first held where it is: the server selects what it spawns, and a destination that
+-- followed the selection would carry the next piece clicked off from where the set puts it.
+local function spawnPiece(piece)
+	if run or not spot then
+		return
+	end
+	if not spotPinned then
+		spotPinned = true
+		update()
+	end
+	local name = Client.FileName(piece.file) or ("model %d"):format(piece.file)
+	Console.SpawnPiece(piece, name, Pose.Copy(spot), WAYS)
 end
 
 local function buildPreview()
 	preview.Label:SetText("Preview")
 	preview.Hint:SetText("Drag to turn, right-drag to pan, wheel to zoom.")
-	stage = Scene.New(preview.Scene, showLoading, showHovered)
+	stage = Scene.New(preview.Scene, showLoading, showHovered, spawnPiece)
 	preview.Scene:HookScript("OnUpdate", Client.Guarded(followPointer))
 	buildControls()
 	buildPreviewGrip()
