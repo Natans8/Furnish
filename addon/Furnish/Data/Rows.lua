@@ -10,6 +10,22 @@ Furnish.Rows = Rows
 
 local Reader = Furnish.Reader
 
+--- What makes two placements one: the display they spawn, where, turned and scaled. Sets of one
+-- WMO often place the same doodad, and a placement in two chosen sets is spawned once.
+function Rows.Key(row)
+	return ("%d %s %s %s %s %s %s %s %s"):format(
+		row.display,
+		row.x,
+		row.y,
+		row.z,
+		row.qx,
+		row.qy,
+		row.qz,
+		row.qw,
+		row.scale
+	)
+end
+
 --- A set's placements, or nil and the reason.
 -- @param id a set id, as Sets.OfFile or Sets.OfPlacement give it
 -- @return a list of { display, x, y, z, qx, qy, qz, qw, scale }

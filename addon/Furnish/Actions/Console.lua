@@ -979,14 +979,19 @@ end
 --- The rows of several sets in the order given, and how a line names them, as "Base and Full
 -- (sets 0 and 1, 3 objects)"; or nil and the reason.
 local function gather(chosen)
-	local rows, names, indexes = {}, {}, {}
+	local rows, names, indexes, seen = {}, {}, {}, {}
 	for i, set in ipairs(chosen) do
 		local own, missing = Rows.OfSet(set.id)
 		if not own then
 			return nil, missing
 		end
+		-- A placement two sets share is spawned once.
 		for _, row in ipairs(own) do
-			rows[#rows + 1] = row
+			local key = Rows.Key(row)
+			if not seen[key] then
+				seen[key] = true
+				rows[#rows + 1] = row
+			end
 		end
 		names[i], indexes[i] = setName(set), set.index
 	end

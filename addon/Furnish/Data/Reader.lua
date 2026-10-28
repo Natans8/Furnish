@@ -16,7 +16,9 @@
 
 local _, Furnish = ...
 local FORMAT = 7
-local decoded = {}
+--- The sets decoded, by id, kept only while something holds their rows, so a session that looks
+-- at many sets does not keep them all.
+local decoded = setmetatable({}, { __mode = "v" })
 
 local Reader = {}
 Furnish.Reader = Reader

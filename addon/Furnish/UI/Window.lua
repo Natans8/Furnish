@@ -601,13 +601,18 @@ local function updatePreview()
 	local key = shown and (shown.file .. ":" .. table.concat(indexes, ",")) or ""
 	if key ~= previewed then
 		previewed = key
-		local pieces, names = {}, {}
+		local pieces, names, seen = {}, {}, {}
 		for _, set in ipairs(shown and shown.sets or {}) do
 			if chosen[set.index] then
 				names[#names + 1] = set.name
+				-- A placement two sets share is drawn once, under the first set that places it.
 				for _, piece in ipairs(Rows.Pieces(set.id) or {}) do
-					piece.set = set.name
-					pieces[#pieces + 1] = piece
+					local key = Rows.Key(piece)
+					if not seen[key] then
+						seen[key] = true
+						piece.set = set.name
+						pieces[#pieces + 1] = piece
+					end
 				end
 			end
 		end
