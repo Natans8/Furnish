@@ -47,9 +47,9 @@ local YAW, PITCH = math.rad(225), math.rad(35)
 --- How far the camera tilts up or down, short of looking straight down the vertical.
 local STEEPEST = 1.45
 
---- The kit that marks the piece under the pointer: the outline Gilded Claws draws, judged the same
--- as the glow `.gob select` puts on a gob.
-local HOVER_KIT = 90111
+--- The kit that marks the piece under the pointer: a steady pale yellow glow along its edges, the
+-- nearest a scene draws to the outline `.gob select` puts on a gob, which a scene does not draw.
+local HOVER_KIT = 87979
 
 --- The corners of a box, as which of its two ends each axis takes.
 local CORNERS = {}
