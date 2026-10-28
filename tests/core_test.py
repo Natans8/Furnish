@@ -1052,9 +1052,15 @@ def test_a_shift_click_chooses_a_piece_too_and_again_lets_it_go(tmp_path: Path) 
     lua.execute(f"GetCursorPosition = function() return {x}, {y} end SCENE:Tick(0)")
     click(lua)
     assert chosen(lua) == [7, 8]
-    # Shift-clicked again, a chosen piece is let go, the first keeping its place.
+    # Shift-clicked again, a chosen piece is let go, the first keeping its place; under the
+    # pointer still, it goes dark, so the letting go shows, and lights again once the pointer
+    # comes back to it.
     click(lua)
     assert chosen(lua) == [7]
+    assert tuple(lua.eval("ACTORS[2].SetSpellVisualKit").values()) == ()
+    lua.execute("GetCursorPosition = function() return 0, 100 end SCENE:Tick(0)")
+    lua.execute(f"GetCursorPosition = function() return {x}, {y} end SCENE:Tick(0)")
+    assert tuple(lua.eval("ACTORS[2].SetSpellVisualKit").values()) == (87979, False)
     # Clicked without shift, the second stands alone.
     lua.execute("SHIFT = nil")
     click(lua)
@@ -1083,7 +1089,14 @@ def test_a_shift_drag_chooses_every_piece_whose_middle_its_band_holds(tmp_path: 
     assert lua.eval("SCENE.dragged") is None and lua.eval("BAND.Show") is not None
     width, height = abs(far_x - x0), abs(far_y - y0)
     assert tuple(lua.eval("BAND.SetSize").values()) == pytest.approx((width, height))
-    # Let go, the first two cubes are chosen, in the order drawn, and the third, outside, is not.
+    # The band chooses as it goes: the first two cubes are chosen already, in the order drawn, and
+    # the third, outside, is not; drawn back short of the second, it lets the second go again.
+    assert chosen(lua) == [7, 8]
+    lua.execute(f"GetCursorPosition = function() return {x0 + (far_x - x0) / 8}, {y0} end")
+    lua.execute("SCENE:Tick(0)")
+    assert chosen(lua) == [7]
+    lua.execute(f"GetCursorPosition = function() return {far_x}, {far_y} end SCENE:Tick(0)")
+    # Let go, the band is read once more where it ends.
     lua.execute("BAND.Hide = nil HELD.LeftButton = nil SCENE:Tick(0)")
     assert chosen(lua) == [7, 8] and lua.eval("BAND.Hide") is not None
     assert tuple(lua.eval("ACTORS[2].SetSpellVisualKit").values()) == (87979, False)

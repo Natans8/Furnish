@@ -13,8 +13,8 @@
 -- from.
 --
 -- A click chooses the piece under the pointer, a shift-click chooses it too, and a shift-drag
--- chooses every piece whose middle its band holds; what is chosen stays lit as the pointed piece
--- is, in the order chosen, and the scene says when that changes.
+-- chooses every piece whose middle its band holds, as it is drawn; what is chosen stays lit as the
+-- pointed piece is, in the order chosen, and the scene says when that changes.
 
 local _, Furnish = ...
 local Scene = {}
@@ -179,9 +179,16 @@ function Scene.New(frame, onLoad, onHover, onChoose)
 	frame:SetScript("OnMouseDown", function(_, button)
 		if button == "LeftButton" then
 			local x, y = _G.GetCursorPosition()
-			self.pressed = { x = x, y = y, more = _G.IsShiftKeyDown() }
-			-- With shift held, the press draws a band rather than turning the camera.
-			if self.pressed.more then
+			local more = _G.IsShiftKeyDown()
+			self.pressed = { x = x, y = y, more = more }
+			-- With shift held, the press draws a band rather than turning the camera, and what
+			-- is chosen as it is pressed stays chosen under the band.
+			if more then
+				local kept = {}
+				for index, actor in ipairs(self.chosen) do
+					kept[index] = actor
+				end
+				self.pressed.kept = kept
 				return
 			end
 		end
@@ -597,7 +604,7 @@ end
 -- taken off, so what the kit painted is cleared too, by the method Epsilon's client gives every
 -- scene actor; a client without it has the model loaded afresh instead, which draws it without.
 function Scene:Paint(actor)
-	local lit = actor == self.hovered or actor.chosen == true
+	local lit = (actor == self.hovered and actor ~= self.dimmed) or actor.chosen == true
 	if lit == (actor.lit == true) then
 		return
 	end
@@ -619,7 +626,7 @@ function Scene:Hover(actor)
 		return
 	end
 	local left = self.hovered
-	self.hovered = actor
+	self.hovered, self.dimmed = actor, nil
 	if left then
 		self:Paint(left)
 	end
@@ -631,33 +638,34 @@ function Scene:Hover(actor)
 	end
 end
 
---- Choose the piece an actor draws alone, in place of what was chosen, or too, which toggles it;
--- nil alone chooses none. What is chosen stays lit, in the order chosen, and the change is told.
--- @param actor the piece's actor, or nil
--- @param more true to keep what was chosen
-function Scene:Choose(actor, more)
-	local chosen = self.chosen
-	if not more then
-		self.chosen = {}
-		for _, each in ipairs(chosen) do
-			each.chosen = nil
-			self:Paint(each)
-		end
-		chosen = self.chosen
-	end
-	if actor and actor.chosen == true then
-		actor.chosen = nil
-		for index, each in ipairs(chosen) do
-			if each == actor then
-				table.remove(chosen, index)
+--- Make a list of actors what is chosen, in its order: the flag comes off those let go and goes
+-- on those taken, each is lit or not as it stands, and the change is told. An unchanged list is
+-- nothing.
+function Scene:Settle(chosen)
+	local was = self.chosen
+	local same = #was == #chosen
+	if same then
+		for index, actor in ipairs(chosen) do
+			if was[index] ~= actor then
+				same = false
 				break
 			end
 		end
-	elseif actor then
-		actor.chosen = true
-		chosen[#chosen + 1] = actor
 	end
-	if actor then
+	if same then
+		return
+	end
+	for _, actor in ipairs(was) do
+		actor.chosen = nil
+	end
+	for _, actor in ipairs(chosen) do
+		actor.chosen = true
+	end
+	self.chosen = chosen
+	for _, actor in ipairs(was) do
+		self:Paint(actor)
+	end
+	for _, actor in ipairs(chosen) do
 		self:Paint(actor)
 	end
 	if self.onChoose then
@@ -665,34 +673,59 @@ function Scene:Choose(actor, more)
 	end
 end
 
---- Choose too every loaded piece whose middle the band between two corners holds: the corners in
--- screen pixels, as the pointer is read, and the middles where the scene draws them, those behind
--- the camera left out.
-function Scene:ChooseWithin(x0, y0, x1, y1)
-	local frame, chosen = self.frame, self.chosen
-	local scale = frame:GetEffectiveScale()
-	local left, bottom = frame:GetLeft() * scale, frame:GetBottom() * scale
-	local lowX, highX = math.min(x0, x1) - left, math.max(x0, x1) - left
-	local lowY, highY = math.min(y0, y1) - bottom, math.max(y0, y1) - bottom
-	local eye, fx, fy, fz = self:Eye()
-	local added = false
-	for _, box in ipairs(self.boxes) do
-		local actor, middle = box.actor, box.centre
-		local depth = (middle[1] - eye[1]) * fx
-			+ (middle[2] - eye[2]) * fy
-			+ (middle[3] - eye[3]) * fz
-		if depth > NEAR and actor.chosen ~= true then
-			local x, y = frame:Project3DPointTo2D(middle[1], middle[2], middle[3])
-			if x and y and x >= lowX and x <= highX and y >= lowY and y <= highY then
-				actor.chosen, added = true, true
-				chosen[#chosen + 1] = actor
-				self:Paint(actor)
+--- Choose the piece an actor draws alone, in place of what was chosen, or too, which toggles it;
+-- nil alone chooses none.
+-- @param actor the piece's actor, or nil
+-- @param more true to keep what was chosen
+function Scene:Choose(actor, more)
+	local chosen = {}
+	if more then
+		for _, each in ipairs(self.chosen) do
+			if each ~= actor then
+				chosen[#chosen + 1] = each
 			end
 		end
 	end
-	if added and self.onChoose then
-		self.onChoose()
+	if actor and not (more and actor.chosen == true) then
+		chosen[#chosen + 1] = actor
+	elseif actor then
+		-- Let go under the pointer, the piece goes dark until the pointer leaves it, or the light
+		-- it keeps as the pointed piece would hide that it was let go.
+		self.dimmed = actor
 	end
+	self:Settle(chosen)
+end
+
+--- Choose what a shift press kept and every loaded piece whose middle its band holds now, in
+-- that order: read afresh each frame the band is stretched, so a piece lights as the band reaches
+-- it and goes out as the band leaves it. The band's far corner is in screen pixels, as the pointer
+-- is read, and the middles are where the scene draws them, those behind the camera left out.
+function Scene:Banded(pressed, x1, y1)
+	local frame = self.frame
+	local scale = frame:GetEffectiveScale()
+	local left, bottom = frame:GetLeft() * scale, frame:GetBottom() * scale
+	local lowX, highX = math.min(pressed.x, x1) - left, math.max(pressed.x, x1) - left
+	local lowY, highY = math.min(pressed.y, y1) - bottom, math.max(pressed.y, y1) - bottom
+	local eye, fx, fy, fz = self:Eye()
+	local chosen, kept = {}, {}
+	for index, actor in ipairs(pressed.kept) do
+		chosen[index], kept[actor] = actor, true
+	end
+	for _, box in ipairs(self.boxes) do
+		local actor, middle = box.actor, box.centre
+		if not kept[actor] then
+			local depth = (middle[1] - eye[1]) * fx
+				+ (middle[2] - eye[2]) * fy
+				+ (middle[3] - eye[3]) * fz
+			if depth > NEAR then
+				local x, y = frame:Project3DPointTo2D(middle[1], middle[2], middle[3])
+				if x and y and x >= lowX and x <= highX and y >= lowY and y <= highY then
+					chosen[#chosen + 1] = actor
+				end
+			end
+		end
+	end
+	self:Settle(chosen)
 end
 
 --- The pieces chosen, as Draw was given them, in the order chosen.
@@ -705,8 +738,8 @@ function Scene:Chosen()
 end
 
 --- A press let go. The left button's, let go where it was made, is a click, which chooses the
--- piece under the pointer alone or, with shift, too; dragged with shift, it chooses every piece its
--- band holds too; dragged without, it turned the camera.
+-- piece under the pointer alone or, with shift, too; dragged with shift, its band chose as it
+-- went and is read once more where it was let go; dragged without, it turned the camera.
 function Scene:Release(button)
 	self.dragged = nil
 	local pressed = self.pressed
@@ -719,11 +752,12 @@ function Scene:Release(button)
 	if wandered(self.frame, pressed, x, y) <= CLICK_SLOP then
 		self:Choose(self.hovered, pressed.more)
 	elseif pressed.more then
-		self:ChooseWithin(pressed.x, pressed.y, x, y)
+		self:Banded(pressed, x, y)
 	end
 end
 
---- Draw the band from a shift press to the pointer, once the press has wandered past a click.
+--- Draw the band from a shift press to the pointer, once the press has wandered past a click,
+-- and choose what it holds.
 function Scene:Stretch(pressed)
 	local frame, band = self.frame, self.band
 	local scale = frame:GetEffectiveScale()
@@ -745,6 +779,7 @@ function Scene:Stretch(pressed)
 		math.max(math.abs(y - pressed.y) / scale, 1)
 	)
 	band:Show()
+	self:Banded(pressed, x, y)
 end
 
 --- Let go of all the pointer held, as the scene hides: the press, the drag, the band and what was
