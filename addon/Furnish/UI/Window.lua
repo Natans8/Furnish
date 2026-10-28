@@ -1798,13 +1798,26 @@ local function buildPreviewGrip()
 	end)
 end
 
---- Numbers as a box shows them, each after its word: "x 1.5, y -2, z 0".
-local function spelled(words, values)
+--- A pose's numbers of one part as the window's boxes word and colour them: each axis word in its
+-- axis's colour before its value, "X 1.5  Y -2  Z 0".
+-- @param part "position" or "rotation", as NUMBERS names the boxes' parts
+-- @param values the part's numbers by the boxes' keys
+local function axes(part, values)
 	local said = {}
-	for i, word in ipairs(words) do
-		said[i] = word .. " " .. shownNumber(values[i])
+	for _, number in ipairs(NUMBERS) do
+		if number.part == part then
+			local colour = number.colour
+			said[#said + 1] = ("|cff%02x%02x%02x%s%s %s"):format(
+				math.floor(colour[1] * 255 + 0.5),
+				math.floor(colour[2] * 255 + 0.5),
+				math.floor(colour[3] * 255 + 0.5),
+				number.box,
+				Chat.END,
+				shownNumber(values[number.key])
+			)
+		end
 	end
-	return table.concat(said, ", ")
+	return table.concat(said, "   ")
 end
 
 --- Say in a tooltip at the pointer what the piece under it is, enough to place it by hand: its
@@ -1823,11 +1836,16 @@ local function showHovered(piece)
 		Transform.ToAngles({ x = piece.qx, y = piece.qy, z = piece.qz, w = piece.qw })
 	local lines = {
 		{ label = "Set", value = piece.set },
-		{ label = "Position", value = spelled({ "x", "y", "z" }, { piece.x, piece.y, piece.z }) },
-		{ label = "Rotation", value = spelled({ "roll", "pitch", "turn" }, { roll, pitch, turn }) },
+		{ label = "Position", value = axes("position", piece) },
+		{
+			label = "Rotation",
+			value = axes("rotation", { roll = roll, pitch = pitch, turn = turn }),
+		},
 	}
-	if piece.scale ~= 1 then
-		lines[#lines + 1] = { label = "Scale", value = shownNumber(piece.scale) }
+	-- A scale is stored as a float, so one that shows as one is the model's own.
+	local scale = shownNumber(piece.scale)
+	if scale ~= "1" then
+		lines[#lines + 1] = { label = "Scale", value = scale }
 	end
 	lines[#lines + 1] = {
 		text = "Typed: " .. Commands.Typed(Commands.SpawnHere(-piece.display)),

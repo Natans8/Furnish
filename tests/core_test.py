@@ -888,13 +888,19 @@ def test_the_piece_under_the_pointer_is_marked_and_named(tmp_path: Path) -> None
     lua.execute("HOOKED.OnEnter() SCENE:Tick(0)")
     assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (87979, False)
     assert lua.eval("HOVERS[#HOVERS]") == 7
-    # Off the cube, the glow comes off and the name goes.
-    lua.execute("GetCursorPosition = function() return 0, 100 end SCENE:Tick(0)")
-    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == ()
+    # Off the cube, its model is loaded afresh where it stood, which takes the glow off, and the
+    # name goes.
+    lua.execute(
+        "ACTORS[1].SetModelByFileID, ACTORS[1].SetPosition = nil, nil"
+        " GetCursorPosition = function() return 0, 100 end SCENE:Tick(0)"
+    )
+    assert tuple(lua.eval("ACTORS[1].SetModelByFileID").values()) == (7,)
+    assert tuple(lua.eval("ACTORS[1].SetPosition").values()) == (0, 0, 0)
     assert lua.eval("HOVERS[#HOVERS]") is False
     # Back on it, then off the scene altogether.
-    lua.execute("GetCursorPosition = function() return 100, 50 end SCENE:Tick(0) HOOKED.OnLeave()")
-    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == ()
+    lua.execute("GetCursorPosition = function() return 100, 50 end SCENE:Tick(0)")
+    lua.execute("ACTORS[1].SetModelByFileID = nil HOOKED.OnLeave()")
+    assert tuple(lua.eval("ACTORS[1].SetModelByFileID").values()) == (7,)
     assert lua.eval("HOVERS[#HOVERS]") is False
 
 

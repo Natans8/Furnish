@@ -364,6 +364,22 @@ function Scene:Grab()
 	end
 end
 
+--- Load an actor's model afresh, at its piece's place, tilt and scale, with nothing on it. An
+-- actor stands in its own scaled space, so its offset is divided by its scale.
+function Scene:Load(actor)
+	local piece = actor.piece
+	local offset, scale = piece.offset, piece.scale
+	actor:ClearModel()
+	actor:SetUseCenterForOrigin(false, false, false)
+	actor:SetPosition(offset[1] / scale, offset[2] / scale, offset[3] / scale)
+	actor:SetScale(scale)
+	local roll, pitch, yaw = Transform.ToAngles(piece.turn)
+	actor:SetRoll(math.rad(roll))
+	actor:SetPitch(math.rad(pitch))
+	actor:SetYaw(math.rad(yaw))
+	actor:SetModelByFileID(actor.source.file)
+end
+
 --- Mark the piece under the pointer and say which it is, taking the mark off the last.
 -- @param actor the piece's actor, or nil for none
 function Scene:Hover(actor)
@@ -371,8 +387,9 @@ function Scene:Hover(actor)
 		return
 	end
 	if self.hovered then
-		-- Nil takes a kit off, as the client's own actors are cleared; nought leaves it on.
-		self.hovered:SetSpellVisualKit(nil)
+		-- The glow stays painted once its kit is taken off, nil or nought, so the piece's model
+		-- is loaded afresh, which draws it without.
+		self:Load(self.hovered)
 	end
 	self.hovered = actor
 	if actor then
@@ -481,16 +498,8 @@ function Scene:Draw(pieces)
 			local turn = { x = piece.qx, y = piece.qy, z = piece.qz, w = piece.qw }
 			actor.piece = { offset = offset, turn = turn, scale = scale }
 			actor.source = piece
-			actor:ClearModel()
-			actor:SetUseCenterForOrigin(false, false, false)
-			actor:SetPosition(offset[1] / scale, offset[2] / scale, offset[3] / scale)
-			actor:SetScale(scale)
-			local roll, pitch, yaw = Transform.ToAngles(turn)
-			actor:SetRoll(math.rad(roll))
-			actor:SetPitch(math.rad(pitch))
-			actor:SetYaw(math.rad(yaw))
 			actor:SetOnModelLoadedCallback(Client.Guarded(loaded))
-			actor:SetModelByFileID(piece.file)
+			self:Load(actor)
 			actor:Show()
 		end
 	end
