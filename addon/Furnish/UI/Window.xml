@@ -535,11 +535,12 @@
 							</Anchors>
 						</FontString>
 						<!-- The status line: how far the models have loaded, or, once any piece is chosen,
-						     how many are and which leads; it ends where Spawn begins. Window.lua fills it. -->
+						     how many are and which leads. It ends where Spawn begins, which Window.lua
+						     anchors, since the button is made after the layers and a layer cannot name it;
+						     Window.lua fills it. -->
 						<FontString parentKey="Status" inherits="GameFontDisableSmall" justifyH="LEFT" wordwrap="false">
 							<Anchors>
 								<Anchor point="BOTTOMLEFT" x="16" y="16"/>
-								<Anchor point="RIGHT" relativeKey="$parent.Spawn" relativePoint="LEFT" x="-8" y="0"/>
 							</Anchors>
 						</FontString>
 						<FontString parentKey="Hint" inherits="GameFontDisableSmall" justifyH="RIGHT" wordwrap="false">

@@ -1970,6 +1970,8 @@ local function buildPreview()
 	preview.Spawn:SetScript("OnClick", Client.Guarded(spawnChosen))
 	preview.Spawn:SetText("Spawn")
 	preview.Spawn:Disable()
+	-- The status line ends where Spawn begins; a layer's string cannot name a button made after it.
+	preview.Status:SetPoint("RIGHT", preview.Spawn, "LEFT", -8, 0)
 	hint(preview.Spawn, "Spawn the chosen pieces", spawnChosenLines)
 	preview.CloseButton:SetScript(
 		"OnClick",
