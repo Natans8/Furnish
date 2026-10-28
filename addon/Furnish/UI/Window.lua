@@ -34,6 +34,7 @@ local Sets = Furnish.Sets
 local Chat = Furnish.Chat
 local Names = Furnish.Names
 local Commands = Furnish.Commands
+local Transform = Furnish.Transform
 local Previews = Furnish.Previews
 local Scene = Furnish.Scene
 
@@ -590,6 +591,7 @@ local function updatePreview()
 		if chosen[set.index] then
 			names[#names + 1] = set.name
 			for _, piece in ipairs(Rows.Pieces(set.id) or {}) do
+				piece.set = set.name
 				pieces[#pieces + 1] = piece
 			end
 		end
@@ -1677,7 +1679,8 @@ local function showLoading(loaded, total, seconds)
 end
 
 --- The Preview pane's model controls, as the game's dressing room draws its own: each button's icon
--- on the same art, nil for the art's own, its tooltip, and what a click or a hold does to the scene.
+-- on the same art, nil for the art's own, its tooltip, and what a click or a hold does to the
+-- scene.
 local MODEL_CONTROLS = {
 	{
 		key = "ZoomIn",
@@ -1795,8 +1798,19 @@ local function buildPreviewGrip()
 	end)
 end
 
---- Name the piece under the pointer in a tooltip at the pointer, with its scale where it is not
--- its model's own; nil takes the tooltip down.
+--- Numbers as a box shows them, each after its word: "x 1.5, y -2, z 0".
+local function spelled(words, values)
+	local said = {}
+	for i, word in ipairs(words) do
+		said[i] = word .. " " .. shownNumber(values[i])
+	end
+	return table.concat(said, ", ")
+end
+
+--- Say in a tooltip at the pointer what the piece under it is, enough to place it by hand: its
+-- model, its set, where it stands from the WMO's origin and how it is turned, as `.gob spawn`
+-- takes them, its scale where it is not its model's own, and the command that spawns it. Nil
+-- takes the tooltip down.
 local function showHovered(piece)
 	local scene = preview.Scene
 	if not piece then
@@ -1805,10 +1819,20 @@ local function showHovered(piece)
 		end
 		return
 	end
-	local lines = {}
+	local roll, pitch, turn =
+		Transform.ToAngles({ x = piece.qx, y = piece.qy, z = piece.qz, w = piece.qw })
+	local lines = {
+		{ label = "Set", value = piece.set },
+		{ label = "Position", value = spelled({ "x", "y", "z" }, { piece.x, piece.y, piece.z }) },
+		{ label = "Rotation", value = spelled({ "roll", "pitch", "turn" }, { roll, pitch, turn }) },
+	}
 	if piece.scale ~= 1 then
-		lines[1] = { label = "Scale", value = shownNumber(piece.scale) }
+		lines[#lines + 1] = { label = "Scale", value = shownNumber(piece.scale) }
 	end
+	lines[#lines + 1] = {
+		text = "Typed: " .. Commands.Typed(Commands.SpawnHere(-piece.display)),
+		colour = GREY,
+	}
 	_G.GameTooltip:SetOwner(scene, "ANCHOR_CURSOR")
 	Chat.Tip(_G.GameTooltip, Client.FileName(piece.file) or ("Model %d"):format(piece.file), lines)
 	_G.GameTooltip:Show()

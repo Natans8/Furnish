@@ -676,8 +676,8 @@ def test_with_both_that_may_lead_refused_the_rest_stand_loose(tmp_path: Path) ->
 def test_a_sets_pieces_are_its_placements_by_the_file_each_draws(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     pieces = lua.eval("Furnish.Rows.Pieces(Furnish.Sets.Pick(900, 1).id)")
-    drawn = sorted((p.file, p.x, p.y, p.z, p.qw, p.scale) for p in pieces.values())
-    assert drawn == [(1001, 1.5, -2.0, 0.25, 1.0, 1.0), (1002, 0.0, 0.0, 3.0, 1.0, 0.5)]
+    drawn = sorted((p.display, p.file, p.x, p.y, p.z, p.qw, p.scale) for p in pieces.values())
+    assert drawn == [(20, 1001, 1.5, -2.0, 0.25, 1.0, 1.0), (21, 1002, 0.0, 0.0, 3.0, 1.0, 0.5)]
     # A display the data names no file for is left out.
     lua.execute(
         "local file = Furnish.Reader.ModelFile function Furnish.Reader.ModelFile(display)"
@@ -868,7 +868,7 @@ def test_the_wheel_grabs_the_piece_under_the_pointer_at_its_depth(tmp_path: Path
     assert lua.eval("CAMERA.SetZoomDistance[1]") == pytest.approx((framed - reach) * 0.88)
 
 
-def test_the_piece_under_the_pointer_is_outlined_and_named(tmp_path: Path) -> None:
+def test_the_piece_under_the_pointer_is_marked_and_named(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     lua.execute(RECORDING_SCENE)
     lua.execute(
@@ -877,17 +877,19 @@ def test_the_piece_under_the_pointer_is_outlined_and_named(tmp_path: Path) -> No
         SCENE = Furnish.Scene.New(FRAME, SAID, function(piece)
           HOVERS[#HOVERS + 1] = piece and piece.file or false
         end)
-        SCENE:Draw({ { file = 7, x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 } })
+        SCENE:Draw({ { file = 7, display = 70, x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1,
+          scale = 1 } })
         LOAD(1) SCENE:Tick(0)
         """
     )
     # Not looked for until the pointer is on the scene.
     assert lua.eval("ACTORS[1].SetSpellVisualKit") is None
-    # On the scene's middle the pointer is on the cube, which takes the outline and is named.
+    # On the scene's middle the pointer is on the cube, which takes the pale yellow tint and is
+    # named.
     lua.execute("HOOKED.OnEnter() SCENE:Tick(0)")
-    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (90111, False)
+    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (170969, False)
     assert lua.eval("HOVERS[#HOVERS]") == 7
-    # Off the cube, the outline comes off and the name goes.
+    # Off the cube, the tint comes off and the name goes.
     lua.execute("GetCursorPosition = function() return 0, 100 end SCENE:Tick(0)")
     assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (0,)
     assert lua.eval("HOVERS[#HOVERS]") is False

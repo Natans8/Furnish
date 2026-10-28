@@ -47,9 +47,10 @@ local YAW, PITCH = math.rad(225), math.rad(35)
 --- How far the camera tilts up or down, short of looking straight down the vertical.
 local STEEPEST = 1.45
 
---- The kit that outlines the piece under the pointer: the outline Gilded Claws draws, judged the
--- same as the glow `.gob select` puts on a gob.
-local HOVER_KIT = 90111
+--- The kit that marks the piece under the pointer: a pale yellow, the colour of the glow
+-- `.gob select` puts on a gob, from Epsilon's `.gob tint` grid (red and green whole, blue at 8 of
+-- 20, opaque, unfaded). A tint is what a scene draws of a kit; an outline it does not draw.
+local HOVER_KIT = 170969
 
 --- The corners of a box, as which of its two ends each axis takes.
 local CORNERS = {}
@@ -364,7 +365,7 @@ function Scene:Grab()
 	end
 end
 
---- Outline the piece under the pointer and say which it is, taking the outline off the last.
+--- Mark the piece under the pointer and say which it is, taking the mark off the last.
 -- @param actor the piece's actor, or nil for none
 function Scene:Hover(actor)
 	if actor == self.hovered then
@@ -378,7 +379,7 @@ function Scene:Hover(actor)
 		actor:SetSpellVisualKit(HOVER_KIT, false)
 	end
 	if self.onHover then
-		self.onHover(actor and actor.piece)
+		self.onHover(actor and actor.source)
 	end
 end
 
@@ -478,7 +479,8 @@ function Scene:Draw(pieces)
 			end
 			local offset = { piece.x - cx, piece.y - cy, piece.z - cz }
 			local turn = { x = piece.qx, y = piece.qy, z = piece.qz, w = piece.qw }
-			actor.piece = { file = piece.file, offset = offset, turn = turn, scale = scale }
+			actor.piece = { offset = offset, turn = turn, scale = scale }
+			actor.source = piece
 			actor:ClearModel()
 			actor:SetUseCenterForOrigin(false, false, false)
 			actor:SetPosition(offset[1] / scale, offset[2] / scale, offset[3] / scale)

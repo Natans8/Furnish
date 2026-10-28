@@ -25,9 +25,10 @@ function Rows.OfSet(id)
 	return rows
 end
 
---- A set's placements with the model file each draws, for a scene of the set: each { file, x, y,
--- z, qx, qy, qz, qw, scale }, about the WMO's origin as the rows are. Those drawing a display the
--- data names no file for are left out. Nil and the reason where the set is not in the data.
+--- A set's placements with the model file each draws, for a scene of the set: each { display,
+-- file, x, y, z, qx, qy, qz, qw, scale }, about the WMO's origin as the rows are. Those drawing a
+-- display the data names no file for are left out. Nil and the reason where the set is not in the
+-- data.
 -- @param id a set id, as Sets.OfFile or Sets.OfPlacement give it
 function Rows.Pieces(id)
 	local rows, reason = Rows.OfSet(id)
@@ -39,6 +40,7 @@ function Rows.Pieces(id)
 		local file = Reader.ModelFile(row.display)
 		if file then
 			pieces[#pieces + 1] = {
+				display = row.display,
 				file = file,
 				x = row.x,
 				y = row.y,
