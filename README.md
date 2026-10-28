@@ -79,10 +79,10 @@ doodad `.doodad select` picks is a selection of its own, held beside the gob's: 
 Source or Destination, and while there is one a panel stands against the window's right edge with
 its name and the sets of the WMO it is, those it draws already marked baked. Every pick takes
 the panel, the window open or not, and a doodad with no sets Furnish knows of shows there saying so. Use as source keeps
-that WMO as the source, with the sets the doodad drew beyond its base chosen. Import doodad turns
-it into a gob that is selected like any other; while Source follows the selection, the same sets
-come chosen on it, and either block kept as it is stays so. The doodad is
-hidden, not gone, and stays selected; closing the panel lets it go. Group leader is one choice
+that WMO as the source, with the sets the doodad drew beyond its base chosen. Import doodad is
+`/furn import`: it turns the doodad into a gob and spawns those sets merged into it, the run on
+the window's bar. The doodad is hidden, not gone, and stays selected; closing the panel lets it
+go. Group leader is one choice
 of four, all in view: No group spawns the objects loose; Pivot, the default, makes them one
 group led by an invisible pivot at the destination, which the button counts; First spawned lets
 the first object lead instead, so nothing extra spawns; Selected gob makes whatever is selected

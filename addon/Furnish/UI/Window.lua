@@ -16,11 +16,10 @@
 -- decides is the group, which the Selected gob leader joins. The doodad `.doodad select`
 -- picks is another selection, held at the same time and shown in a panel of its own beside the
 -- window: picking it never changes the source or the destination, and selecting a gob never clears
--- it. It is a step before the gob pipeline, giving each side something in advance. Use as source
--- keeps its WMO as the source with the sets it drew chosen; Import doodad turns it into a gob,
--- selected like any other, with those sets chosen while the source follows the selection; a
--- block kept as it is stays so. Importing hides the doodad, which stays selected, so the panel
--- keeps it. While a run goes nothing changes, since every spawn moves the selection.
+-- it. Use as source keeps its WMO as the source with the sets it drew chosen; Import doodad is
+-- the import a command makes, turning it into a gob and spawning those sets merged into it, the
+-- run on the window's bar. Importing hides the doodad, which stays selected, so the panel keeps
+-- it. While a run goes nothing changes, since every spawn moves the selection.
 
 local _, Furnish = ...
 local Window = {}
@@ -169,15 +168,12 @@ end
 
 --- Where the sets come from: the Source request pinned, or nil to follow the gob selection; the
 -- doodad `.doodad select` picked, in its own slot, imported or not, with the sets of the WMO it
--- is; the doodad imported last while the source followed the selection, whose sets come chosen
--- when the gob it became is shown; the source shown, or nil, and the gob entry its ID box holds;
--- and the sets chosen, by index. And the doodad the window asked to import, by its unique id,
--- until the server names the gob it made.
-local pinned, doodad, marks, shown, shownEntry, asked
+-- is; the source shown, or nil, and the gob entry its ID box holds; and the sets chosen, by index.
+local pinned, doodad, shown, shownEntry
 local chosen = {}
 
 --- Whether the next source shown has its sets chosen afresh, even where it is the WMO shown
--- already: a doodad used or imported brings its own; and what the list shows, as listKey says
+-- already: a doodad used as the source brings its own; and what the list shows, as listKey says
 -- it, so the list is rebuilt only when that changes.
 local rechoose, listed = false, nil
 
@@ -665,17 +661,6 @@ local function chooseFirst(file, sets)
 	end
 end
 
---- The source's request: what is pinned, the doodad's WMO among them, or the selected gob, marked
--- with the sets the doodad it was imported from drew.
-local function sourceRequest()
-	if pinned then
-		return pinned
-	elseif marks then
-		return { placement = marks }
-	end
-	return nil
-end
-
 --- The source's detail line: what it is and how many sets it has.
 local function sourceDetail()
 	return Chat.Count(#shown.sets, "set") .. (shown.blank and ", unfurnished" or "")
@@ -714,7 +699,8 @@ local function refresh()
 		return
 	end
 	local before = shown
-	shown = not (pinned and pinned.empty) and Console.Source(sourceRequest()) or nil
+	-- What is pinned, the doodad's WMO among them, or nil for the selected gob.
+	shown = not (pinned and pinned.empty) and Console.Source(pinned) or nil
 	if shown then
 		for _, set in ipairs(shown.sets) do
 			shown.placed = shown.placed or set.placed
@@ -723,11 +709,6 @@ local function refresh()
 	if shown and (rechoose or not (before and before.file == shown.file)) then
 		rechoose = false
 		chooseFirst(shown.file, shown.sets)
-	end
-	-- The doodad imported last says which sets come chosen on the gob it became, once that gob is
-	-- shown, and nothing after.
-	if marks and shown and shown.placed then
-		marks = nil
 	end
 	if not spotPinned then
 		local selected = Console.Selected()
@@ -1129,8 +1110,7 @@ end
 --- What the Import doodad tooltip says: what importing does, and whether it has been.
 local function importLines()
 	local lines = {
-		{ text = "Turn the doodad into a gob and select it." },
-		{ text = "The sets it drew come chosen.", colour = GREY },
+		{ text = "Turn the doodad into a gob and spawn the sets it drew on it." },
 	}
 	if doodad and doodad.removed then
 		lines[#lines + 1] = {
@@ -1208,14 +1188,12 @@ local function useDoodad()
 	refresh()
 end
 
---- Import the doodad picked: it becomes a gob, selected like any other, which Source and Destination
--- each follow while ticked; the sets the doodad drew come chosen when the source shows that gob.
--- Either kept as it is stays so, the source's chosen sets and all. The doodad is hidden, not
--- gone, and stays selected, so it stays in its slot. It counts as imported once the server names
--- the gob it made, since the gob is selected by the GUID that names it.
+--- Import the doodad picked as the command does: it becomes a gob, and the sets it drew spawn
+-- merged into it, the run on the window's bar. The doodad is hidden, not gone, and stays
+-- selected, so it stays in its slot. It counts as imported once the server names the gob it
+-- made, since the gob is selected by the GUID that names it.
 local function importDoodad()
-	asked = doodad.uid
-	Console.Import({ uid = doodad.uid, only = true, ways = WAYS })
+	Console.Import({ uid = doodad.uid, quiet = true, ways = WAYS })
 	update()
 end
 
@@ -1318,22 +1296,12 @@ local function listOf(box, data, template, initializer)
 end
 
 --- The server named the gob an import made, so the doodad in the panel, where it is the one, is
--- imported, and the server refuses a second import. The one the window asked to import also has
--- its sets come chosen when the source shows the gob it became.
+-- imported, and the server refuses a second import.
 local function importConfirmed(uid)
 	-- A unique id is a number where the window read it off a line, and a string where an import
 	-- line names it.
-	local function names(wanted)
-		return wanted ~= nil and tostring(wanted) == tostring(uid)
-	end
-	if not (uid and doodad and names(doodad.uid)) then
+	if not (uid and doodad and tostring(doodad.uid) == tostring(uid)) then
 		return
-	end
-	if names(asked) then
-		asked = nil
-		if not pinned then
-			marks, chosen, rechoose = doodad, {}, true
-		end
 	end
 	if not doodad.imported then
 		doodad.imported = true
@@ -1618,7 +1586,7 @@ local function buildDoodad()
 			text = "Keep the doodad's WMO as the source, the sets it drew chosen.",
 		},
 	})
-	hint(panel.Import, nil, importLines)
+	hint(panel.Import, nil, importLines, "import")
 end
 
 local function buildOffer()
