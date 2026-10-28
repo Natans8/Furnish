@@ -853,12 +853,13 @@ end
 --- The blueprint the last run offers, shown while Console says it stands. A new offer starts
 -- from its suggested name; the one already up keeps whatever has been typed into it.
 local function showOffer()
-	local name = Console.Offer()
+	local name, leader = Console.Offer()
 	if not name then
 		offer:Hide()
 		offer.made = nil
 		return
 	end
+	offer.leader = leader
 	if offer.made ~= name then
 		offer.made = name
 		offer.Name:SetText(name)
@@ -867,15 +868,15 @@ local function showOffer()
 	offer:Show()
 end
 
---- Put the blueprint command in the chat box, the name as the box holds it. Sending it is the
--- player's, and so is whatever the server answers.
+--- Put the blueprint command in the chat box, the name as the box holds it, as the chat's own
+-- button does. Sending it is the player's, and so is whatever the server answers.
 local function pasteOffer()
 	local name = offer.Name:GetText()
 	if name == "" then
 		return
 	end
 	offer.Name:ClearFocus()
-	Chat.Paste(Console.OfferCommand(name))
+	Console.PasteOffer(name, offer.leader)
 end
 
 --- Draw the run Console holds on the bar: how far it has got, or, once a stopped run deletes

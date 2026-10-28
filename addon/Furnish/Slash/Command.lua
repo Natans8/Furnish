@@ -217,9 +217,9 @@ function Command.Click(words, modifier)
 	elseif kind == "list" then
 		return Console.List({ entry = tonumber(value), ways = Command.WAYS })
 	end
-	local offered = Console.OfferIn(words)
+	local offered, leader = Console.OfferIn(words)
 	if offered then
-		return Console.PasteOffer(offered)
+		return Console.PasteOffer(offered, leader)
 	end
 	local request = Console.LinkRequest(words)
 	if request then

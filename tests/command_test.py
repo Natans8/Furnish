@@ -340,7 +340,7 @@ def on_the_house_at_scale_one(tmp_path: Path) -> lua51.LuaRuntime:
 
 
 def offer(lua: lua51.LuaRuntime) -> str | None:
-    named: str | None = lua.eval("Furnish.Console.Offer()")
+    named: str | None = lua.eval("(Furnish.Console.Offer())")
     return named
 
 
@@ -403,8 +403,10 @@ def test_the_offer_shows_whenever_its_group_is_selected(tmp_path: Path) -> None:
     assert offer(lua) is None
     lua.execute(f'SELECTED, GROUP_LEADER = "group", {leader}')
     assert offer(lua) == "house_set_full"
-    # As a run settles the selection passes through what it spawned, so the offer comes back
-    # with its group rather than lapsing on the first other selection.
+    # As a run settles the client's mirror of the selection passes through what the run spawned,
+    # in no sure order, so an object of the run's counts as the run still selected.
+    lua.execute('RECORDS[7002] = { guid = "7002" } SELECTED = 7002')
+    assert offer(lua) == "house_set_full"
     lua.execute("SELECTED = 502")
     assert offer(lua) is None
     lua.execute(f'SELECTED, GROUP_LEADER = "group", {leader}')
@@ -417,25 +419,30 @@ def test_a_run_from_chat_offers_its_blueprint_as_a_button_that_pastes(tmp_path: 
     lua = on_the_house_at_scale_one(tmp_path)
     lua.execute("PASTED = {} function ChatFrame_OpenChat(text) PASTED[#PASTED + 1] = text end")
     lines = run(lua, "1")
+    leader = lua.eval("GROUP_LEADER")
+    button = f"garrmission:furnish:blueprint:{leader}:house_set_full"
     assert lines[-1] == (
-        PREFIX
-        + "Save as a blueprint? |cff71d5ff|Hgarrmission:furnish:blueprint:house_set_full|h"
-        + "[house_set_full]|h|r"
+        PREFIX + f"Save as a blueprint? |cff71d5ff|H{button}|h[house_set_full]|h|r"
     )
     click = lua.globals().HOOKS.SetItemRef
-    leader = lua.eval("GROUP_LEADER")
-    # Pasted only while the run's group is selected, since the command saves the selection.
+    # Pasted only while the selection rests on the run, since the command saves the selection.
     lua.execute("SELECTED = 502")
-    click("garrmission:furnish:blueprint:house_set_full")
+    click(button)
     assert printed(lua)[-1] == (
         PREFIX + "house_set_full saves the run's group, so select that group first, as with "
         f".gobject group select {leader}"
     )
     lua.execute(f'SELECTED, GROUP_LEADER = "group", {leader}')
-    click("garrmission:furnish:blueprint:house_set_full")
+    click(button)
     assert list(lua.eval("PASTED").values()) == [".gobject blueprint new house_set_full"]
+    # On one of the run's own objects, the group is selected first, as the run's end selects it.
+    lua.execute('RECORDS[7002] = { guid = "7002" } SELECTED = 7002')
+    before = len(sent(lua))
+    click(button)
+    assert sent(lua)[before:] == [f"gobject group select {leader}"]
+    assert list(lua.eval("PASTED").values())[-1] == ".gobject blueprint new house_set_full"
     run(lua, "1 nogroup")
-    click("garrmission:furnish:blueprint:house_set_full")
+    click(button)
     assert printed(lua)[-1] == PREFIX + "that blueprint offer has gone with a later run"
 
 

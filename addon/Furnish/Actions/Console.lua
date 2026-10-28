@@ -468,6 +468,15 @@ end
 
 local stride = Chat.Stride
 
+--- Every object a run made, by GUID as a string: its leader and all it spawned.
+local function madeBy(result)
+	local made = { [tostring(result.leader)] = true }
+	for _, guid in ipairs(result.spawned) do
+		made[tostring(guid)] = true
+	end
+	return made
+end
+
 local function hooks(about)
 	local told, cleaned, started = 0, 0, Client.Now()
 	return {
@@ -496,13 +505,18 @@ local function hooks(about)
 			finish(result, started, about.anchor)
 			local offer = about.blueprint
 					and whole(result)
-					and { name = about.blueprint, leader = tostring(result.leader) }
+					and {
+						name = about.blueprint,
+						leader = tostring(result.leader),
+						made = madeBy(result),
+					}
 				or nil
 			current, last =
 				nil, { result = result, seconds = Client.Now() - started, offer = offer }
 			-- A window draws its own offer; in chat, the name is a button.
 			if offer and not about.quiet then
-				say(Console.OFFER.title .. " " .. Chat.Link(OFFERED .. offer.name, offer.name))
+				local words = OFFERED .. offer.leader .. ":" .. offer.name
+				say(Console.OFFER.title .. " " .. Chat.Link(words, offer.name))
 			end
 			tell("finished", result, last.seconds)
 		end,
@@ -719,14 +733,28 @@ function Console.Run()
 	return current, last
 end
 
---- The blueprint name the last run offers, while that run's group is what is selected, since the
--- command that saves it saves the selection; or nil. It stands until it is dismissed or the next
--- run starts, and shows again whenever the group is selected again: as a run settles, the
--- selection passes through the objects it spawned before the group's own lands.
+--- Whether the selection rests on what the last run made: its group, or one of its own objects.
+-- The client's mirror of the selection settles late and passes between the group and the
+-- objects a run spawned after the run's own select, so an object of the run's counts as the run
+-- still selected, and only a selection outside it counts as moving on.
+-- @param offer the last run's offer, which names its group's leader and what it made
+local function runSelected(offer)
+	local group = Client.SelectedGroup()
+	if group then
+		return group == offer.leader
+	end
+	local object = Client.Selected()
+	return object ~= nil and object ~= false and offer.made[tostring(object.guid)] == true
+end
+
+--- The blueprint name the last run offers, and the leader of the group it saves, which names
+-- the offer; while the selection rests on what that run made, since the command that saves it
+-- saves the selected group; or nil. It stands until it is dismissed or the next run starts, and
+-- shows again whenever the run's group is selected again.
 function Console.Offer()
 	local offer = last and last.offer
-	if offer and Client.SelectedGroup() == offer.leader then
-		return offer.name
+	if offer and runSelected(offer) then
+		return offer.name, offer.leader
 	end
 	return nil
 end
@@ -736,25 +764,34 @@ function Console.OfferCommand(name)
 	return Commands.Typed(Commands.BlueprintNew(name))
 end
 
---- The blueprint name a chat line's button carries, or nil for words no such button wrote.
+--- The blueprint name a chat line's button carries, and the leader naming its offer; or nil for
+-- words no such button wrote.
 function Console.OfferIn(words)
-	return words:match("^" .. OFFERED .. "(.+)$")
+	local leader, name = words:match("^" .. OFFERED .. "(%d+):(.+)$")
+	return name, leader
 end
 
---- Put the command that saves the last run's group as a blueprint in the chat box, while that
--- group is what is selected, since the command saves the selection; sending it is the player's.
-function Console.PasteOffer(name)
+--- Put the command that saves the last run's group as a blueprint in the chat box; sending it is
+-- the player's. The command saves the selected group, so where the selection rests on one of the
+-- run's own objects rather than its group, the group is selected first, as the run's end selects
+-- it; a selection outside the run is the player's, and the offer says what to select.
+-- @param name the blueprint's name, the offer's own or one the player edited
+-- @param leader the leader naming the offer, as Console.Offer and a chat button give it
+function Console.PasteOffer(name, leader)
 	local offer = last and last.offer
-	if not (offer and offer.name == name) then
+	if not (offer and offer.leader == leader) then
 		return say("that blueprint offer has gone with a later run")
 	end
-	if Client.SelectedGroup() ~= offer.leader then
+	if not runSelected(offer) then
 		return say(
 			("%s saves the run's group, so select that group first, as with %s"):format(
 				name,
 				Commands.Typed(Commands.SelectGroup(offer.leader))
 			)
 		)
+	end
+	if Client.SelectedGroup() ~= offer.leader then
+		Client.Send()(Commands.SelectGroup(offer.leader), nil, true)
 	end
 	Chat.Paste(Console.OfferCommand(name))
 end
