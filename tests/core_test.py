@@ -710,6 +710,7 @@ FRAME = {
   GetCameraFieldOfView = function() return 2 * math.atan(0.5) end,
   GetWidth = function() return 200 end, GetHeight = function() return 100 end,
   GetEffectiveScale = function() return 1 end, GetCenter = function() return 100, 50 end,
+  GetLeft = function() return 0 end, GetBottom = function() return 0 end,
   GetActiveCamera = function() return recorder(CAMERA) end,
   CreateActor = function()
     local told = {}
@@ -948,6 +949,56 @@ def test_a_piece_only_behind_another_is_not_pointed_at(tmp_path: Path) -> None:
     ahead = forward(math.radians(225), math.radians(35))
     behind = tuple(3 * a for a in ahead)
     assert hovered_of(lua, piece_at(1, (0, 0, 0), 1) + piece_at(2, behind, 0.2)) == 1
+
+
+#: A pinhole projection for the stub scene, wider than its field of view claims: a tangent of 0.8
+#: up from the middle to the top edge where GetCameraFieldOfView says 0.5. It answers in pixels
+#: from the scene's bottom left, as the client's does, from the scene's own camera.
+WIDER_LENS = """
+function FRAME:Project3DPointTo2D(x, y, z)
+  local s = SCENE
+  local fx = math.cos(s.pitch) * math.cos(s.yaw)
+  local fy = math.cos(s.pitch) * math.sin(s.yaw)
+  local fz = -math.sin(s.pitch)
+  local rx, ry, rz, ux, uy, uz = s:Axes()
+  local d = s.distance * s.zoom
+  local vx = x - (s.centre[1] - fx * d)
+  local vy = y - (s.centre[2] - fy * d)
+  local vz = z - (s.centre[3] - fz * d)
+  local depth = vx * fx + vy * fy + vz * fz
+  if depth <= 0 then return nil end
+  local k = 50 / 0.8
+  local across, up = vx * rx + vy * ry + vz * rz, vx * ux + vy * uy + vz * uz
+  return 100 + k * across / depth, 50 + k * up / depth
+end
+"""
+
+
+def test_the_pointer_is_read_through_the_scene_s_own_projection(tmp_path: Path) -> None:
+    # Two small pieces apart, the scene wider than its field of view says: the pointer put where
+    # the projection draws the second is on the second, which a ray built from the claimed field
+    # of view would miss.
+    lua = lua_core(tmp_path)
+    lua.execute(RECORDING_SCENE)
+    lua.execute(WIDER_LENS)
+    lua.execute(
+        f"""
+        HOVERS = {{}}
+        SCENE = Furnish.Scene.New(FRAME, SAID, function(piece)
+          HOVERS[#HOVERS + 1] = piece and piece.file or false
+        end)
+        SCENE:Draw({{ {piece_at(1, (0, 0, 0), 0.1)} {piece_at(2, (0, 6, 0), 0.1)} }})
+        LOAD(1) LOAD(2) SCENE:Tick(0)
+        """
+    )
+    x, y = lua.eval("{ FRAME:Project3DPointTo2D(unpack(SCENE.boxes[2].centre)) }").values()
+    lua.execute(
+        f"GetCursorPosition = function() return {x}, {y} end HOOKED.OnEnter() SCENE:Tick(0)"
+    )
+    assert lua.eval("HOVERS[#HOVERS]") == 2
+    # And the framing reads the same projection: the sphere fits the wider view.
+    radius = math.dist((-0.1, -0.1, -0.1), (0.1, 6.1, 0.1)) / 2
+    assert lua.eval("SCENE.distance") == pytest.approx(radius / math.sin(math.atan(0.8)))
 
 
 def test_a_held_rotate_button_turns_and_reset_reframes(tmp_path: Path) -> None:

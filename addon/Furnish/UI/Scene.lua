@@ -47,6 +47,10 @@ local YAW, PITCH = math.rad(225), math.rad(35)
 --- How far the camera tilts up or down, short of looking straight down the vertical.
 local STEEPEST = 1.45
 
+--- How far off the view's axis, as a share of the depth, the points stand that the scene's own
+-- projection is asked about to measure it.
+local LENS_STEP = 0.1
+
 --- The kit that marks the piece under the pointer: a steady pale yellow glow along its edges, the
 -- nearest a scene draws to the outline `.gob select` puts on a gob, which a scene does not draw.
 local HOVER_KIT = 87979
@@ -205,11 +209,17 @@ function Scene:Fit()
 	if radius <= 0 then
 		return false
 	end
-	-- The field of view is read as the vertical one. A frame not yet laid out measures nothing, and
-	-- is taken as square until it does.
-	local tall = math.tan(self.frame:GetCameraFieldOfView() / 2)
-	local width, height = self.frame:GetWidth(), self.frame:GetHeight()
-	local wide = (width > 0 and height > 0) and tall * width / height or tall
+	-- How far the view reaches off its axis, up and across, as the scene draws it; a frame not yet
+	-- laid out measures nothing, and is taken as square until it does.
+	local frame = self.frame
+	local scale = frame:GetEffectiveScale()
+	local width, height = frame:GetWidth() * scale, frame:GetHeight() * scale
+	local tall = math.tan(frame:GetCameraFieldOfView() / 2)
+	local wide = tall
+	if width > 0 and height > 0 then
+		local across, up = self:Lens()
+		tall, wide = height / 2 / math.abs(up), width / 2 / math.abs(across)
+	end
 	self.centre = { (low[1] + high[1]) / 2, (low[2] + high[2]) / 2, (low[3] + high[3]) / 2 }
 	self.distance = radius / math.sin(math.atan(math.min(tall, wide)))
 	self:Aim()
@@ -320,15 +330,51 @@ end
 --- Move what the camera looks at across the view, so the pieces at its depth follow the pointer:
 -- a pixel is the share of the view's height it spans, at the camera's distance.
 function Scene:Pan(dx, dy)
-	local frame = self.frame
-	local tall = 2 * self.distance * self.zoom * math.tan(frame:GetCameraFieldOfView() / 2)
-	local step = tall / (frame:GetHeight() * frame:GetEffectiveScale())
+	local across, up = self:Lens()
+	local depth = self.distance * self.zoom
+	local sideways, upward = dx * depth / across, dy * depth / up
 	local rx, ry, rz, ux, uy, uz = self:Axes()
 	local centre = self.centre
-	centre[1] = centre[1] - (rx * dx + ux * dy) * step
-	centre[2] = centre[2] - (ry * dx + uy * dy) * step
-	centre[3] = centre[3] - (rz * dx + uz * dy) * step
+	centre[1] = centre[1] - rx * sideways - ux * upward
+	centre[2] = centre[2] - ry * sideways - uy * upward
+	centre[3] = centre[3] - rz * sideways - uz * upward
 	self.moved = true
+end
+
+--- How the scene projects: pixels per unit of tangent off the view's axis, across and up, and the
+-- pixel, from the scene's bottom left, where what the camera looks at lands. Measured with the
+-- scene's own projection, which answers in pixels from its bottom left, so nothing rests on what
+-- its field of view means; read from the field of view, as the vertical one, while the scene
+-- projects nothing, as before it is first drawn.
+function Scene:Lens()
+	local frame = self.frame
+	local scale = frame:GetEffectiveScale()
+	local width, height = frame:GetWidth() * scale, frame:GetHeight() * scale
+	if frame.Project3DPointTo2D then
+		local c = self.centre
+		local step = self.distance * self.zoom * LENS_STEP
+		local rx, ry, rz, ux, uy, uz = self:Axes()
+		local midX, midY = frame:Project3DPointTo2D(c[1], c[2], c[3])
+		local rightX =
+			frame:Project3DPointTo2D(c[1] + rx * step, c[2] + ry * step, c[3] + rz * step)
+		local _, upY =
+			frame:Project3DPointTo2D(c[1] + ux * step, c[2] + uy * step, c[3] + uz * step)
+		if midX and midY and rightX and upY and rightX ~= midX and upY ~= midY then
+			return (rightX - midX) / LENS_STEP, (upY - midY) / LENS_STEP, midX, midY
+		end
+	end
+	local reach = height / 2 / math.tan(frame:GetCameraFieldOfView() / 2)
+	return reach, reach, width / 2, height / 2
+end
+
+--- Where the pointer is off the view's axis, in units of tangent, across and up.
+function Scene:Pointer()
+	local frame = self.frame
+	local scale = frame:GetEffectiveScale()
+	local across, up, midX, midY = self:Lens()
+	local x, y = _G.GetCursorPosition()
+	return (x - frame:GetLeft() * scale - midX) / across,
+		(y - frame:GetBottom() * scale - midY) / up
 end
 
 --- Bring the camera nearer or farther by steps of the wheel, toward the point under the pointer,
@@ -341,11 +387,13 @@ function Scene:Zoom(steps, straight)
 	end
 	local zoom = clamp(self.zoom * ZOOM_STEP ^ steps, NEAR / self.distance, FARTHEST)
 	if not straight then
-		local share = 1 - zoom / self.zoom
-		local x, y = _G.GetCursorPosition()
-		local cx, cy = self.frame:GetCenter()
-		local scale = self.frame:GetEffectiveScale()
-		self:Pan(-(x - cx * scale) * share, -(y - cy * scale) * share)
+		local across, upward = self:Pointer()
+		local reach = self.distance * self.zoom * (1 - zoom / self.zoom)
+		local rx, ry, rz, ux, uy, uz = self:Axes()
+		local centre = self.centre
+		centre[1] = centre[1] + (rx * across + ux * upward) * reach
+		centre[2] = centre[2] + (ry * across + uy * upward) * reach
+		centre[3] = centre[3] + (rz * across + uz * upward) * reach
 	end
 	self.zoom = zoom
 	self.moved = true
@@ -367,16 +415,10 @@ end
 --- The nearest loaded piece under the pointer, by its box: the box, which names its actor, how
 -- deep along the view it lies, and where the camera stands. Nil where the pointer is on none.
 function Scene:Pick()
-	local frame = self.frame
-	local scale = frame:GetEffectiveScale()
-	local half = frame:GetHeight() * scale / 2
-	if not self.boxes[1] or half <= 0 then
+	if not self.boxes[1] or self.frame:GetHeight() <= 0 then
 		return nil
 	end
-	local x, y = _G.GetCursorPosition()
-	local cx, cy = frame:GetCenter()
-	local spread = math.tan(frame:GetCameraFieldOfView() / 2) / half
-	local across, upward = (x - cx * scale) * spread, (y - cy * scale) * spread
+	local across, upward = self:Pointer()
 	local fx, fy, fz = forwardOf(self.yaw, self.pitch)
 	local rx, ry, rz, ux, uy, uz = self:Axes()
 	local distance, centre = self.distance * self.zoom, self.centre
