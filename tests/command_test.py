@@ -694,6 +694,21 @@ def test_several_sets_spawn_together_and_the_base_set_comes_once(tmp_path: Path)
     assert [s.split()[2] for s in sent(lua)] == ["-21", "-20", "-21"]
 
 
+def test_a_placement_two_chosen_sets_share_is_spawned_once(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    # Every set places the same rows, Full's chair and lamp, as two sets of one WMO may.
+    lua.execute(
+        """
+        local rows = Furnish.Rows.OfSet(Furnish.Sets.Pick(900, 1).id)
+        Furnish.Rows.OfSet = function() return rows end
+        SELECTED = 501
+        """
+    )
+    lua.globals().Furnish.Console.Spawn(lua.eval("{ indexes = { 0, 1 }, group = 'nogroup' }"))
+    assert began(lua).startswith(PREFIX + "spawning Base and Full (sets 0 and 1, 2 objects)")
+    assert [s.split()[2] for s in sent(lua)] == ["-20", "-21"]
+
+
 def test_a_set_named_by_its_entry_onto_its_own_wmo_is_not_named_again(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 500")
