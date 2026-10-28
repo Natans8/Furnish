@@ -611,7 +611,6 @@ local function updatePreview()
 				end
 			end
 		end
-		preview.Name:SetText(shown and shown.name or "No sets")
 		local detail = "Choose a set to see it laid out."
 		if #names > 0 then
 			detail = ("%s, %s"):format(table.concat(names, ", "), objects(#pieces))
@@ -619,6 +618,8 @@ local function updatePreview()
 		preview.Detail:SetText(detail)
 		stage:Draw(pieces)
 	end
+	-- Named on every update, since a source's name can arrive after its sets were drawn.
+	preview.Name:SetText(shown and shown.name or "No sets")
 	updateChosen()
 end
 
