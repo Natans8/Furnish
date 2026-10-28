@@ -10,9 +10,8 @@ every model to the display that spawns it, and writes one SQLite file.
 
 ## Commands
 
-The command is `/furn`, or `/furnish`, and `/furn help` prints a short form of what follows. Both names are
-placeholders: they are `SLASH_FURNISH1` and `SLASH_FURNISH2` in `Command.lua`, and every message
-reads the first.
+The command is `/furn`, or `/furnish`, and `/furn help` prints a short form of what follows; every
+message reads the first name.
 
 | command                    | does                                                                           |
 |----------------------------|--------------------------------------------------------------------------------|
@@ -54,7 +53,9 @@ A WMO's doodad line, from `.doodad select` or `.doodad near`, carries a `[Furnis
 that imports that WMO by its unique id and furnishes it as `/furn import` does, where the map
 placed it with a set beyond its base, so that the import spawns something; and a WMO gob's
 selection line, from `.gob select`, or its spawn line, from `.gob spawn`, which selects what it
-makes, one that lists its sets.
+makes, one that lists its sets. A right-click on either, or on a set's button in a list, opens
+the window on it instead: the doodad in its panel, the gob's WMO as the source, or that set
+chosen on its WMO.
 
 The window reads top to bottom as where the sets come from, which to spawn, and where they go.
 Source is the WMO a gob entry is, held in its ID box as Destination's numbers are: the selected gob's, one typed, which
@@ -118,9 +119,12 @@ stand over the scene, and Reset frames the sets as they opened. The pane's corne
 and the window taller with it. Resting on a piece marks it with a glow and names it in a tooltip
 at the pointer: its model and the display it spawns by, its set, its position and rotation from
 the WMO's origin as `.gob spawn` takes them, in Destination's colours, and its scale where it is
-not one. A click spawns that piece alone, ungrouped, where a run of its set would put it at
-Destination, and unticks Destination's Follow selection, since the server selects what it spawns
-and a destination that followed would carry the next piece off; the piece stays selected.
+not one. A click chooses a piece alone, a shift-click chooses it too, and a shift-drag chooses
+every piece in its band; the chosen stay lit and are counted under the pane's name, and Spawn,
+at the pane's foot, spawns them where a run of their sets would put them at Destination, one
+alone and several as a group led by the first chosen. It unticks Destination's Follow selection,
+since the server selects what it spawns and a destination that followed would carry the next
+pieces off; what spawned stays selected, and the choice is let go.
 
 ## Build
 

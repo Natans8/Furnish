@@ -217,9 +217,10 @@ local lead = Console.GROUPED
 -- told; and the last run's result the bar has said.
 local run, told
 
---- The scene the Preview pane draws in, made as the window is built; and what it last drew, as
--- its source and chosen sets, so it is drawn again only when they change.
-local stage, previewed
+--- The scene the Preview pane draws in, made as the window is built; what it last drew, as its
+-- source and chosen sets, so it is drawn again only when they change; and the line saying what
+-- that is.
+local stage, previewed, previewedDetail
 
 --- The search match Enter takes, by its place in the list.
 local picked = 1
@@ -576,6 +577,19 @@ local function updateDoodad()
 	panel.Import:SetEnabled(not run and importable and not Console.Busy())
 end
 
+--- Say in the Preview pane how many pieces are chosen in it, and offer to spawn them while any
+-- are and nothing runs.
+local function updateChosen()
+	local count = #stage:Chosen()
+	local detail = previewedDetail or ""
+	if count > 0 then
+		detail = ("%s, %d chosen"):format(detail, count)
+	end
+	preview.Detail:SetText(detail)
+	preview.Spawn:SetText(count > 1 and ("Spawn %d"):format(count) or "Spawn")
+	preview.Spawn:SetEnabled(count > 0 and not run and spot ~= nil and not Console.Busy())
+end
+
 --- Draw the chosen sets in the Preview pane, while it shows and only when what is chosen changed.
 local function updatePreview()
 	if not preview:IsShown() then
@@ -583,27 +597,26 @@ local function updatePreview()
 	end
 	local indexes = chosenSets()
 	local key = shown and (shown.file .. ":" .. table.concat(indexes, ",")) or ""
-	if key == previewed then
-		return
-	end
-	previewed = key
-	local pieces, names = {}, {}
-	for _, set in ipairs(shown and shown.sets or {}) do
-		if chosen[set.index] then
-			names[#names + 1] = set.name
-			for _, piece in ipairs(Rows.Pieces(set.id) or {}) do
-				piece.set = set.name
-				pieces[#pieces + 1] = piece
+	if key ~= previewed then
+		previewed = key
+		local pieces, names = {}, {}
+		for _, set in ipairs(shown and shown.sets or {}) do
+			if chosen[set.index] then
+				names[#names + 1] = set.name
+				for _, piece in ipairs(Rows.Pieces(set.id) or {}) do
+					piece.set = set.name
+					pieces[#pieces + 1] = piece
+				end
 			end
 		end
+		preview.Name:SetText(shown and shown.name or "No sets")
+		previewedDetail = "Choose a set to see it laid out."
+		if #names > 0 then
+			previewedDetail = ("%s, %s"):format(table.concat(names, ", "), objects(#pieces))
+		end
+		stage:Draw(pieces)
 	end
-	stage:Draw(pieces)
-	preview.Name:SetText(shown and shown.name or "No sets")
-	local detail = "Choose a set to see it laid out."
-	if #names > 0 then
-		detail = ("%s, %s"):format(table.concat(names, ", "), objects(#pieces))
-	end
-	preview.Detail:SetText(detail)
+	updateChosen()
 end
 
 local function update()
@@ -950,6 +963,15 @@ local function finished(result, seconds)
 	showOffer()
 end
 
+--- Open the Preview pane on what is chosen. A scene applies nothing while hidden, so a pane
+-- opened now is drawn afresh.
+local function openPreview()
+	if not preview:IsShown() then
+		preview:Show()
+		previewed = nil
+	end
+end
+
 --- A click chooses the one set, and a ctrl- or shift-click adds or removes it; either opens the
 -- Preview pane on what is chosen then.
 local function rowClick(button)
@@ -963,11 +985,7 @@ local function rowClick(button)
 	else
 		chosen = { [index] = true }
 	end
-	-- A scene applies nothing while hidden, so a pane opened now is drawn afresh.
-	if not preview:IsShown() then
-		preview:Show()
-		previewed = nil
-	end
+	openPreview()
 	update()
 end
 
@@ -1745,7 +1763,7 @@ local MODEL_CONTROLS = {
 local function buildControls()
 	local controls = preview.Scene.Controls
 	-- A control over a model states its own frame level, or the model may draw over it.
-	controls:SetFrameLevel(preview.Scene:GetFrameLevel() + 10)
+	controls:SetFrameLevel(preview.Scene:GetFrameLevel() + Scene.ABOVE)
 	for _, control in ipairs(MODEL_CONTROLS) do
 		local button = controls[control.key]
 		button:Init("AnyUp", control.icon, control.title, control.text)
@@ -1813,6 +1831,18 @@ local OFF_POINTER = 16
 --- The hovered piece's tooltip, drawn by LibQTip as a grid; nil while none shows.
 local pieceTip
 
+--- What the clicks on a piece do, as its tooltip says them.
+local PIECE_CLICKS = {
+	"Click: choose it alone",
+	"Shift-click: choose it too",
+	"Shift-drag: choose a band of them",
+}
+
+--- What to call a piece: its model's name, or its model's file.
+local function pieceName(piece)
+	return Client.FileName(piece.file) or ("model %d"):format(piece.file)
+end
+
 --- Stand the piece's tooltip just off the pointer, as the client's own does at the pointer.
 local function followPointer()
 	if not pieceTip then
@@ -1851,8 +1881,7 @@ local function showHovered(piece)
 	-- The model's name, and across from it the display it spawns by, as `.gob spawn` takes it, in
 	-- the regular font after its word, as an item's level stands across from its name.
 	local line = grid:AddHeader()
-	local name = Client.FileName(piece.file) or ("Model %d"):format(piece.file)
-	grid:SetCell(line, 1, name, nil, "LEFT", 3)
+	grid:SetCell(line, 1, pieceName(piece), nil, "LEFT", 3)
 	grid:SetCellTextColor(line, 1, unpack(colours.title))
 	local id = ("%sID%s %d"):format(Chat.GREY, Chat.END, -piece.display)
 	grid:SetCell(line, 4, id, grid:GetFont(), "RIGHT")
@@ -1881,40 +1910,58 @@ local function showHovered(piece)
 		line = grid:AddLine("Scale", scale)
 		grid:SetCellTextColor(line, 1, unpack(colours.label))
 	end
-	line = grid:AddLine()
-	grid:SetCell(line, 1, "Click: spawn this piece where the set would put it", nil, "LEFT", 4)
-	grid:SetCellTextColor(line, 1, unpack(colours.click))
-	if not spotPinned then
+	for _, click in ipairs(PIECE_CLICKS) do
 		line = grid:AddLine()
-		grid:SetCell(line, 1, "and untick the destination's Follow selection", nil, "LEFT", 4)
-		grid:SetCellTextColor(line, 1, unpack(colours.label))
+		grid:SetCell(line, 1, click, nil, "LEFT", 4)
+		grid:SetCellTextColor(line, 1, unpack(colours.click))
 	end
 	followPointer()
 	grid:Show()
 end
 
---- Spawn the piece clicked in the Preview pane alone, where a run of its set would put it, the
--- destination first held where it is: the server selects what it spawns, and a destination that
--- followed the selection would carry the next piece clicked off from where the set puts it.
-local function spawnPiece(piece)
-	if run or not spot then
+--- Spawn the pieces chosen in the Preview pane where a run of their sets would put them, one
+-- alone and several as a group led by the first chosen, the destination first held where it is:
+-- the server selects what it spawns and a run's end selects its group, and a destination that
+-- followed the selection would carry the next pieces off from where their sets put them. What was
+-- chosen is let go, so a second click spawns nothing twice.
+local function spawnChosen()
+	local pieces = stage:Chosen()
+	if run or not spot or #pieces == 0 then
 		return
 	end
+	spotPinned = true
+	local what = #pieces == 1 and pieceName(pieces[1])
+		or ("%d pieces of %s"):format(#pieces, shown.name)
+	Console.SpawnPieces(pieces, what, Pose.Copy(spot), WAYS)
+	stage:Choose(nil)
+	update()
+end
+
+--- What the pane's Spawn offers: where the pieces go, and that the destination is held there.
+local function spawnChosenLines()
+	local lines = {
+		{ text = "Where their sets would put them, as a group led by the first chosen." },
+	}
 	if not spotPinned then
-		spotPinned = true
-		update()
+		lines[#lines + 1] = {
+			text = "Unticks the destination's Follow selection, since the server selects what it spawns.",
+			colour = GREY,
+		}
 	end
-	local name = Client.FileName(piece.file) or ("model %d"):format(piece.file)
-	Console.SpawnPiece(piece, name, Pose.Copy(spot), WAYS)
+	return lines
 end
 
 local function buildPreview()
 	preview.Label:SetText("Preview")
-	preview.Hint:SetText("Drag to turn, right-drag to pan, wheel to zoom.")
-	stage = Scene.New(preview.Scene, showLoading, showHovered, spawnPiece)
+	preview.Hint:SetText("Drag turns, right-drag pans, wheel zooms; click chooses.")
+	stage = Scene.New(preview.Scene, showLoading, showHovered, updateChosen)
 	preview.Scene:HookScript("OnUpdate", Client.Guarded(followPointer))
 	buildControls()
 	buildPreviewGrip()
+	preview.Spawn:SetScript("OnClick", Client.Guarded(spawnChosen))
+	preview.Spawn:SetText("Spawn")
+	preview.Spawn:Disable()
+	hint(preview.Spawn, "Spawn the chosen pieces", spawnChosenLines)
 	preview.CloseButton:SetScript(
 		"OnClick",
 		Client.Guarded(function()
@@ -2077,6 +2124,56 @@ end
 --- Show the window, or hide it when it shows.
 function Window.Toggle()
 	frame:SetShown(not frame:IsShown())
+end
+
+--- Show the window on what a door set in it: opened, it reads itself afresh; open, it is read
+-- here.
+local function open()
+	if frame:IsShown() then
+		refresh()
+	else
+		frame:Show()
+	end
+end
+
+--- Open the window with a WMO as the source, kept whatever is selected, as a chat button names
+-- the gob it is by its entry.
+function Window.ShowSource(entry)
+	pinned = { entry = entry }
+	frame.Search:SetText("")
+	frame.Results:Hide()
+	rechoose = true
+	open()
+end
+
+--- Open the window with a WMO as the source and one of its sets alone chosen, as a list's button
+-- names them.
+function Window.ShowSet(file, index, name)
+	pinned = { file = file, name = name }
+	frame.Search:SetText("")
+	frame.Results:Hide()
+	open()
+	chosen = { [index] = true }
+	openPreview()
+	update()
+end
+
+--- Open the window on a doodad a chat button names, in its panel, as `.doodad select` puts
+-- one there: by its unique id and its gob entry, on the player's map.
+function Window.ShowDoodad(uid, entry)
+	local file = Sets.OfEntry(entry)
+	doodad = {
+		uid = uid,
+		entry = entry,
+		map = Client.Map(),
+		name = file and Client.FileName(file) or ("object %d"):format(entry),
+	}
+	if frame:IsShown() then
+		fillDoodad()
+		update()
+	else
+		frame:Show()
+	end
 end
 
 build()

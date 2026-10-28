@@ -699,10 +699,13 @@ def test_a_sets_pieces_are_its_placements_by_the_file_each_draws(tmp_path: Path)
 #: narrower, with a tangent of 0.5. Every model is a two-yard cube about its origin, and loads only
 #: when LOAD calls it in, as the client calls back.
 RECORDING_SCENE = """
-ACTORS, CAMERA, TOLD, SCRIPTS, HOOKED, NOW = {}, {}, {}, {}, {}, 10
+ACTORS, CAMERA, TOLD, SCRIPTS, HOOKED, BAND, NOW = {}, {}, {}, {}, {}, {}, 10
 GetTime = function() return NOW end
--- The pointer rests on the scene's middle unless a test moves it.
+-- The pointer rests on the scene's middle unless a test moves it, with no button or shift held.
 GetCursorPosition = function() return 100, 50 end
+HELD = {}
+IsMouseButtonDown = function(button) return HELD[button] end
+IsShiftKeyDown = function() return SHIFT end
 local function recorder(into, own)
   return setmetatable(own or {}, { __index = function(_, method)
     return function(_, ...) into[method] = { ... } end
@@ -718,6 +721,7 @@ FRAME = {
   GetWidth = function() return 200 end, GetHeight = function() return 100 end,
   GetEffectiveScale = function() return 1 end, GetCenter = function() return 100, 50 end,
   GetLeft = function() return 0 end, GetBottom = function() return 0 end,
+  GetFrameLevel = function() return 1 end,
   GetActiveCamera = function() return recorder(CAMERA) end,
   CreateActor = function()
     local told = {}
@@ -732,6 +736,8 @@ FRAME = {
   end,
 }
 function LOAD(i) ACTORS[i].loaded(ACTORS[i].actor) end
+-- The band is the one frame a scene makes.
+CreateFrame = function(_, _, _, template) BAND.template = template return recorder(BAND) end
 SAID = function(loaded, total, seconds) TOLD[#TOLD + 1] = { loaded, total, seconds } end
 """
 
@@ -1008,32 +1014,103 @@ def test_the_pointer_is_read_through_the_scene_s_own_projection(tmp_path: Path) 
     assert lua.eval("SCENE.distance") == pytest.approx(radius / math.sin(math.atan(0.8)))
 
 
-def test_a_press_let_go_where_it_was_made_clicks_the_piece_under_the_pointer(
-    tmp_path: Path,
-) -> None:
-    lua = core_scene_with_click(tmp_path)
-    lua.execute("SCRIPTS.OnMouseDown(FRAME, 'LeftButton') SCRIPTS.OnMouseUp(FRAME, 'LeftButton')")
-    assert lua.eval("CLICKED") == 7
-    # A press dragged away before it is let go turns the camera, and clicks nothing.
+def test_a_click_chooses_the_piece_under_the_pointer_alone(tmp_path: Path) -> None:
+    lua = core_scene_choosing(tmp_path)
+    click(lua)
+    assert chosen(lua) == [7] and lua.eval("TOLD_CHOSEN") == 1
+    # Chosen, the cube stays lit once the pointer leaves it.
+    lua.execute("GetCursorPosition = function() return 0, 100 end SCENE:Tick(0)")
+    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (87979, False)
+    assert lua.eval("ACTORS[1].ClearAllEffects") is None
+    # A click on nothing chooses none, and the light goes out.
+    click(lua)
+    assert chosen(lua) == [] and lua.eval("TOLD_CHOSEN") == 2
+    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == ()
+    # A press dragged away before it is let go turns the camera, and chooses nothing.
+    lua.execute("GetCursorPosition = function() return PRESS[1], PRESS[2] end SCENE:Tick(0)")
     lua.execute(
-        "CLICKED = nil SCRIPTS.OnMouseDown(FRAME, 'LeftButton')"
+        "SCRIPTS.OnMouseDown(FRAME, 'LeftButton')"
         " GetCursorPosition = function() return 110, 50 end SCRIPTS.OnMouseUp(FRAME, 'LeftButton')"
     )
-    assert lua.eval("CLICKED") is None
+    assert chosen(lua) == [] and lua.eval("TOLD_CHOSEN") == 2
 
 
-def core_scene_with_click(tmp_path: Path) -> lua51.LuaRuntime:
-    """A scene of one cube with the pointer on it, noting the file of a piece clicked."""
-    lua = lua_core(tmp_path)
-    lua.execute(RECORDING_SCENE)
+def test_a_shift_click_chooses_a_piece_too_and_again_lets_it_go(tmp_path: Path) -> None:
+    lua = core_scene_choosing(tmp_path, piece_at(8, (0, 6, 0), 1))
+    lua.execute("SHIFT = true")
+    click(lua)
+    on_second = lua.eval("{ FRAME:Project3DPointTo2D(unpack(SCENE.boxes[2].centre)) }")
+    x, y = on_second.values()
+    lua.execute(f"GetCursorPosition = function() return {x}, {y} end SCENE:Tick(0)")
+    click(lua)
+    assert chosen(lua) == [7, 8]
+    # Shift-clicked again, a chosen piece is let go, the first keeping its place.
+    click(lua)
+    assert chosen(lua) == [7]
+    # Clicked without shift, the second stands alone.
+    lua.execute("SHIFT = nil")
+    click(lua)
+    assert chosen(lua) == [8]
+    # A drawing lets everything go.
+    lua.execute(f"SCENE:Draw({{ {piece_at(7, (0, 0, 0), 1)} }})")
+    assert chosen(lua) == [] and lua.eval("rawget(ACTORS[2].actor, 'chosen')") is None
+
+
+def test_a_shift_drag_chooses_every_piece_whose_middle_its_band_holds(tmp_path: Path) -> None:
+    lua = core_scene_choosing(tmp_path, piece_at(8, (0, 6, 0), 1), piece_at(9, (0, -6, 0), 1))
+    # A press with shift at the first cube's middle, dragged just past the second's, stretches
+    # the band over the scene as it goes, and lets no drag turn the camera.
+    x0, y0 = lua.eval("PRESS").values()
+    second = lua.eval("{ FRAME:Project3DPointTo2D(unpack(SCENE.boxes[2].centre)) }")
+    x, y = second.values()
+    far_x, far_y = x + math.copysign(2, x - x0), y + math.copysign(2, y - y0)
     lua.execute(
         f"""
-        SCENE = Furnish.Scene.New(FRAME, SAID, nil, function(piece) CLICKED = piece.file end)
-        SCENE:Draw({{ {piece_at(7, (0, 0, 0), 1)} }})
-        LOAD(1) SCENE:Tick(0) HOOKED.OnEnter() SCENE:Tick(0)
+        SHIFT, HELD.LeftButton = true, true
+        SCRIPTS.OnMouseDown(FRAME, 'LeftButton')
+        GetCursorPosition = function() return {far_x}, {far_y} end
+        SCENE:Tick(0)
+        """
+    )
+    assert lua.eval("SCENE.dragged") is None and lua.eval("BAND.Show") is not None
+    width, height = abs(far_x - x0), abs(far_y - y0)
+    assert tuple(lua.eval("BAND.SetSize").values()) == pytest.approx((width, height))
+    # Let go, the first two cubes are chosen, in the order drawn, and the third, outside, is not.
+    lua.execute("BAND.Hide = nil HELD.LeftButton = nil SCENE:Tick(0)")
+    assert chosen(lua) == [7, 8] and lua.eval("BAND.Hide") is not None
+    assert tuple(lua.eval("ACTORS[2].SetSpellVisualKit").values()) == (87979, False)
+    assert lua.eval("ACTORS[3].SetSpellVisualKit") is None
+
+
+def core_scene_choosing(tmp_path: Path, *more: str) -> lua51.LuaRuntime:
+    """A scene of a cube at the origin, and any more given, projected as the scene's own lens
+    would, the pointer on the first cube, counting how often what is chosen is told."""
+    lua = lua_core(tmp_path)
+    lua.execute(RECORDING_SCENE)
+    lua.execute(WIDER_LENS)
+    lua.execute(
+        f"""
+        TOLD_CHOSEN = 0
+        SCENE = Furnish.Scene.New(FRAME, SAID, nil, function() TOLD_CHOSEN = TOLD_CHOSEN + 1 end)
+        SCENE:Draw({{ {piece_at(7, (0, 0, 0), 1)} {"".join(more)} }})
+        for i = 1, #ACTORS do LOAD(i) end
+        SCENE:Tick(0)
+        PRESS = {{ FRAME:Project3DPointTo2D(unpack(SCENE.boxes[1].centre)) }}
+        GetCursorPosition = function() return PRESS[1], PRESS[2] end
+        HOOKED.OnEnter() SCENE:Tick(0)
         """
     )
     return lua
+
+
+def click(lua: lua51.LuaRuntime) -> None:
+    """A press let go where it was made."""
+    lua.execute("SCRIPTS.OnMouseDown(FRAME, 'LeftButton') SCRIPTS.OnMouseUp(FRAME, 'LeftButton')")
+
+
+def chosen(lua: lua51.LuaRuntime) -> list[int]:
+    """The files of the pieces chosen, in the order chosen."""
+    return [piece.file for piece in lua.eval("SCENE:Chosen()").values()]
 
 
 def test_a_held_rotate_button_turns_and_reset_reframes(tmp_path: Path) -> None:

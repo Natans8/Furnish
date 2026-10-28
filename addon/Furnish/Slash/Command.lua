@@ -49,8 +49,8 @@ for _, each in ipairs(Command.WORDS) do
 end
 
 --- One of the links this file writes: a doodad line's button, "import", carrying the doodad's
--- unique id; a gob line's, "list", carrying the gob's entry; or a word in the help, "word".
--- A list's buttons for its sets carry words of Console's own.
+-- unique id and its gob entry; a gob line's, "list", carrying the gob's entry; or a word in the
+-- help, "word". A list's buttons for its sets carry words of Console's own.
 local function link(kind, value, label)
 	return Chat.Link(kind .. ":" .. value, label)
 end
@@ -203,18 +203,34 @@ function Command.Run(text)
 	end
 end
 
+--- What a right-click on each kind of button does: opens the window on it.
+local OPENS = {
+	import = "Right-click: show it in the window",
+	list = "Right-click: show its sets in the window",
+	set = "Right-click: choose it in the window",
+}
+
 --- A click on a list's button spawns its set: plainly on the selected object, with ctrl at
 -- the player's feet. A click on a doodad line's button imports that WMO and furnishes it,
--- and one on a gob line's lists the gob's sets.
+-- and one on a gob line's lists the gob's sets. A right-click on any of them opens the window
+-- on it: the doodad in its panel, the gob as the source, the set chosen on its WMO.
 function Command.Click(words, modifier)
 	-- TODO: a shift-click shares the set, once what a shared set carries is decided.
 	if modifier == "share" then
 		return
 	end
+	local window = Furnish.Window
 	local kind, value = linked(words)
 	if kind == "import" then
-		return Console.Import({ uid = value, ways = Command.WAYS })
+		local uid, entry = value:match("^(%d+):(%d+)$")
+		if modifier == "open" then
+			return window.ShowDoodad(uid, tonumber(entry))
+		end
+		return Console.Import({ uid = uid, ways = Command.WAYS })
 	elseif kind == "list" then
+		if modifier == "open" then
+			return window.ShowSource(tonumber(value))
+		end
 		return Console.List({ entry = tonumber(value), ways = Command.WAYS })
 	end
 	local offered, leader = Console.OfferIn(words)
@@ -222,25 +238,29 @@ function Command.Click(words, modifier)
 		return Console.PasteOffer(offered, leader)
 	end
 	local request = Console.LinkRequest(words)
-	if request then
-		request.here = modifier == "ctrl"
-		request.ways = Command.WAYS
-		Console.Spawn(request)
+	if not request then
+		return
 	end
+	if modifier == "open" then
+		return window.ShowSet(request.file, request.index, request.label)
+	end
+	request.here = modifier == "ctrl"
+	request.ways = Command.WAYS
+	Console.Spawn(request)
 end
 
 --- What resting on one of Furnish's links shows: a set and its clicks, what a doodad or gob
 -- line's button does, or what a word in the help does.
 function Command.Hover(words, tooltip)
 	local kind, value = linked(words)
+	local opens = OPENS[kind] and { text = OPENS[kind], colour = Chat.TIP.click }
 	if kind == "import" then
-		return Console.DescribeImport(tooltip)
+		return Console.DescribeImport(tooltip, opens)
 	elseif kind == "list" then
-		return Chat.Tip(
-			tooltip,
-			Furnish.NAME,
-			{ { text = "Click: list this WMO's sets", colour = Chat.TIP.click } }
-		)
+		return Chat.Tip(tooltip, Furnish.NAME, {
+			{ text = "Click: list this WMO's sets", colour = Chat.TIP.click },
+			opens,
+		})
 	elseif kind == "word" and WORD[value] then
 		return Chat.Tip(tooltip, value, { { text = WORD[value].hint } })
 	end
@@ -250,23 +270,22 @@ function Command.Hover(words, tooltip)
 	end
 	local request = Console.LinkRequest(words)
 	if request then
-		Console.Describe(request, tooltip)
+		Console.Describe(request, tooltip, { text = OPENS.set, colour = Chat.TIP.click })
 	end
 end
 
--- TODO: both names are placeholders until the command's final name is chosen. Messages
--- read the first through Chat.Typed, so a rename is these two lines.
+-- The command's two names; messages read the first through Chat.Typed.
 _G.SLASH_FURNISH1 = "/furn"
 _G.SLASH_FURNISH2 = "/furnish"
 _G.SlashCmdList.FURNISH = Client.Guarded(Command.Run)
 Chat.OnLinks(Command.Click, Command.Hover)
 
---- The unique id of the doodad a server line names by its link, where it is a WMO
--- Furnish has sets for, still on the map, and the map placed it with a set beyond its base, so
--- that importing it spawns something. The number after the name in the link is the object's gameobject
--- entry, and the data answers for it; the name is never read, since many a WMO's
--- name has no `.wmo` in it. A select line names its map, and a near line's doodads stand on
--- the player's. The first such line loads the data.
+--- The unique id and the gob entry of the doodad a server line names by its link, where it is
+-- a WMO Furnish has sets for, still on the map, and the map placed it with a set beyond its base,
+-- so that importing it spawns something. The number after the name in the link is the object's
+-- gameobject entry, and the data answers for it; the name is never read, since many a WMO's name
+-- has no `.wmo` in it. A select line names its map, and a near line's doodads stand on the
+-- player's. The first such line loads the data.
 function Command.PlacedWmo(line)
 	local uid, entry, map, removed = Furnish.Commands.DoodadLink(line)
 	-- One taken off the map, by a delete, an import or a replace, cannot be imported.
@@ -275,7 +294,7 @@ function Command.PlacedWmo(line)
 		return nil
 	end
 	if Furnish.Sets.DrawsBeyondBase(file, map or Client.Map(), uid) then
-		return uid
+		return uid, entry
 	end
 	return nil
 end
@@ -298,10 +317,10 @@ Chat.OnServerLines(function(line)
 	if not Furnish.Settings.chatButtons then
 		return nil
 	end
-	local uid = Command.PlacedWmo(line)
+	local uid, entry = Command.PlacedWmo(line)
 	if uid then
-		return " - " .. link("import", uid, Furnish.NAME)
+		return " - " .. link("import", uid .. ":" .. entry, Furnish.NAME)
 	end
-	local entry = Command.SelectedWmo(line)
+	entry = Command.SelectedWmo(line)
 	return entry and " - " .. link("list", entry, Furnish.NAME) or nil
 end)

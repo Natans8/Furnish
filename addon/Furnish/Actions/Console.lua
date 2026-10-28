@@ -135,6 +135,11 @@ local function since(moment)
 	return ("%.1f s"):format(Client.Now() - moment)
 end
 
+--- Where a run goes, as a line says a position.
+local function atWords(position)
+	return ("at %.1f, %.1f, %.1f"):format(position.x, position.y, position.z)
+end
+
 --- A way out as a door words it, or nil where the door offers none.
 -- @param ways a request's ways, or nil
 -- @param name which way: "stop", "list", "from" or "here"
@@ -926,7 +931,8 @@ end
 --- Fill a tooltip for a list link's set: its name, what it is, and what a click does.
 -- @param request a list link's request
 -- @param tooltip a tooltip owned and empty
-function Console.Describe(request, tooltip)
+-- @param more a line of the door's own after the clicks, or nil
+function Console.Describe(request, tooltip, more)
 	local set = Reader.Load() and Sets.Pick(request.file, request.index)
 	if not set then
 		return
@@ -948,6 +954,7 @@ function Console.Describe(request, tooltip)
 		#said > 0 and { text = "with " .. table.concat(said, " and "), colour = tip.label } or {},
 		{ text = "Click: spawn on the selected gob", colour = tip.click },
 		{ text = "Ctrl-click: spawn at your feet", colour = tip.click },
+		more or {},
 	})
 end
 
@@ -959,9 +966,11 @@ end
 
 --- Fill a tooltip for the button on a WMO's doodad line.
 -- @param tooltip a tooltip owned and empty
-function Console.DescribeImport(tooltip)
+-- @param more a line of the door's own after the click, or nil
+function Console.DescribeImport(tooltip, more)
 	Chat.Tip(tooltip, Furnish.NAME, {
 		{ text = "Click: import this WMO and spawn its sets on it", colour = Chat.TIP.click },
+		more or {},
 	})
 end
 
@@ -1037,12 +1046,11 @@ local function spawnOn(request, destination, selected)
 	if not group then
 		return say(lead)
 	end
-	local spot = destination.position
 	start(rows, destination, group, {
 		what = what,
-		where = request.here and "at your feet"
-			or onto and ("on " .. onto.name)
-			or ("at %.1f, %.1f, %.1f"):format(spot.x, spot.y, spot.z),
+		where = request.here and "at your feet" or onto and ("on " .. onto.name) or atWords(
+			destination.position
+		),
 		lead = lead,
 		anchor = selected and selected.guid and selected or nil,
 		quiet = request.quiet,
@@ -1051,22 +1059,22 @@ local function spawnOn(request, destination, selected)
 	})
 end
 
---- Spawn one placement of a set where a run of the set at the destination would put it, standing
--- alone: what a click on a piece in a window's preview asks. The server selects what it spawns, and
--- the run, forming no group, leaves that be.
--- @param row a placement as Rows.Pieces gives it
--- @param name what to call it, its model's name
+--- Spawn placements where a run of their sets at the destination would put them, as a window's
+-- preview asks for the pieces chosen in it: one stands alone, and several form a group led by the
+-- first. The server selects what it spawns, and a run forming no group leaves that be.
+-- @param rows placements as Rows.Pieces gives them, in the order chosen
+-- @param what what to call them
 -- @param at the destination's pose
 -- @param ways the ways out of the door it came through, as a request carries them
-function Console.SpawnPiece(row, name, at, ways)
+function Console.SpawnPieces(rows, what, at, ways)
 	if not ready(ways) then
 		return
 	end
-	local alone, spot = GROUPING.nogroup, at.position
-	start({ row }, at, alone.group, {
-		what = name,
-		where = ("at %.1f, %.1f, %.1f"):format(spot.x, spot.y, spot.z),
-		lead = alone.lead,
+	local grouping = GROUPING[#rows > 1 and "first" or "nogroup"]
+	start(rows, at, grouping.group, {
+		what = what,
+		where = atWords(at.position),
+		lead = grouping.lead,
 		watched = true,
 	})
 end

@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from lupa import lua51
 
-from tests.core_test import CATALOGUE, SPAWN_CHAIR, fake_client, lua_core, printed
+from tests.core_test import CATALOGUE, SPAWN_CHAIR, SPAWN_LAMP, fake_client, lua_core, printed
 
 PREFIX = "|cff66ccffFurnish:|r "
 
@@ -287,20 +287,35 @@ def test_a_set_spawns_at_a_pose_given_with_no_object_behind_it(tmp_path: Path) -
     )
 
 
+#: The chair and the lamp as a preview's pieces, where their set puts them.
+CHAIR = "{ display = 20, x = 1.5, y = -2, z = 0.25, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 }"
+LAMP = "{ display = 21, x = 0, y = 0, z = 3, qx = 0, qy = 0, qz = 0, qw = 1, scale = 0.5 }"
+
+
 def test_a_piece_spawns_alone_where_its_set_would_put_it(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute(
-        """
-        Furnish.Console.SpawnPiece(
-          { display = 20, x = 1.5, y = -2, z = 0.25, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 },
-          "chair", Furnish.Pose.At(10, 20, 30, 0), nil)
-        """
+        f"Furnish.Console.SpawnPieces({{ {CHAIR} }}, 'chair', Furnish.Pose.At(10, 20, 30, 0), nil)"
     )
     # The chair the full set spawns at that destination, nothing grouped or selected after it, and
     # nothing said in chat, since the window's bar says it.
     assert sent(lua) == [SPAWN_CHAIR]
     assert shown(lua) == []
     assert not [line for line in printed(lua) if line.startswith(PREFIX + "spawning")]
+
+
+def test_several_pieces_spawn_as_a_group_the_first_leads(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute(
+        f"Furnish.Console.SpawnPieces({{ {CHAIR}, {LAMP} }}, '2 pieces of house',"
+        " Furnish.Pose.At(10, 20, 30, 0), nil)"
+    )
+    assert sent(lua) == [
+        SPAWN_CHAIR,
+        SPAWN_LAMP,
+        "gobject group add 7001",
+        "gobject group select 7001",
+    ]
 
 
 MERGE_REFUSED = (
@@ -854,6 +869,7 @@ def test_resting_on_a_link_says_the_set_and_the_clicks(tmp_path: Path) -> None:
         "with base",
         "Click: spawn on the selected gob",
         "Ctrl-click: spawn at your feet",
+        "Right-click: choose it in the window",
     ]
 
 
@@ -973,6 +989,38 @@ def test_without_a_picture_none_is_given(tmp_path: Path, pictures: str, name: st
     lua = command_lua(tmp_path)
     lua.execute(pictures)
     assert lua.eval("Furnish.Previews.Picture")(None, name) is None
+
+
+# -- A right-click opens the window -------------------------------------------------------
+
+#: A window that notes what each door opened it on.
+WINDOW = """
+OPENED = {}
+Furnish.Window = {
+  ShowDoodad = function(uid, entry) OPENED[#OPENED + 1] = { "doodad", uid, entry } end,
+  ShowSource = function(entry) OPENED[#OPENED + 1] = { "source", entry } end,
+  ShowSet = function(file, index, name) OPENED[#OPENED + 1] = { "set", file, index, name } end,
+}
+"""
+
+
+def test_a_right_click_on_a_chat_button_opens_the_window_on_it(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute("SELECTED = 500")
+    words = run(lua, "list")[1].split("garrmission:furnish:")[2].split("|h")[0]
+    lua.execute(WINDOW)
+    click = lua.globals().HOOKS.SetItemRef
+    click("garrmission:furnish:" + words, None, "RightButton")
+    click("garrmission:furnish:list:817579", None, "RightButton")
+    click("garrmission:furnish:import:4242:817579", None, "RightButton")
+    opened = [list(each.values()) for each in lua.eval("OPENED").values()]
+    assert opened == [
+        ["set", 900, 1, "house"],
+        ["source", 817579],
+        ["doodad", "4242", 817579],
+    ]
+    # Nothing was spawned, listed or imported by them.
+    assert not [command for command in sent(lua) if "spawn" in command or "import" in command]
 
 
 # -- Importing ---------------------------------------------------------------------------
@@ -1161,8 +1209,9 @@ def test_a_wmos_doodad_line_carries_a_button_that_imports_and_furnishes_it(
 ) -> None:
     lua = command_lua(tmp_path)
     line = shown_line(lua, WMO_LINE)
-    assert line == WMO_LINE + " - |cff71d5ff|Hgarrmission:furnish:import:4242|h[Furnish]|h|r"
-    lua.globals().HOOKS.SetItemRef("garrmission:furnish:import:4242")
+    button = "|cff71d5ff|Hgarrmission:furnish:import:4242:817579|h[Furnish]|h|r"
+    assert line == WMO_LINE + " - " + button
+    lua.globals().HOOKS.SetItemRef("garrmission:furnish:import:4242:817579")
     assert sent(lua)[:2] == ["doodad import 4242", "gobject select 500"]
     assert printed(lua)[-2] == (PREFIX + "spawning Full (set 1, 2 objects) on house, led by house")
 
@@ -1212,10 +1261,8 @@ def test_a_doodad_off_the_map_gets_no_button(tmp_path: Path) -> None:
 def test_a_near_line_takes_the_map_the_player_stands_on(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     near = "|Hdoodad_uid:4242:0|h[6dr_draenei_house2 - 817579]|h"
-    assert (
-        shown_line(lua, near)
-        == near + " - |cff71d5ff|Hgarrmission:furnish:import:4242|h[Furnish]|h|r"
-    )
+    button = "|cff71d5ff|Hgarrmission:furnish:import:4242:817579|h[Furnish]|h|r"
+    assert shown_line(lua, near) == near + " - " + button
 
 
 def test_a_line_whose_entry_is_no_furnished_wmo_is_left_as_it_came(tmp_path: Path) -> None:
@@ -1229,7 +1276,7 @@ def test_a_line_whose_entry_is_no_furnished_wmo_is_left_as_it_came(tmp_path: Pat
 def test_an_import_hears_its_line_when_the_server_sends_it_apart(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("IMPORT_APART = true")
-    lua.globals().HOOKS.SetItemRef("garrmission:furnish:import:4242")
+    lua.globals().HOOKS.SetItemRef("garrmission:furnish:import:4242:817579")
     assert sent(lua)[:2] == ["doodad import 4242", "gobject select 500"]
     assert printed(lua)[-2] == (PREFIX + "spawning Full (set 1, 2 objects) on house, led by house")
 

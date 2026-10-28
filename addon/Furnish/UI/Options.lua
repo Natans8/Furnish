@@ -160,4 +160,8 @@ end
 
 panel.refresh = show
 
+local credit = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+credit:SetPoint("BOTTOMLEFT", 16, 16)
+credit:SetText("Put together by Nataari, mostly with AI — mistakes are possible")
+
 _G.InterfaceOptions_AddCategory(panel)

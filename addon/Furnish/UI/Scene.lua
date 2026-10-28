@@ -11,6 +11,10 @@
 -- model, the pieces following the pointer, and the wheel zooms toward the point under the pointer.
 -- The client's own scene script moves the camera every frame; the scene only says where it looks
 -- from.
+--
+-- A click chooses the piece under the pointer, a shift-click chooses it too, and a shift-drag
+-- chooses every piece whose middle its band holds; what is chosen stays lit as the pointed piece
+-- is, in the order chosen, and the scene says when that changes.
 
 local _, Furnish = ...
 local Scene = {}
@@ -41,6 +45,19 @@ local CLICK_SLOP = 4
 --- What each button drags: the left turns the camera, the right and the middle pan it.
 local DRAGS = { LeftButton = "Turn", RightButton = "Pan", MiddleButton = "Pan" }
 
+--- How the band a shift-drag draws looks: a thin edge over a faint fill, both in the interface's
+-- own gold.
+local BAND = {
+	bgFile = "Interface/Buttons/WHITE8x8",
+	edgeFile = "Interface/Buttons/WHITE8x8",
+	edgeSize = 1,
+}
+local BAND_FILL, BAND_EDGE = { 1, 0.82, 0, 0.1 }, { 1, 0.82, 0, 0.7 }
+
+--- How many frame levels a frame drawn over the models stands above the scene, which draws its
+-- models over anything level with it.
+Scene.ABOVE = 10
+
 --- How fast a held rotate button turns the camera, in radians a second: half a turn a second, as
 -- the game's own model frames turn while theirs is held.
 local SPIN = math.pi
@@ -55,9 +72,10 @@ local STEEPEST = 1.45
 -- projection is asked about to measure it.
 local LENS_STEP = 0.1
 
---- The kit that marks the piece under the pointer: a steady pale yellow glow along its edges, the
--- nearest a scene draws to the outline `.gob select` puts on a gob, which a scene does not draw.
-local HOVER_KIT = 87979
+--- The kit that lights the piece under the pointer and the pieces chosen: a steady pale yellow
+-- glow along the edges, the nearest a scene draws to the outline `.gob select` puts on a gob,
+-- which a scene does not draw.
+local GLOW_KIT = 87979
 
 --- The corners of a box, as which of its two ends each axis takes.
 local CORNERS = {}
@@ -105,22 +123,27 @@ local function enters(origin, ray, low, high)
 	return near
 end
 
+--- How far the pointer has moved from a press, in the interface's own units.
+local function wandered(frame, pressed, x, y)
+	return math.sqrt((x - pressed.x) ^ 2 + (y - pressed.y) ^ 2) / frame:GetEffectiveScale()
+end
+
 --- A scene over a ModelScene frame, made from ModelSceneMixinTemplate.
 -- @param onLoad called as the models load, with how many have, how many there are, and the
 --   seconds since the drawing began
 -- @param onHover called when the piece under the pointer changes, with that piece as Draw was
 --   given it, or nil where there is none
--- @param onClick called when the piece under the pointer is clicked, a press let go where it was
---   made, with that piece as Draw was given it
+-- @param onChoose called when the pieces chosen change, which Chosen then lists
 -- @return the scene, which Draw fills
-function Scene.New(frame, onLoad, onHover, onClick)
+function Scene.New(frame, onLoad, onHover, onChoose)
 	local self = setmetatable({
 		frame = frame,
 		actors = {},
 		boxes = {},
+		chosen = {},
 		onLoad = onLoad,
 		onHover = onHover,
-		onClick = onClick,
+		onChoose = onChoose,
 		yaw = YAW,
 		pitch = PITCH,
 		zoom = 1,
@@ -131,32 +154,34 @@ function Scene.New(frame, onLoad, onHover, onClick)
 	frame:SetCameraFarClip(2 ^ 64)
 	frame:EnableMouse(true)
 	frame:EnableMouseWheel(true)
+	-- The band a shift-drag draws, over the models, as the controls stand over them.
+	local band = _G.CreateFrame("Frame", nil, frame, "BackdropTemplate")
+	band:SetFrameLevel(frame:GetFrameLevel() + Scene.ABOVE)
+	band:SetBackdrop(BAND)
+	band:SetBackdropColor(unpack(BAND_FILL))
+	band:SetBackdropBorderColor(unpack(BAND_EDGE))
+	band:Hide()
+	self.band = band
 	-- The presses and the wheel are taken over from the scene's own script, which turns the camera
 	-- its own way; its per-frame script stays, since it is what moves the camera, and a drag is
 	-- read beside it.
 	frame:SetScript("OnMouseDown", function(_, button)
+		if button == "LeftButton" then
+			local x, y = _G.GetCursorPosition()
+			self.pressed = { x = x, y = y, more = _G.IsShiftKeyDown() }
+			-- With shift held, the press draws a band rather than turning the camera.
+			if self.pressed.more then
+				return
+			end
+		end
 		if DRAGS[button] then
 			self:Drag(DRAGS[button], button, true)
-		end
-		if button == "LeftButton" then
-			self.pressed = { _G.GetCursorPosition() }
 		end
 	end)
 	frame:SetScript(
 		"OnMouseUp",
 		Client.Guarded(function(_, button)
-			self.dragged = nil
-			local pressed = self.pressed
-			self.pressed = nil
-			if button ~= "LeftButton" or not pressed then
-				return
-			end
-			local x, y = _G.GetCursorPosition()
-			local wandered = math.sqrt((x - pressed[1]) ^ 2 + (y - pressed[2]) ^ 2)
-			local hovered = self.hovered
-			if wandered / frame:GetEffectiveScale() <= CLICK_SLOP and hovered and self.onClick then
-				self.onClick(hovered.source)
-			end
+			self:Release(button)
 		end)
 	)
 	frame:SetScript(
@@ -180,6 +205,12 @@ function Scene.New(frame, onLoad, onHover, onClick)
 		Client.Guarded(function()
 			self.pointed = false
 			self:Hover(nil)
+		end)
+	)
+	frame:HookScript(
+		"OnHide",
+		Client.Guarded(function()
+			self:Rest()
 		end)
 	)
 	return self
@@ -436,6 +467,16 @@ function Scene:Drag(action, button, pointed)
 	self.dragged = { x = x, y = y, button = button, action = action }
 end
 
+--- Where the camera stands, as a point, and the way it looks, as a unit vector's three numbers.
+function Scene:Eye()
+	local fx, fy, fz = forwardOf(self.yaw, self.pitch)
+	local distance, centre = self.distance * self.zoom, self.centre
+	return { centre[1] - fx * distance, centre[2] - fy * distance, centre[3] - fz * distance },
+		fx,
+		fy,
+		fz
+end
+
 --- The nearest loaded piece under the pointer, by its box: the box, which names its actor, how
 -- deep along the view it lies, and where the camera stands. Nil where the pointer is on none.
 function Scene:Pick()
@@ -443,11 +484,8 @@ function Scene:Pick()
 		return nil
 	end
 	local across, upward = self:Pointer()
-	local fx, fy, fz = forwardOf(self.yaw, self.pitch)
+	local origin, fx, fy, fz = self:Eye()
 	local rx, ry, rz, ux, uy, uz = self:Axes()
-	local distance, centre = self.distance * self.zoom, self.centre
-	local origin =
-		{ centre[1] - fx * distance, centre[2] - fy * distance, centre[3] - fz * distance }
 	local ray = {
 		fx + rx * across + ux * upward,
 		fy + ry * across + uy * upward,
@@ -509,6 +547,7 @@ end
 function Scene:Load(actor)
 	local piece = actor.piece
 	local offset, scale = piece.offset, piece.scale
+	actor.lit = nil
 	actor:ClearModel()
 	actor:SetUseCenterForOrigin(false, false, false)
 	actor:SetPosition(offset[1] / scale, offset[2] / scale, offset[3] / scale)
@@ -520,31 +559,168 @@ function Scene:Load(actor)
 	actor:SetModelByFileID(actor.source.file)
 end
 
---- Mark the piece under the pointer and say which it is, taking the mark off the last.
+--- Light an actor's piece, or put its light out, as it is pointed at or chosen: the kit goes on
+-- as either begins and comes off once both have ended. The glow stays painted once its kit is
+-- taken off, so what the kit painted is cleared too, by the method Epsilon's client gives every
+-- scene actor; a client without it has the model loaded afresh instead, which draws it without.
+function Scene:Paint(actor)
+	local lit = actor == self.hovered or actor.chosen == true
+	if lit == (actor.lit == true) then
+		return
+	end
+	actor.lit = lit or nil
+	if lit then
+		actor:SetSpellVisualKit(GLOW_KIT, false)
+	elseif actor.ClearAllEffects then
+		actor:SetSpellVisualKit(nil)
+		actor:ClearAllEffects()
+	else
+		self:Load(actor)
+	end
+end
+
+--- Point at a piece, or at none: the piece pointed at is lit and named, and the last is let be.
 -- @param actor the piece's actor, or nil for none
 function Scene:Hover(actor)
 	if actor == self.hovered then
 		return
 	end
 	local left = self.hovered
-	if left then
-		-- The glow stays painted once its kit is taken off, so what the kit painted is cleared too,
-		-- by the method Epsilon's client gives every scene actor. A client without it has the
-		-- model loaded afresh instead, which draws it without.
-		left:SetSpellVisualKit(nil)
-		if left.ClearAllEffects then
-			left:ClearAllEffects()
-		else
-			self:Load(left)
-		end
-	end
 	self.hovered = actor
+	if left then
+		self:Paint(left)
+	end
 	if actor then
-		actor:SetSpellVisualKit(HOVER_KIT, false)
+		self:Paint(actor)
 	end
 	if self.onHover then
 		self.onHover(actor and actor.source)
 	end
+end
+
+--- Choose the piece an actor draws alone, in place of what was chosen, or too, which toggles it;
+-- nil alone chooses none. What is chosen stays lit, in the order chosen, and the change is told.
+-- @param actor the piece's actor, or nil
+-- @param more true to keep what was chosen
+function Scene:Choose(actor, more)
+	local chosen = self.chosen
+	if not more then
+		self.chosen = {}
+		for _, each in ipairs(chosen) do
+			each.chosen = nil
+			self:Paint(each)
+		end
+		chosen = self.chosen
+	end
+	if actor and actor.chosen == true then
+		actor.chosen = nil
+		for index, each in ipairs(chosen) do
+			if each == actor then
+				table.remove(chosen, index)
+				break
+			end
+		end
+	elseif actor then
+		actor.chosen = true
+		chosen[#chosen + 1] = actor
+	end
+	if actor then
+		self:Paint(actor)
+	end
+	if self.onChoose then
+		self.onChoose()
+	end
+end
+
+--- Choose too every loaded piece whose middle the band between two corners holds: the corners in
+-- screen pixels, as the pointer is read, and the middles where the scene draws them, those behind
+-- the camera left out.
+function Scene:ChooseWithin(x0, y0, x1, y1)
+	local frame, chosen = self.frame, self.chosen
+	local scale = frame:GetEffectiveScale()
+	local left, bottom = frame:GetLeft() * scale, frame:GetBottom() * scale
+	local lowX, highX = math.min(x0, x1) - left, math.max(x0, x1) - left
+	local lowY, highY = math.min(y0, y1) - bottom, math.max(y0, y1) - bottom
+	local eye, fx, fy, fz = self:Eye()
+	local added = false
+	for _, box in ipairs(self.boxes) do
+		local actor, middle = box.actor, box.centre
+		local depth = (middle[1] - eye[1]) * fx
+			+ (middle[2] - eye[2]) * fy
+			+ (middle[3] - eye[3]) * fz
+		if depth > NEAR and actor.chosen ~= true then
+			local x, y = frame:Project3DPointTo2D(middle[1], middle[2], middle[3])
+			if x and y and x >= lowX and x <= highX and y >= lowY and y <= highY then
+				actor.chosen, added = true, true
+				chosen[#chosen + 1] = actor
+				self:Paint(actor)
+			end
+		end
+	end
+	if added and self.onChoose then
+		self.onChoose()
+	end
+end
+
+--- The pieces chosen, as Draw was given them, in the order chosen.
+function Scene:Chosen()
+	local pieces = {}
+	for index, actor in ipairs(self.chosen) do
+		pieces[index] = actor.source
+	end
+	return pieces
+end
+
+--- A press let go. The left button's, let go where it was made, is a click, which chooses the
+-- piece under the pointer alone or, with shift, too; dragged with shift, it chooses every piece its
+-- band holds too; dragged without, it turned the camera.
+function Scene:Release(button)
+	self.dragged = nil
+	local pressed = self.pressed
+	self.pressed = nil
+	if button ~= "LeftButton" or not pressed then
+		return
+	end
+	self.band:Hide()
+	local x, y = _G.GetCursorPosition()
+	if wandered(self.frame, pressed, x, y) <= CLICK_SLOP then
+		self:Choose(self.hovered, pressed.more)
+	elseif pressed.more then
+		self:ChooseWithin(pressed.x, pressed.y, x, y)
+	end
+end
+
+--- Draw the band from a shift press to the pointer, once the press has wandered past a click.
+function Scene:Stretch(pressed)
+	local frame, band = self.frame, self.band
+	local scale = frame:GetEffectiveScale()
+	local x, y = _G.GetCursorPosition()
+	if wandered(frame, pressed, x, y) <= CLICK_SLOP then
+		band:Hide()
+		return
+	end
+	band:ClearAllPoints()
+	band:SetPoint(
+		"BOTTOMLEFT",
+		frame,
+		"BOTTOMLEFT",
+		math.min(pressed.x, x) / scale - frame:GetLeft(),
+		math.min(pressed.y, y) / scale - frame:GetBottom()
+	)
+	band:SetSize(
+		math.max(math.abs(x - pressed.x) / scale, 1),
+		math.max(math.abs(y - pressed.y) / scale, 1)
+	)
+	band:Show()
+end
+
+--- Let go of all the pointer held, as the scene hides: the press, the drag, the band and what was
+-- pointed at.
+function Scene:Rest()
+	self.pointed = false
+	self.pressed, self.dragged = nil, nil
+	self.band:Hide()
+	self:Hover(nil)
 end
 
 --- Turn the camera on its own while the left mouse button stays down, as a held rotate button
@@ -553,13 +729,24 @@ function Scene:Spin(direction)
 	self.spin = direction
 end
 
---- What a frame does: a drag turns or pans the camera, a held rotate button turns it, and what
--- loaded since the last frame is framed and told, once for however many loaded.
+--- What a frame does: a drag turns or pans the camera, a held rotate button turns it, a shift
+-- press stretches its band, and what loaded since the last frame is framed and told, once for
+-- however many loaded.
 -- @param elapsed the seconds since the last frame
 function Scene:Tick(elapsed)
+	-- A press let go off the scene is not heard by it, so the button is read as it is.
+	local pressed = self.pressed
+	local banding = pressed and pressed.more
+	if banding then
+		if _G.IsMouseButtonDown("LeftButton") then
+			self:Stretch(pressed)
+		else
+			self:Release("LeftButton")
+			banding = false
+		end
+	end
 	local dragged = self.dragged
 	if dragged then
-		-- A press let go off the scene is not heard by it, so the button is read as it is.
 		if not _G.IsMouseButtonDown(dragged.button) then
 			self.dragged = nil
 		else
@@ -578,8 +765,8 @@ function Scene:Tick(elapsed)
 		end
 	end
 	-- The piece under the pointer is looked for again when the pointer or the camera has moved,
-	-- and not while a drag holds the view.
-	if self.pointed and not self.dragged then
+	-- and not while a drag holds the view or a band is drawn.
+	if self.pointed and not self.dragged and not banding then
 		local x, y = _G.GetCursorPosition()
 		local looked = self.looked
 		if not (looked and looked[1] == x and looked[2] == y) then
@@ -622,6 +809,11 @@ function Scene:Draw(pieces)
 	local drawing = (self.drawing or 0) + 1
 	self.drawing, self.low, self.high, self.zoom, self.moved = drawing, nil, nil, 1, false
 	self.boxes = {}
+	local chose = #self.chosen > 0
+	for _, actor in ipairs(self.chosen) do
+		actor.chosen = nil
+	end
+	self.chosen = {}
 	self.loaded, self.took, self.started = 0, nil, Client.Now()
 	local function loaded(actor)
 		if self.drawing == drawing and actor.drawing ~= drawing then
@@ -658,4 +850,7 @@ function Scene:Draw(pieces)
 	self.looked = nil
 	self.total = placed
 	self:Tell()
+	if chose and self.onChoose then
+		self.onChoose()
+	end
 end

@@ -247,19 +247,21 @@ function Chat.OnServerLines(append)
 end
 
 --- Act on Furnish's links: onClick(words, modifier) when one is clicked, where modifier is
--- "share" for the client's chat-link click, "ctrl" for a control-click and nil for a plain
--- one; and onEnter(words, tooltip) when the pointer rests on one, with the tooltip owned and
--- empty, which leaving takes down. Called once, at load.
+-- "open" for a right-click, "share" for the client's chat-link click, "ctrl" for a
+-- control-click and nil for a plain one; and onEnter(words, tooltip) when the pointer rests on
+-- one, with the tooltip owned and empty, which leaving takes down. Called once, at load.
 function Chat.OnLinks(onClick, onEnter)
 	_G.hooksecurefunc(
 		"SetItemRef",
-		Furnish.Client.Guarded(function(link)
+		Furnish.Client.Guarded(function(link, _, button)
 			local words = wordsOf(link)
 			if not words then
 				return
 			end
 			local modifier
-			if _G.IsModifiedClick("CHATLINK") then
+			if button == "RightButton" then
+				modifier = "open"
+			elseif _G.IsModifiedClick("CHATLINK") then
 				modifier = "share"
 			elseif _G.IsControlKeyDown() then
 				modifier = "ctrl"
