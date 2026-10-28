@@ -109,9 +109,9 @@ local LIST_INSET, BAR_ROOM = 8, 22
 --- The room an empty list's line saying why takes, its margins in FurnishListTemplate.
 local EMPTY_ROOM = 40
 
---- The smallest the window may be drawn, which is the size its layout was made for without the
--- source's picture; it may grow to twice that.
-local MIN_WIDTH, MIN_HEIGHT = 400, 656
+--- The smallest the window may be drawn, which is the size its layout was made for; it may grow
+-- to twice that.
+local MIN_WIDTH, MIN_HEIGHT = 400, 668
 
 --- How many letters a name search waits for, as Blizzard's own searches do; how many WMOs it
 -- lists at most, and how many rows of them show before the list scrolls.
@@ -216,10 +216,6 @@ local run, told
 --- The scene the Preview pane draws in, made as the window is built; and what it last drew, as
 -- its source and chosen sets, so it is drawn again only when they change.
 local stage, previewed
-
---- The least height the window may be drawn at: MIN_HEIGHT, deepened as the source section is
--- where there is room for its picture.
-local leastHeight = MIN_HEIGHT
 
 --- The search match Enter takes, by its place in the list.
 local picked = 1
@@ -1651,29 +1647,52 @@ local function buildDoodad()
 	hint(panel.Import, nil, importLines, "import")
 end
 
---- Stand the Preview pane at the window's right, past the doodad panel while it shows.
+--- Stand the Preview pane against the window's right edge, as tall as the room the side panels
+-- leave it: below the doodad panel and above the blueprint offer while they show.
 local function placePreview()
 	preview:ClearAllPoints()
-	preview:SetPoint("TOPLEFT", panel:IsShown() and panel or frame, "TOPRIGHT", 5, 0)
+	if panel:IsShown() then
+		preview:SetPoint("TOPLEFT", panel, "BOTTOMLEFT")
+	else
+		preview:SetPoint("TOPLEFT", frame, "TOPRIGHT")
+	end
+	if offer:IsShown() then
+		preview:SetPoint("BOTTOMLEFT", offer, "TOPLEFT")
+	else
+		preview:SetPoint("BOTTOMLEFT", frame, "BOTTOMRIGHT")
+	end
+end
+
+--- Say under the scene how far its models have loaded, and once they have, how long they took.
+local function showLoading(loaded, total, seconds)
+	local text = ""
+	if loaded < total then
+		text = ("Loading %s of %s"):format(thousands(loaded), objects(total))
+	elseif total > 0 then
+		text = ("%s loaded in %.2f s"):format(objects(total), seconds)
+	end
+	preview.Loading:SetText(text)
 end
 
 local function buildPreview()
 	preview.Label:SetText("Preview")
 	preview.Hint:SetText("Drag to turn, wheel to zoom.")
-	stage = Scene.New(preview.Scene)
+	stage = Scene.New(preview.Scene, showLoading)
 	preview.CloseButton:SetScript(
 		"OnClick",
 		Client.Guarded(function()
 			preview:Hide()
 		end)
 	)
-	panel:HookScript("OnShow", Client.Guarded(placePreview))
-	panel:HookScript("OnHide", Client.Guarded(placePreview))
+	for _, side in ipairs({ panel, offer }) do
+		side:HookScript("OnShow", Client.Guarded(placePreview))
+		side:HookScript("OnHide", Client.Guarded(placePreview))
+	end
 end
 
 --- Make room for the source's picture where Glimpse's WMO pictures are installed: its box shown,
--- the section as deep as the box, the words beside it, and the window deeper by as much, so its
--- list keeps its rows. Done once, since an addon is installed or not for the whole session.
+-- and the rows beside it narrowed to leave it its width. Done once, since an addon is installed or
+-- not for the whole session.
 local function buildPicture()
 	if not Previews.Pictured() then
 		return
@@ -1681,8 +1700,6 @@ local function buildPicture()
 	local box = frame.PictureBox
 	dress(box, PANEL)
 	box:Show()
-	leastHeight = MIN_HEIGHT + box:GetHeight() - frame.SourceSpan:GetHeight()
-	frame.SourceSpan:SetHeight(box:GetHeight())
 	frame.PictureRoom:SetWidth(box:GetWidth() + PICTURE_GAP)
 end
 
@@ -1756,8 +1773,8 @@ local function build()
 	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 	-- Moved or resized by hand, the game's own layout cache keeps the window's place and size.
 	buildPicture()
-	frame:SetMinResize(MIN_WIDTH, leastHeight)
-	frame:SetMaxResize(MIN_WIDTH * 2, leastHeight * 2)
+	frame:SetMinResize(MIN_WIDTH, MIN_HEIGHT)
+	frame:SetMaxResize(MIN_WIDTH * 2, MIN_HEIGHT * 2)
 	frame.Grip:SetScript("OnMouseDown", function()
 		-- Held by its centre, the frame would grow on both sides and the corner leave the cursor;
 		-- held by its top left corner, the corner dragged is the one that moves.
@@ -1790,8 +1807,8 @@ local function build()
 			_G.PlaySound(_G.SOUNDKIT.IG_CHARACTER_INFO_OPEN)
 			-- A size the game kept from an older window may be smaller than this layout needs.
 			local width, height = frame:GetSize()
-			if width < MIN_WIDTH or height < leastHeight then
-				frame:SetSize(math.max(width, MIN_WIDTH), math.max(height, leastHeight))
+			if width < MIN_WIDTH or height < MIN_HEIGHT then
+				frame:SetSize(math.max(width, MIN_WIDTH), math.max(height, MIN_HEIGHT))
 			end
 			-- A position read when nothing was selected is read again when the window opens, so it is
 			-- where the player stands now rather than wherever they stood last time.

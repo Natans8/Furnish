@@ -687,21 +687,40 @@ def test_a_sets_pieces_are_its_placements_by_the_file_each_draws(tmp_path: Path)
     assert [p.file for p in pieces.values()] == [1002]
 
 
-#: A model scene that keeps what each actor and the camera were last told, by method.
+#: A model scene that keeps what each actor and the camera were last told, by method. Its field of
+#: view is twice atan(0.5) and it is twice as wide as tall, so the vertical half-angle is the
+#: narrower, with a tangent of 0.5. Every model is a two-yard cube about its origin, and loads only
+#: when LOAD calls it in, as the client calls back.
 RECORDING_SCENE = """
-ACTORS, CAMERA = {}, {}
-local function recorder(into)
-  return setmetatable({}, { __index = function(_, method)
+ACTORS, CAMERA, TOLD, SCRIPTS, NOW = {}, {}, {}, {}, 10
+GetTime = function() return NOW end
+local function recorder(into, own)
+  return setmetatable(own or {}, { __index = function(_, method)
     return function(_, ...) into[method] = { ... } end
   end })
 end
 FRAME = {
   SetCameraNearClip = function() end, SetCameraFarClip = function() end,
   CreateCameraFromScene = function() end, EnableMouse = function() end,
-  EnableMouseWheel = function() end, SetScript = function() end,
+  EnableMouseWheel = function() end, HookScript = function() end,
+  SetScript = function(_, name, fn) SCRIPTS[name] = fn end,
+  GetCameraFieldOfView = function() return 2 * math.atan(0.5) end,
+  GetWidth = function() return 200 end, GetHeight = function() return 100 end,
   GetActiveCamera = function() return recorder(CAMERA) end,
-  CreateActor = function() local told = {} ACTORS[#ACTORS + 1] = told return recorder(told) end,
+  CreateActor = function()
+    local told = {}
+    ACTORS[#ACTORS + 1] = told
+    local actor
+    actor = recorder(told, {
+      SetOnModelLoadedCallback = function(_, fn) told.loaded = fn end,
+      GetActiveBoundingBox = function() return -1, -1, -1, 1, 1, 1 end,
+    })
+    told.actor = actor
+    return actor
+  end,
 }
+function LOAD(i) ACTORS[i].loaded(ACTORS[i].actor) end
+SAID = function(loaded, total, seconds) TOLD[#TOLD + 1] = { loaded, total, seconds } end
 """
 
 
@@ -710,7 +729,7 @@ def test_a_scene_lays_each_piece_about_the_centre_in_its_own_scale(tmp_path: Pat
     lua.execute(RECORDING_SCENE)
     lua.execute(
         """
-        SCENE = Furnish.Scene.New(FRAME)
+        SCENE = Furnish.Scene.New(FRAME, SAID)
         SCENE:Draw({
           { file = 1, x = 10, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 0.5 },
           { file = 2, x = 0, y = 2, z = 0, qx = 0, qy = 0, qz = 0.70710678, qw = 0.70710678,
@@ -725,8 +744,6 @@ def test_a_scene_lays_each_piece_about_the_centre_in_its_own_scale(tmp_path: Pat
     assert (first.SetModelByFileID[1], first.SetScale[1]) == (1, 0.5)
     # A quarter turn about the vertical, read as `.gob spawn` reads it.
     assert second.SetYaw[1] == pytest.approx(math.pi / 2)
-    # Framed at the widest extent, ten yards, a third again.
-    assert lua.eval("CAMERA.SetZoomDistance[1]") == pytest.approx(13)
     # Drawn again with less, the rest are emptied and hidden.
     lua.execute(
         "SCENE:Draw({ { file = 3, x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1,"
@@ -734,6 +751,59 @@ def test_a_scene_lays_each_piece_about_the_centre_in_its_own_scale(tmp_path: Pat
     )
     assert lua.eval("ACTORS[2].Hide") is not None
     assert len(lua.eval("ACTORS")) == 2
+
+
+def test_a_scene_frames_the_sphere_around_its_loaded_models(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute(RECORDING_SCENE)
+    lua.execute(
+        """
+        SCENE = Furnish.Scene.New(FRAME, SAID)
+        SCENE:Draw({
+          { file = 1, x = 10, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 0.5 },
+          { file = 2, x = 0, y = 2, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 },
+        })
+        """
+    )
+    assert tuple(lua.eval("TOLD[1]").values()) == (0, 2, 0)
+    # Nothing loaded leaves the camera unaimed.
+    lua.execute("SCENE:Tick()")
+    assert lua.eval("CAMERA.SetZoomDistance") is None
+    # Both cubes loaded, about the centre (5, 1, 0): one yard either side of (-5, 1, 0), and half a
+    # yard either side of (5, -1, 0). The sphere around them reaches the frame's top and bottom.
+    lua.execute("NOW = 10.25 LOAD(1) LOAD(2) SCENE:Tick()")
+    low, high = (-6, -1.5, -1), (5.5, 2, 1)
+    radius = math.dist(low, high) / 2
+    assert tuple(lua.eval("CAMERA.SetTarget").values()) == pytest.approx((-0.25, 0.25, 0))
+    distance = lua.eval("CAMERA.SetZoomDistance[1]")
+    assert distance == pytest.approx(radius / math.sin(math.atan(0.5)))
+    assert tuple(lua.eval("TOLD[#TOLD]").values()) == (2, 2, 0.25)
+    # The camera scene's drift as it zooms is taken out, and a load counts once.
+    assert tuple(lua.eval("CAMERA.SetTargetSpline").values()) == ()
+    lua.execute("LOAD(2) SCENE:Tick()")
+    assert lua.eval("SCENE.loaded") == 2
+
+
+def test_once_the_wheel_has_turned_a_load_leaves_the_camera_be(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute(RECORDING_SCENE)
+    lua.execute(
+        """
+        SCENE = Furnish.Scene.New(FRAME, SAID)
+        SCENE:Draw({
+          { file = 1, x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 },
+          { file = 2, x = 30, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 },
+        })
+        LOAD(1) SCENE:Tick()
+        """
+    )
+    framed = lua.eval("CAMERA.SetZoomDistance[1]")
+    lua.execute("SCRIPTS.OnMouseWheel(FRAME, 1)")
+    assert lua.eval("CAMERA.SetZoomDistance[1]") == pytest.approx(framed * 0.88)
+    # The second, far piece loading would widen the frame, but the player has zoomed.
+    lua.execute("LOAD(2) SCENE:Tick()")
+    assert lua.eval("CAMERA.SetZoomDistance[1]") == pytest.approx(framed * 0.88)
+    assert tuple(lua.eval("TOLD[#TOLD]").values())[:2] == (2, 2)
 
 
 def test_rows_from_two_sets_spawn_as_one_collection(tmp_path: Path) -> None:
