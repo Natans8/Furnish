@@ -909,6 +909,35 @@ function Console.Describe(request, tooltip)
 	})
 end
 
+--- What a preview of a set shows: the models it holds, each once with its count, under a name;
+-- nil where it holds none the data can name.
+-- @param id the set's id
+-- @param name what to call it, its WMO's name before its own: "house's Full"
+function Console.SetPreview(id, name)
+	local models = Rows.Models(id)
+	if not (models and models[1]) then
+		return nil
+	end
+	return { kind = "models", name = name, models = models }
+end
+
+--- What a preview of a list link's set shows, as Console.SetPreview gives it; nil where the
+-- link names no set the data has.
+-- @param request a list link's request
+function Console.LinkPreview(request)
+	local set = Reader.Load() and Sets.Pick(request.file, request.index)
+	if not set then
+		return nil
+	end
+	return Console.SetPreview(set.id, ("%s's %s"):format(request.label, setName(set)))
+end
+
+--- What a preview of a WMO shows: its picture, found by the WMO file's name.
+-- @param name the file's name, as the client's catalogue spells it, whole or as a line shows it
+function Console.WmoPreview(name)
+	return { kind = "wmo", id = 0, name = name }
+end
+
 --- Fill a tooltip for the button on a WMO's doodad line.
 -- @param tooltip a tooltip owned and empty
 function Console.DescribeImport(tooltip)

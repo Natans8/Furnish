@@ -34,6 +34,7 @@ local Sets = Furnish.Sets
 local Chat = Furnish.Chat
 local Names = Furnish.Names
 local Commands = Furnish.Commands
+local Previews = Furnish.Previews
 
 --- The border a list wears, ObjectMover's: a tooltip's edge over a dark shade.
 local PANEL = {
@@ -283,6 +284,12 @@ end
 --- What is selected as a word: "group" for a group, else "gob".
 local function kindOf(selected)
 	return selected and selected.group and "group" or "gob"
+end
+
+--- Take down what resting on a row showed: its tooltip, and the preview beside it.
+local function leaveRow()
+	_G.GameTooltip:Hide()
+	Previews.Unpeek()
 end
 
 --- Show a tooltip beside a control, its lines as Chat.Tip takes them.
@@ -1011,13 +1018,14 @@ local function rowEnter(button)
 	lines[#lines + 1] = { text = "Click: choose only this set", colour = GREEN }
 	lines[#lines + 1] = { text = "Ctrl- or shift-click: add or remove this set", colour = GREEN }
 	tip(button, set.name, lines)
+	Previews.Peek(Console.SetPreview(set.id, ("%s's %s"):format(shown.name, set.name)))
 end
 
 local function initRow(button, set, new)
 	if new then
 		button:SetScript("OnClick", Client.Guarded(rowClick))
 		button:SetScript("OnEnter", Client.Guarded(rowEnter))
-		button:SetScript("OnLeave", _G.GameTooltip_Hide)
+		button:SetScript("OnLeave", Client.Guarded(leaveRow))
 	end
 	fillSetRow(button, set, baked(set) and "baked")
 	mark(button, set)
@@ -1057,6 +1065,7 @@ local function resultEnter(button)
 	end
 	lines[#lines + 1] = { text = "Click: show its sets", colour = GREEN }
 	tip(button, wmo.name, lines)
+	Previews.Peek(Console.WmoPreview(wmo.name))
 end
 
 local function initResult(button, wmo, new)
@@ -1068,7 +1077,7 @@ local function initResult(button, wmo, new)
 			end)
 		)
 		button:SetScript("OnEnter", Client.Guarded(resultEnter))
-		button:SetScript("OnLeave", _G.GameTooltip_Hide)
+		button:SetScript("OnLeave", Client.Guarded(leaveRow))
 	end
 	button.Label:SetText(wmo.name)
 	button.Count:SetText(Chat.Count(wmo.sets, "set"))
@@ -1177,12 +1186,13 @@ local function drawnEnter(button)
 		lines[#lines + 1] = { text = text, colour = GREEN }
 	end
 	tip(button, set.name, lines)
+	Previews.Peek(Console.SetPreview(set.id, ("%s's %s"):format(doodad.name, set.name)))
 end
 
 local function initDrawn(button, set, new)
 	if new then
 		button:SetScript("OnEnter", Client.Guarded(drawnEnter))
-		button:SetScript("OnLeave", _G.GameTooltip_Hide)
+		button:SetScript("OnLeave", Client.Guarded(leaveRow))
 	end
 	fillSetRow(button, set, set.draws and "baked")
 end

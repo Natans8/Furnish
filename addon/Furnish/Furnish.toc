@@ -20,6 +20,7 @@ Data\Rows.lua
 Client\Chat.lua
 Client\Client.lua
 Client\Pose.lua
+Client\Previews.lua
 Actions\Console.lua
 UI\Window.xml
 UI\Window.lua

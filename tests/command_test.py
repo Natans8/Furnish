@@ -833,6 +833,70 @@ def test_resting_on_a_link_says_the_set_and_the_clicks(tmp_path: Path) -> None:
     ]
 
 
+# -- Previews through Glimpse ------------------------------------------------------------
+
+#: A tooltip that takes lines and keeps none.
+QUIET_TOOLTIP = "TOOLTIP = { SetText = function() end, AddLine = function() end }"
+
+#: The next Glimpse's preview door, noting what it is asked; today's Glimpse offers Provide alone.
+GLIMPSE = """
+PEEKED, UNPEEKED = {}, 0
+Glimpse = {
+  Provide = function() return true end,
+  Peek = function(read) PEEKED[#PEEKED + 1] = read return true end,
+  Unpeek = function() UNPEEKED = UNPEEKED + 1 end,
+}
+"""
+
+
+def listed_set(lua: lua51.LuaRuntime) -> str:
+    """The words the selected house's list gives its Full set, with a tooltip to rest on it."""
+    lua.execute("SELECTED = 500")
+    words: str = run(lua, "list")[1].split("garrmission:furnish:")[2].split("|h")[0]
+    lua.execute(QUIET_TOOLTIP)
+    return words
+
+
+def test_resting_on_a_listed_set_peeks_its_models_through_glimpse(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    words = listed_set(lua)
+    lua.execute(GLIMPSE)
+    lua.eval("Furnish.Command.Hover")(words, lua.eval("TOOLTIP"))
+    read = lua.eval("PEEKED[1]")
+    assert (read.kind, read.name) == ("models", "house's Full")
+    assert [(m.file, m.count) for m in read.models.values()] == [(1001, 1), (1002, 1)]
+    lua.eval("Furnish.Command.Unhover")()
+    assert lua.eval("UNPEEKED") == 1
+
+
+@pytest.mark.parametrize(
+    "glimpse",
+    [
+        "Glimpse = nil",
+        "Glimpse = { Provide = function() return true end }",
+        "local fail = function() error('broken') end Glimpse = { Peek = fail, Unpeek = fail }",
+    ],
+)
+def test_without_a_working_preview_door_a_set_is_only_described(
+    tmp_path: Path, glimpse: str
+) -> None:
+    lua = command_lua(tmp_path)
+    words = listed_set(lua)
+    lua.execute(glimpse)
+    lua.eval("Furnish.Command.Hover")(words, lua.eval("TOOLTIP"))
+    lua.eval("Furnish.Command.Unhover")()
+    assert lua.eval("Furnish.Previews.Peek(Furnish.Console.WmoPreview('house'))") is False
+    assert not [line for line in printed(lua) if "error" in line]
+
+
+def test_a_wmo_is_previewed_by_its_files_name(tmp_path: Path) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute(GLIMPSE)
+    assert lua.eval("Furnish.Previews.Peek(Furnish.Console.WmoPreview('house'))") is True
+    read = lua.eval("PEEKED[1]")
+    assert (read.kind, read.id, read.name) == ("wmo", 0, "house")
+
+
 # -- Importing ---------------------------------------------------------------------------
 
 

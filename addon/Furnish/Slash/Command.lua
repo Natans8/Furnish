@@ -251,7 +251,13 @@ function Command.Hover(words, tooltip)
 	local request = Console.LinkRequest(words)
 	if request then
 		Console.Describe(request, tooltip)
+		Furnish.Previews.Peek(Console.LinkPreview(request))
 	end
+end
+
+--- Leaving one of Furnish's links takes down the preview resting on it showed.
+function Command.Unhover()
+	Furnish.Previews.Unpeek()
 end
 
 -- TODO: both names are placeholders until the command's final name is chosen. Messages
@@ -259,7 +265,7 @@ end
 _G.SLASH_FURNISH1 = "/furn"
 _G.SLASH_FURNISH2 = "/furnish"
 _G.SlashCmdList.FURNISH = Client.Guarded(Command.Run)
-Chat.OnLinks(Command.Click, Command.Hover)
+Chat.OnLinks(Command.Click, Command.Hover, Command.Unhover)
 
 --- The unique id of the doodad a server line names by its link, where it is a WMO
 -- Furnish has sets for, still on the map, and the map placed it with a set beyond its base, so

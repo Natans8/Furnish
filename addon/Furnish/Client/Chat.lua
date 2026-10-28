@@ -235,8 +235,8 @@ end
 --- Act on Furnish's links: onClick(words, modifier) when one is clicked, where modifier is
 -- "share" for the client's chat-link click, "ctrl" for a control-click and nil for a plain
 -- one; onEnter(words, tooltip) when the pointer rests on one, with the tooltip owned and
--- empty. Called once, at load.
-function Chat.OnLinks(onClick, onEnter)
+-- empty; and onLeave(), if given, when it leaves. Called once, at load.
+function Chat.OnLinks(onClick, onEnter, onLeave)
 	_G.hooksecurefunc(
 		"SetItemRef",
 		Furnish.Client.Guarded(function(link)
@@ -269,6 +269,9 @@ function Chat.OnLinks(onClick, onEnter)
 		if holding then
 			holding = false
 			_G.GameTooltip:Hide()
+			if onLeave then
+				onLeave()
+			end
 		end
 	end)
 	for i = 1, _G.NUM_CHAT_WINDOWS do
