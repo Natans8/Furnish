@@ -548,6 +548,75 @@
 							<Anchor point="TOPLEFT" x="12" y="-72"/>
 							<Anchor point="BOTTOMRIGHT" x="-12" y="36"/>
 						</Anchors>
+						<Frames>
+							<!-- The game's own model controls, as its dressing room lays them over the model:
+							     zoom in, zoom out, a pan held and dragged, rotate left and right while held,
+							     and reset. Half seen until the pointer is on them; Window.lua wires them. -->
+							<Frame parentKey="Controls" alpha="0.5">
+								<Size x="112" y="23"/>
+								<Anchors>
+									<Anchor point="TOP" x="0" y="-4"/>
+								</Anchors>
+								<Layers>
+									<Layer level="BACKGROUND">
+										<Texture parentKey="Right" file="Interface\Common\UI-ModelControlPanel">
+											<Size x="23" y="23"/>
+											<Anchors>
+												<Anchor point="RIGHT"/>
+											</Anchors>
+											<TexCoords left="0.015625" right="0.375" top="0.4296875" bottom="0.609375"/>
+										</Texture>
+										<Texture parentKey="Left" file="Interface\Common\UI-ModelControlPanel">
+											<Size x="23" y="23"/>
+											<Anchors>
+												<Anchor point="LEFT"/>
+											</Anchors>
+											<TexCoords left="0.40625" right="0.765625" top="0.4296875" bottom="0.609375"/>
+										</Texture>
+										<Texture file="Interface\Common\UI-ModelControlPanel">
+											<Size y="23"/>
+											<Anchors>
+												<Anchor point="LEFT" relativeKey="$parent.Left" relativePoint="RIGHT"/>
+												<Anchor point="RIGHT" relativeKey="$parent.Right" relativePoint="LEFT"/>
+											</Anchors>
+											<TexCoords left="0" right="1" top="0.625" bottom="0.8046875"/>
+										</Texture>
+									</Layer>
+								</Layers>
+								<Frames>
+									<Button parentKey="ZoomIn" inherits="ModelControlButtonTemplate">
+										<Anchors>
+											<Anchor point="LEFT" x="2" y="0"/>
+										</Anchors>
+									</Button>
+									<Button parentKey="ZoomOut" inherits="ModelControlButtonTemplate">
+										<Anchors>
+											<Anchor point="LEFT" relativeKey="$parent.ZoomIn" relativePoint="RIGHT"/>
+										</Anchors>
+									</Button>
+									<Button parentKey="Pan" inherits="ModelControlButtonTemplate">
+										<Anchors>
+											<Anchor point="LEFT" relativeKey="$parent.ZoomOut" relativePoint="RIGHT"/>
+										</Anchors>
+									</Button>
+									<Button parentKey="RotateLeft" inherits="ModelControlButtonTemplate">
+										<Anchors>
+											<Anchor point="LEFT" relativeKey="$parent.Pan" relativePoint="RIGHT"/>
+										</Anchors>
+									</Button>
+									<Button parentKey="RotateRight" inherits="ModelControlButtonTemplate">
+										<Anchors>
+											<Anchor point="LEFT" relativeKey="$parent.RotateLeft" relativePoint="RIGHT"/>
+										</Anchors>
+									</Button>
+									<Button parentKey="Reset" inherits="ModelControlButtonTemplate">
+										<Anchors>
+											<Anchor point="LEFT" relativeKey="$parent.RotateRight" relativePoint="RIGHT"/>
+										</Anchors>
+									</Button>
+								</Frames>
+							</Frame>
+						</Frames>
 					</ModelScene>
 				</Frames>
 			</Frame>

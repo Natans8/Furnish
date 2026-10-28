@@ -709,7 +709,6 @@ FRAME = {
   GetCameraFieldOfView = function() return 2 * math.atan(0.5) end,
   GetWidth = function() return 200 end, GetHeight = function() return 100 end,
   GetEffectiveScale = function() return 1 end, GetCenter = function() return 100, 50 end,
-  GetCameraRight = function() return 0, -1, 0 end, GetCameraUp = function() return 0, 0, 1 end,
   GetActiveCamera = function() return recorder(CAMERA) end,
   CreateActor = function()
     local told = {}
@@ -813,6 +812,56 @@ def test_once_the_wheel_has_turned_a_load_leaves_the_camera_be(tmp_path: Path) -
     assert lua.eval("CAMERA.SetZoomDistance[1]") == pytest.approx(0.01)
 
 
+def view_axes(lua: lua51.LuaRuntime) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """The scene's view right and up, as SCENE:Axes gives them."""
+    axes = lua.eval("{ SCENE:Axes() }")
+    values = tuple(axes.values())
+    return values[:3], values[3:]
+
+
+def forward(yaw: float, pitch: float) -> tuple[float, float, float]:
+    """Where the client's orbit camera looks, as Vector3D_CalculateNormalFromYawPitch has it."""
+    return (math.cos(pitch) * math.cos(yaw), math.cos(pitch) * math.sin(yaw), -math.sin(pitch))
+
+
+def test_the_view_axes_are_square_and_right_is_east_looking_north(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute(RECORDING_SCENE)
+    lua.execute("SCENE = Furnish.Scene.New(FRAME, SAID)")
+    right, up = view_axes(lua)
+    ahead = forward(math.radians(225), math.radians(35))
+    square = (math.sumprod(right, ahead), math.sumprod(up, ahead), math.sumprod(right, up))
+    assert square == pytest.approx((0, 0, 0))
+    assert up[2] > 0
+    # Looking north, level: right is east, which is -y, and up is up.
+    lua.execute("SCENE.yaw, SCENE.pitch = 0, 0")
+    right, up = view_axes(lua)
+    assert right == pytest.approx((0, -1, 0))
+    assert up == pytest.approx((0, 0, 1))
+
+
+def test_a_held_rotate_button_turns_and_reset_reframes(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute(RECORDING_SCENE)
+    lua.execute(
+        """
+        HELD = { LeftButton = true }
+        IsMouseButtonDown = function(button) return HELD[button] end
+        SCENE = Furnish.Scene.New(FRAME, SAID)
+        SCENE:Draw({ { file = 1, x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 } })
+        LOAD(1) SCENE:Tick(0)
+        """
+    )
+    framed = lua.eval("CAMERA.SetZoomDistance[1]")
+    # Half a second held turns a quarter of a turn, then letting go stops it.
+    lua.execute("SCENE:Spin(1) SCENE:Tick(0.5) HELD.LeftButton = nil SCENE:Tick(0.5)")
+    assert lua.eval("CAMERA.SetYaw[1]") == pytest.approx(math.radians(225) + math.pi / 2)
+    assert lua.eval("SCENE.spin") is None
+    lua.execute("SCRIPTS.OnMouseWheel(FRAME, 1) SCENE:Reset()")
+    assert lua.eval("CAMERA.SetYaw[1]") == pytest.approx(math.radians(225))
+    assert lua.eval("CAMERA.SetZoomDistance[1]") == pytest.approx(framed)
+
+
 def test_a_right_or_middle_drag_pans_and_the_pieces_follow_the_pointer(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     lua.execute(RECORDING_SCENE)
@@ -838,9 +887,11 @@ def test_a_right_or_middle_drag_pans_and_the_pieces_follow_the_pointer(tmp_path:
             f" HELD.{button} = nil SCENE:Tick()"
         )
     # Twenty pixels right, at a view one framed distance tall over a hundred pixels: what the
-    # camera looks at moves against the view's right, which here points along -y.
+    # camera looks at moves against the view's right, so the pieces move with the pointer.
+    right = view_axes(lua)[0]
     moved = tuple(lua.eval("CAMERA.SetTarget").values())
-    assert moved == pytest.approx((centre[0], centre[1] + 20 * distance / 100, centre[2]))
+    step = 20 * distance / 100
+    assert moved == pytest.approx(tuple(c - r * step for c, r in zip(centre, right, strict=True)))
     assert lua.eval("SCENE.dragged") is None
     # Panned, a load leaves the camera where the player put it.
     lua.execute("LOAD(2) SCENE:Tick()")
@@ -863,12 +914,13 @@ def test_the_wheel_zooms_toward_the_point_under_the_pointer(tmp_path: Path) -> N
     lua.execute("SCRIPTS.OnMouseWheel(FRAME, 1)")
     assert tuple(lua.eval("CAMERA.SetTarget").values()) == pytest.approx(centre)
     # Fifty pixels right of the middle, the point there is approached by the twelfth the step
-    # takes off: fifty pixels at the view's scale then, against the view's right, -y.
+    # takes off: fifty pixels at the view's scale then, along the view's right.
     lua.execute("GetCursorPosition = function() return 150, 50 end SCRIPTS.OnMouseWheel(FRAME, 1)")
     nearer = distance * 0.88
     shift = 50 * nearer / 100 * (1 - 0.88)
+    right = view_axes(lua)[0]
     aimed = tuple(lua.eval("CAMERA.SetTarget").values())
-    assert aimed == pytest.approx((centre[0], centre[1] - shift, centre[2]))
+    assert aimed == pytest.approx(tuple(c + r * shift for c, r in zip(centre, right, strict=True)))
 
 
 def test_rows_from_two_sets_spawn_as_one_collection(tmp_path: Path) -> None:

@@ -37,6 +37,13 @@ local FARTHEST = 4
 --- What each button drags: the left turns the camera, the right and the middle pan it.
 local DRAGS = { LeftButton = "Turn", RightButton = "Pan", MiddleButton = "Pan" }
 
+--- How fast a held rotate button turns the camera, in radians a second: half a turn a second, as
+-- the game's own model frames turn while theirs is held.
+local SPIN = math.pi
+
+--- The angle a drawing opens at: from a corner, looking down.
+local YAW, PITCH = math.rad(225), math.rad(35)
+
 --- How far the camera tilts up or down, short of looking straight down the vertical.
 local STEEPEST = 1.45
 
@@ -59,8 +66,8 @@ function Scene.New(frame, onLoad)
 		frame = frame,
 		actors = {},
 		onLoad = onLoad,
-		yaw = math.rad(225),
-		pitch = math.rad(35),
+		yaw = YAW,
+		pitch = PITCH,
 		zoom = 1,
 		distance = 1,
 		centre = { 0, 0, 0 },
@@ -74,8 +81,7 @@ function Scene.New(frame, onLoad)
 	-- read beside it.
 	frame:SetScript("OnMouseDown", function(_, button)
 		if DRAGS[button] then
-			local x, y = _G.GetCursorPosition()
-			self.dragged = { x = x, y = y, button = button }
+			self:Drag(DRAGS[button], button)
 		end
 	end)
 	frame:SetScript("OnMouseUp", function()
@@ -90,8 +96,8 @@ function Scene.New(frame, onLoad)
 	)
 	frame:HookScript(
 		"OnUpdate",
-		Client.Guarded(function()
-			self:Tick()
+		Client.Guarded(function(_, elapsed)
+			self:Tick(elapsed)
 		end)
 	)
 	return self
@@ -132,15 +138,16 @@ end
 
 --- Stand back far enough that the sphere around everything loaded fits the narrower of the
 -- frame's two fields of view, aimed at its centre. Nothing loaded leaves the camera as it is.
+-- @return true where it framed
 function Scene:Fit()
 	local low, high = self.low, self.high
 	if not low then
-		return
+		return false
 	end
 	local dx, dy, dz = high[1] - low[1], high[2] - low[2], high[3] - low[3]
 	local radius = math.sqrt(dx * dx + dy * dy + dz * dz) / 2
 	if radius <= 0 then
-		return
+		return false
 	end
 	-- The field of view is read as the vertical one. A frame not yet laid out measures nothing, and
 	-- is taken as square until it does.
@@ -150,6 +157,15 @@ function Scene:Fit()
 	self.centre = { (low[1] + high[1]) / 2, (low[2] + high[2]) / 2, (low[3] + high[3]) / 2 }
 	self.distance = radius / math.sin(math.atan(math.min(tall, wide)))
 	self:Aim()
+	return true
+end
+
+--- Put the camera back as a drawing opens it: the opening angle, framing everything loaded.
+function Scene:Reset()
+	self.yaw, self.pitch, self.zoom, self.moved = YAW, PITCH, 1, false
+	if not self:Fit() then
+		self:Aim()
+	end
 end
 
 --- Take in a loaded actor's box, turned, scaled and placed as its piece stands.
@@ -184,14 +200,25 @@ function Scene:Turn(dx, dy)
 	self.pitch = clamp(self.pitch + dy * TURN_PER_PIXEL, -STEEPEST, STEEPEST)
 end
 
+--- The view's right and up in the scene's axes, from the camera's turn and tilt: it looks along
+-- the client's orbit camera's forward, right is level across that, and up is square to both.
+-- Worked out here rather than read from the scene's GetCameraRight, which Blizzard's own panning
+-- adds where the model should follow the pointer, so as pointing to the view's left.
+function Scene:Axes()
+	local yaw, pitch = self.yaw, self.pitch
+	local fx, fy, fz =
+		math.cos(pitch) * math.cos(yaw), math.cos(pitch) * math.sin(yaw), -math.sin(pitch)
+	local rx, ry = math.sin(yaw), -math.cos(yaw)
+	return rx, ry, 0, ry * fz, -rx * fz, rx * fy - ry * fx
+end
+
 --- Move what the camera looks at across the view, so the pieces at its depth follow the pointer:
 -- a pixel is the share of the view's height it spans, at the camera's distance.
 function Scene:Pan(dx, dy)
 	local frame = self.frame
 	local tall = 2 * self.distance * self.zoom * math.tan(frame:GetCameraFieldOfView() / 2)
 	local step = tall / (frame:GetHeight() * frame:GetEffectiveScale())
-	local rx, ry, rz = frame:GetCameraRight()
-	local ux, uy, uz = frame:GetCameraUp()
+	local rx, ry, rz, ux, uy, uz = self:Axes()
 	local centre = self.centre
 	centre[1] = centre[1] - (rx * dx + ux * dy) * step
 	centre[2] = centre[2] - (ry * dx + uy * dy) * step
@@ -201,20 +228,39 @@ end
 
 --- Bring the camera nearer or farther by steps of the wheel, toward the point under the pointer,
 -- which stays under it: what the camera looks at moves toward that point by the share of the
--- distance the step takes off.
-function Scene:Zoom(steps)
+-- distance the step takes off. A button zooms straight in, its pointer being on the button.
+-- @param straight true to zoom toward the middle of the view, whatever is under the pointer
+function Scene:Zoom(steps, straight)
 	local zoom = clamp(self.zoom * ZOOM_STEP ^ steps, NEAR / self.distance, FARTHEST)
-	local share = 1 - zoom / self.zoom
-	local x, y = _G.GetCursorPosition()
-	local cx, cy = self.frame:GetCenter()
-	local scale = self.frame:GetEffectiveScale()
-	self:Pan(-(x - cx * scale) * share, -(y - cy * scale) * share)
+	if not straight then
+		local share = 1 - zoom / self.zoom
+		local x, y = _G.GetCursorPosition()
+		local cx, cy = self.frame:GetCenter()
+		local scale = self.frame:GetEffectiveScale()
+		self:Pan(-(x - cx * scale) * share, -(y - cy * scale) * share)
+	end
 	self.zoom = zoom
+	self.moved = true
 end
 
---- What a frame does: a drag turns or pans the camera, and what loaded since the last frame is
--- framed and told, once for however many loaded.
-function Scene:Tick()
+--- Start dragging with a mouse button held: turning the camera, or panning it.
+-- @param action "Turn" or "Pan"
+-- @param button the mouse button held, whose release ends the drag
+function Scene:Drag(action, button)
+	local x, y = _G.GetCursorPosition()
+	self.dragged = { x = x, y = y, button = button, action = action }
+end
+
+--- Turn the camera on its own while the left mouse button stays down, as a held rotate button
+-- does: 1 the way a drag to the left turns it, -1 the other way.
+function Scene:Spin(direction)
+	self.spin = direction
+end
+
+--- What a frame does: a drag turns or pans the camera, a held rotate button turns it, and what
+-- loaded since the last frame is framed and told, once for however many loaded.
+-- @param elapsed the seconds since the last frame
+function Scene:Tick(elapsed)
 	local dragged = self.dragged
 	if dragged then
 		-- A press let go off the scene is not heard by it, so the button is read as it is.
@@ -222,8 +268,16 @@ function Scene:Tick()
 			self.dragged = nil
 		else
 			local x, y = _G.GetCursorPosition()
-			self[DRAGS[dragged.button]](self, x - dragged.x, y - dragged.y)
+			self[dragged.action](self, x - dragged.x, y - dragged.y)
 			dragged.x, dragged.y = x, y
+			self:Aim()
+		end
+	end
+	if self.spin then
+		if not _G.IsMouseButtonDown("LeftButton") then
+			self.spin = nil
+		else
+			self.yaw = self.yaw + self.spin * SPIN * (elapsed or 0)
 			self:Aim()
 		end
 	end

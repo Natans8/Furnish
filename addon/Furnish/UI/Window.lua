@@ -1674,10 +1674,93 @@ local function showLoading(loaded, total, seconds)
 	preview.Loading:SetText(text)
 end
 
+--- The Preview pane's model controls, as the game's dressing room draws its own: each button's icon
+-- on the same art, nil for the art's own, its tooltip, and what a click or a hold does to the scene.
+local MODEL_CONTROLS = {
+	{
+		key = "ZoomIn",
+		icon = { 0.578125, 0.828125, 0.1484375, 0.2734375 },
+		title = "Zoom in",
+		text = "Or turn the wheel.",
+		click = function()
+			stage:Zoom(1, true)
+			stage:Aim()
+		end,
+	},
+	{
+		key = "ZoomOut",
+		icon = { 0.296875, 0.546875, 0.0078125, 0.1328125 },
+		title = "Zoom out",
+		text = "Or turn the wheel.",
+		click = function()
+			stage:Zoom(-1, true)
+			stage:Aim()
+		end,
+	},
+	{
+		key = "Pan",
+		icon = { 0.296875, 0.546875, 0.2890625, 0.4140625 },
+		title = "Pan",
+		text = "Hold and drag. Or right-drag the view.",
+		hold = function()
+			stage:Drag("Pan", "LeftButton")
+		end,
+	},
+	{
+		key = "RotateLeft",
+		icon = { 0.015625, 0.265625, 0.2890625, 0.4140625 },
+		title = "Rotate left",
+		text = "Hold. Or drag the view.",
+		hold = function()
+			stage:Spin(1)
+		end,
+	},
+	{
+		key = "RotateRight",
+		icon = { 0.578125, 0.828125, 0.2890625, 0.4140625 },
+		title = "Rotate right",
+		text = "Hold. Or drag the view.",
+		hold = function()
+			stage:Spin(-1)
+		end,
+	},
+	{
+		key = "Reset",
+		title = "Reset view",
+		text = "As the sets were first framed.",
+		click = function()
+			stage:Reset()
+		end,
+	},
+}
+
+--- Wire the model controls over the scene, which keep the game's own pressed look and fade.
+local function buildControls()
+	local controls = preview.Scene.Controls
+	-- A control over a model states its own frame level, or the model may draw over it.
+	controls:SetFrameLevel(preview.Scene:GetFrameLevel() + 10)
+	for _, control in ipairs(MODEL_CONTROLS) do
+		local button = controls[control.key]
+		button:Init("AnyUp", control.icon, control.title, control.text)
+		if control.click then
+			button:SetScript(
+				"OnClick",
+				Client.Guarded(function()
+					_G.PlaySound(_G.SOUNDKIT.IG_INVENTORY_ROTATE_CHARACTER)
+					control.click()
+				end)
+			)
+		else
+			button:HookScript("OnMouseDown", Client.Guarded(control.hold))
+		end
+	end
+end
+
 local function buildPreview()
 	preview.Label:SetText("Preview")
 	preview.Hint:SetText("Drag to turn, right-drag to pan, wheel to zoom.")
 	stage = Scene.New(preview.Scene, showLoading)
+	buildControls()
 	preview.CloseButton:SetScript(
 		"OnClick",
 		Client.Guarded(function()
