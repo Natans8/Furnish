@@ -1798,32 +1798,22 @@ local function buildPreviewGrip()
 	end)
 end
 
---- A pose's numbers of one part as the window's boxes word and colour them: each axis word in its
--- axis's colour before its value, "X 1.5  Y -2  Z 0".
--- @param part "position" or "rotation", as NUMBERS names the boxes' parts
--- @param values the part's numbers by the boxes' keys
-local function axes(part, values)
-	local said = {}
-	for _, number in ipairs(NUMBERS) do
-		if number.part == part then
-			local colour = number.colour
-			said[#said + 1] = ("|cff%02x%02x%02x%s%s %s"):format(
-				math.floor(colour[1] * 255 + 0.5),
-				math.floor(colour[2] * 255 + 0.5),
-				math.floor(colour[3] * 255 + 0.5),
-				number.box,
-				Chat.END,
-				shownNumber(values[number.key])
-			)
-		end
-	end
-	return table.concat(said, "   ")
+--- A word in a colour, for a tooltip line drawn in another.
+local function painted(word, colour)
+	return ("|cff%02x%02x%02x%s%s"):format(
+		math.floor(colour[1] * 255 + 0.5),
+		math.floor(colour[2] * 255 + 0.5),
+		math.floor(colour[3] * 255 + 0.5),
+		word,
+		Chat.END
+	)
 end
 
 --- Say in a tooltip at the pointer what the piece under it is, enough to place it by hand: its
--- model, its set, where it stands from the WMO's origin and how it is turned, as `.gob spawn`
--- takes them, its scale where it is not its model's own, and the command that spawns it. Nil
--- takes the tooltip down.
+-- model, its set, then a line for each number as the window's boxes word and colour it, where it
+-- stands from the WMO's origin and how it is turned as `.gob spawn` takes them, and its scale where
+-- it is not its model's own; then the command that spawns it. Every number has three places, so
+-- the column of them lines up. Nil takes the tooltip down.
 local function showHovered(piece)
 	local scene = preview.Scene
 	if not piece then
@@ -1834,18 +1824,22 @@ local function showHovered(piece)
 	end
 	local roll, pitch, turn =
 		Transform.ToAngles({ x = piece.qx, y = piece.qy, z = piece.qz, w = piece.qw })
-	local lines = {
-		{ label = "Set", value = piece.set },
-		{ label = "Position", value = axes("position", piece) },
-		{
-			label = "Rotation",
-			value = axes("rotation", { roll = roll, pitch = pitch, turn = turn }),
-		},
+	local pose = {
+		x = piece.x,
+		y = piece.y,
+		z = piece.z,
+		roll = roll,
+		pitch = pitch,
+		turn = turn,
+		scale = piece.scale,
 	}
-	-- A scale is stored as a float, so one that shows as one is the model's own.
-	local scale = shownNumber(piece.scale)
-	if scale ~= "1" then
-		lines[#lines + 1] = { label = "Scale", value = scale }
+	local lines = { { label = "Set", value = piece.set } }
+	for _, number in ipairs(NUMBERS) do
+		local value = ("%.3f"):format(pose[number.key])
+		-- A scale is stored as a float, so one that shows as one is the model's own.
+		if number.key ~= "scale" or value ~= "1.000" then
+			lines[#lines + 1] = { label = painted(number.box, number.colour), value = value }
+		end
 	end
 	lines[#lines + 1] = {
 		text = "Typed: " .. Commands.Typed(Commands.SpawnHere(-piece.display)),
