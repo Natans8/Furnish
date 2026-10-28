@@ -1159,6 +1159,9 @@ def test_a_ctrl_click_makes_a_piece_lead_until_it_is_let_go(tmp_path: Path) -> N
     lua.execute(f"GetCursorPosition = function() return {x}, {y} end SCENE:Tick(0) CTRL = true")
     click(lua)
     assert chosen(lua) == [9, 7, 8] and lua.eval("TOLD_CHOSEN") == 3
+    # The lead's glow moves with it: the third cube cyan, the first back to the chosen blue.
+    assert tuple(lua.eval("ACTORS[3].SetSpellVisualKit").values()) == (154655, False)
+    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (117557, False)
     assert lua.eval("select(2, SCENE:Leader())") is True
     lua.execute("CTRL, SHIFT = nil, true")
     click(lua)

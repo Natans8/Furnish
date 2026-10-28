@@ -14,7 +14,8 @@
 --
 -- A click chooses the piece under the pointer, a shift-click chooses it too, and a shift-drag
 -- chooses every piece whose middle its band holds, as it is drawn; what is chosen glows blue, the
--- pointed piece yellow, and the scene says when that changes. Chosen lists them as they would spawn,
+-- piece that leads cyan, the pointed piece yellow, and the scene says when that changes. Chosen
+-- lists them as they would spawn,
 -- the lowest-standing piece first, so that it leads the group they form, unless a ctrl-click has
 -- made another lead.
 
@@ -79,9 +80,10 @@ local LENS_STEP = 0.1
 
 --- The kits that light the piece under the pointer and the pieces chosen: a steady pale yellow
 -- glow along the edges, the nearest a scene draws to the outline `.gob select` puts on a gob,
--- which a scene does not draw, and the same glow in sky blue, judged in game against seven other
--- pale tones. A chosen piece under the pointer keeps its blue.
-local GLOW_KIT, CHOSEN_KIT = 87979, 117557
+-- which a scene does not draw, and the same glow in sky blue for a chosen piece and pale cyan for
+-- the one that leads, both judged in game against other pale tones. A chosen piece under the
+-- pointer keeps its colour.
+local GLOW_KIT, CHOSEN_KIT, LEADER_KIT = 87979, 117557, 154655
 
 --- The corners of a box, as which of its two ends each axis takes.
 local CORNERS = {}
@@ -609,7 +611,10 @@ end
 -- gives every scene actor; a client without it has the model loaded afresh instead, which draws
 -- it without.
 function Scene:Paint(actor)
-	local kit = actor.chosen == true and CHOSEN_KIT or actor == self.hovered and GLOW_KIT or nil
+	local kit = actor == self.leading and LEADER_KIT
+		or actor.chosen == true and CHOSEN_KIT
+		or actor == self.hovered and GLOW_KIT
+		or nil
 	local on = type(actor.lit) == "number" and actor.lit or nil
 	if kit == on then
 		return
@@ -647,6 +652,55 @@ function Scene:Hover(actor)
 	end
 end
 
+--- The ground a held box covers: its footprint, square to the scene.
+local function footprint(box)
+	return (box.outerHigh[1] - box.outerLow[1]) * (box.outerHigh[2] - box.outerLow[2])
+end
+
+--- Which chosen piece leads the group they form: the lowest-standing piece's box, bottom to top,
+-- is the ground they stand on, and of the pieces whose bottom lies within it the one covering
+-- most ground leads, the one drawn first among those alike. Level is read off the boxes rather
+-- than as one height, since a chair's lowest vertex and a carpet's are never the same to the
+-- last digit. So a table leads what is on it, a carpet leads the chairs on it, a floor piece
+-- leads what hangs above it, and a group led from the ground sits on the ground when it is moved
+-- there.
+local function leader(actors)
+	local lowest
+	for _, actor in ipairs(actors) do
+		if not lowest or actor.box.outerLow[3] < lowest.box.outerLow[3] then
+			lowest = actor
+		end
+	end
+	local ground = lowest.box.outerHigh[3]
+	local leads
+	for _, actor in ipairs(actors) do
+		if
+			actor.box.outerLow[3] <= ground
+			and (
+				not leads
+				or footprint(actor.box) > footprint(leads.box)
+				or footprint(actor.box) == footprint(leads.box) and actor.order < leads.order
+			)
+		then
+			leads = actor
+		end
+	end
+	return leads
+end
+
+--- Note which chosen piece leads, where more than one is chosen: the one made to, or the one the
+-- rule picks; and light the one that led and the one that leads afresh.
+local function relead(self)
+	local led = self.leading
+	self.leading = self.chosen[2] and (self.lead or leader(self.chosen)) or nil
+	if led and led ~= self.leading then
+		self:Paint(led)
+	end
+	if self.leading then
+		self:Paint(self.leading)
+	end
+end
+
 --- Make a list of actors what is chosen, in its order: the flag comes off those let go and goes
 -- on those taken, each is lit or not as it stands, and the change is told. An unchanged list is
 -- nothing.
@@ -675,6 +729,7 @@ function Scene:Settle(chosen)
 	if self.lead and self.lead.chosen ~= true then
 		self.lead = nil
 	end
+	relead(self)
 	for _, actor in ipairs(was) do
 		self:Paint(actor)
 	end
@@ -709,8 +764,11 @@ function Scene:Choose(actor, more, lead)
 	elseif actor and not (more and actor.chosen == true) then
 		chosen[#chosen + 1] = actor
 	end
-	if not self:Settle(chosen) and self.lead ~= led and self.onChoose then
-		self.onChoose()
+	if not self:Settle(chosen) and self.lead ~= led then
+		relead(self)
+		if self.onChoose then
+			self.onChoose()
+		end
 	end
 end
 
@@ -751,42 +809,6 @@ function Scene:Banded(pressed, x1, y1)
 		chosen[#chosen + 1] = actor
 	end
 	self:Settle(chosen)
-end
-
---- The ground a held box covers: its footprint, square to the scene.
-local function footprint(box)
-	return (box.outerHigh[1] - box.outerLow[1]) * (box.outerHigh[2] - box.outerLow[2])
-end
-
---- Which chosen piece leads the group they form: the lowest-standing piece's box, bottom to top,
--- is the ground they stand on, and of the pieces whose bottom lies within it the one covering
--- most ground leads, the one drawn first among those alike. Level is read off the boxes rather
--- than as one height, since a chair's lowest vertex and a carpet's are never the same to the
--- last digit. So a table leads what is on it, a carpet leads the chairs on it, a floor piece
--- leads what hangs above it, and a group led from the ground sits on the ground when it is moved
--- there.
-local function leader(actors)
-	local lowest
-	for _, actor in ipairs(actors) do
-		if not lowest or actor.box.outerLow[3] < lowest.box.outerLow[3] then
-			lowest = actor
-		end
-	end
-	local ground = lowest.box.outerHigh[3]
-	local leads
-	for _, actor in ipairs(actors) do
-		if
-			actor.box.outerLow[3] <= ground
-			and (
-				not leads
-				or footprint(actor.box) > footprint(leads.box)
-				or footprint(actor.box) == footprint(leads.box) and actor.order < leads.order
-			)
-		then
-			leads = actor
-		end
-	end
-	return leads
 end
 
 --- How many pieces are chosen, which a band's every frame asks, and so without the ranking
@@ -974,7 +996,7 @@ function Scene:Draw(pieces)
 	for _, actor in ipairs(self.chosen) do
 		actor.chosen = nil
 	end
-	self.chosen, self.lead = {}, nil
+	self.chosen, self.lead, self.leading = {}, nil, nil
 	self.loaded, self.took, self.started = 0, nil, Client.Now()
 	local function loaded(actor)
 		if self.drawing == drawing and actor.drawing ~= drawing then

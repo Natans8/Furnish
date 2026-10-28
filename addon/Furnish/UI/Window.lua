@@ -216,10 +216,9 @@ local lead = Console.GROUPED
 -- told; and the last run's result the bar has said.
 local run, told
 
---- The scene the Preview pane draws in, made as the window is built; what it last drew, as its
--- source and chosen sets, so it is drawn again only when they change; and the line saying what
--- that is.
-local stage, previewed, previewedDetail
+--- The scene the Preview pane draws in, made as the window is built; and what it last drew, as
+-- its source and chosen sets, so it is drawn again only when they change.
+local stage, previewed
 
 --- The search match Enter takes, by its place in the list.
 local picked = 1
@@ -574,17 +573,17 @@ local function pieceName(piece)
 	return Client.FileName(piece.file) or ("model %d"):format(piece.file)
 end
 
---- Say in the Preview pane how many pieces are chosen in it, and offer to spawn them while any
--- are and nothing runs.
+--- Say beside the Preview pane's Spawn how many pieces are chosen in it and which leads, and
+-- offer to spawn them while any are and nothing runs.
 local function updateChosen()
 	local count = stage:Count()
-	local detail = previewedDetail or ""
+	local line = ""
 	if count > 1 then
-		detail = ("%s, %d chosen, %s leads"):format(detail, count, pieceName(stage:Leader()))
+		line = ("%d chosen, %s leads"):format(count, pieceName(stage:Leader()))
 	elseif count > 0 then
-		detail = ("%s, %d chosen"):format(detail, count)
+		line = "1 chosen"
 	end
-	preview.Detail:SetText(detail)
+	preview.Chosen:SetText(line)
 	preview.Spawn:SetText(count > 1 and ("Spawn %d"):format(count) or "Spawn")
 	preview.Spawn:SetEnabled(count > 0 and not run and spot ~= nil and not Console.Busy())
 end
@@ -609,10 +608,11 @@ local function updatePreview()
 			end
 		end
 		preview.Name:SetText(shown and shown.name or "No sets")
-		previewedDetail = "Choose a set to see it laid out."
+		local detail = "Choose a set to see it laid out."
 		if #names > 0 then
-			previewedDetail = ("%s, %s"):format(table.concat(names, ", "), objects(#pieces))
+			detail = ("%s, %s"):format(table.concat(names, ", "), objects(#pieces))
 		end
+		preview.Detail:SetText(detail)
 		stage:Draw(pieces)
 	end
 	updateChosen()

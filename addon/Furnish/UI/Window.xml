@@ -507,7 +507,8 @@
 			     the window's right edge, below the doodad panel and above the blueprint offer while
 			     they show, which Window.lua sets; shown when a set is clicked. The scene fills it under
 			     the names, beside which a line says how to move it; under the scene a line says how
-			     far the models have loaded, and a button spawns the pieces chosen in it. -->
+			     far the models have loaded, another how many pieces are chosen and which leads, and a
+			     button spawns them. -->
 			<Frame parentKey="Preview" enableMouse="true" hidden="true">
 				<Size x="440"/>
 				<Anchors>
@@ -536,6 +537,13 @@
 						<FontString parentKey="Loading" inherits="GameFontDisableSmall" justifyH="LEFT">
 							<Anchors>
 								<Anchor point="BOTTOMLEFT" x="16" y="16"/>
+							</Anchors>
+						</FontString>
+						<!-- How many pieces are chosen and which leads, beside Spawn; Window.lua fills it. -->
+						<FontString parentKey="Chosen" inherits="GameFontHighlightSmall" justifyH="RIGHT" wordwrap="false">
+							<Anchors>
+								<Anchor point="LEFT" relativeKey="$parent.Loading" relativePoint="RIGHT" x="8" y="0"/>
+								<Anchor point="RIGHT" relativeKey="$parent.Spawn" relativePoint="LEFT" x="-8" y="0"/>
 							</Anchors>
 						</FontString>
 						<FontString parentKey="Hint" inherits="GameFontDisableSmall" justifyH="RIGHT" wordwrap="false">
