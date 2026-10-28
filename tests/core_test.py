@@ -1587,6 +1587,20 @@ def test_pose_selected_reads_the_record_and_never_selects(tmp_path: Path) -> Non
     assert list(lua.eval("SENT").values()) == []
 
 
+def test_a_pose_leading_a_placement_sets_it_down_where_the_pose_stands(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    lua.execute(
+        """
+        ROW = { x = 1, y = 2, z = 0.5, qx = 0, qy = 0, qz = 0, qw = 1, scale = 1 }
+        MOVED = Furnish.Pose.Leading(Furnish.Pose.At(10, 20, 30, 90, 2), ROW)
+        PLACED = Furnish.Transform.Placer(MOVED.position, MOVED.rotation, MOVED.scale)(ROW)
+        """
+    )
+    placed = lua.eval("PLACED")
+    assert (placed.x, placed.y, placed.z) == pytest.approx((10, 20, 30))
+    assert lua.eval("MOVED.rotation.turn") == 90 and lua.eval("MOVED.scale") == 2
+
+
 def test_pose_here_reads_the_servers_position_and_the_facing(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     fake_client(lua)

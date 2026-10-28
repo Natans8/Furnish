@@ -12,6 +12,7 @@ Furnish.Pose = Pose
 
 local Client = Furnish.Client
 local Commands = Furnish.Commands
+local Transform = Furnish.Transform
 
 --- How far apart two positions may be, in yards, and still be one place: far below what the eye
 -- can tell, and above the rounding a position read back from the server carries.
@@ -37,6 +38,20 @@ function Pose.Copy(pose)
 		rotation = { roll = turned.roll, pitch = turned.pitch, turn = turned.turn },
 		scale = pose.scale,
 	}
+end
+
+--- The pose that sets a placement down where this pose stands, the rest of its set about it as
+-- the set places them: the pose moved back by the placement's own offset, turned and scaled as the
+-- pose turns and scales.
+-- @param row a placement, { x, y, z, ... } in its set's own axes
+function Pose.Leading(pose, row)
+	local turn, scale = pose.rotation, pose.scale or 1
+	local anchor = Transform.FromAngles(turn.roll, turn.pitch, turn.turn)
+	local x, y, z = Transform.Turned(anchor, row.x * scale, row.y * scale, row.z * scale)
+	local moved = Pose.Copy(pose)
+	local at = moved.position
+	at.x, at.y, at.z = at.x - x, at.y - y, at.z - z
+	return moved
 end
 
 --- Whether two poses stand in one place, turned and scaled alike, as the server reads them.

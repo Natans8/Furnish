@@ -1933,21 +1933,31 @@ end
 -- several as a group led by the first given, the destination first held where it is: the server
 -- selects what it spawns and a run's end selects its group, and a destination that followed the
 -- selection would carry the next pieces off from where their sets put them.
-local function spawnPieces(pieces)
+-- @param here true to set the first down at the player's feet, facing the player's way, the rest
+--   about it as their sets place them
+local function spawnPieces(pieces, here)
 	if run or not spot or #pieces == 0 then
 		return
+	end
+	local at = Pose.Copy(spot)
+	if here then
+		local feet, why = Pose.Here()
+		if not feet then
+			return Chat.Say(why)
+		end
+		at = Pose.Leading(feet, pieces[1])
 	end
 	spotPinned = true
 	local what = #pieces == 1 and pieceName(pieces[1])
 		or ("%d pieces of %s"):format(#pieces, shown.name)
-	Console.SpawnPieces(pieces, what, Pose.Copy(spot), WAYS)
+	Console.SpawnPieces(pieces, what, at, WAYS)
 	update()
 end
 
---- Spawn the pieces chosen, the one that leads first, and let them go, so a second click spawns
--- nothing twice.
+--- Spawn the pieces chosen, the one that leads first, at Destination or, with ctrl, with the
+-- leader at the player's feet; and let them go, so a second click spawns nothing twice.
 local function spawnChosen()
-	spawnPieces(stage:Chosen())
+	spawnPieces(stage:Chosen(), _G.IsControlKeyDown())
 	stage:Choose(nil)
 end
 
@@ -1956,26 +1966,14 @@ local function spawnHovered(piece)
 	spawnPieces({ piece })
 end
 
---- What the pane's Spawn offers: where the pieces go, who leads, and that the destination is
--- held there.
+--- What the pane's Spawn says: who leads, and what its two clicks do.
 local function spawnChosenLines()
-	local pieces = stage:Chosen()
-	local lines = { { text = "Where their sets would put them." } }
-	if #pieces > 1 then
-		local leads, made = stage:Leader()
-		lines[#lines + 1] = { label = "Leads", value = pieceName(leads) }
-		lines[#lines + 1] = {
-			text = made and "Made to lead by a ctrl-click."
-				or "The lowest-standing piece leads, the one covering most ground among those level.",
-			colour = GREY,
-		}
+	local lines = {}
+	if stage:Count() > 1 then
+		lines[1] = { label = "Leads", value = pieceName(stage:Leader()) }
 	end
-	if not spotPinned then
-		lines[#lines + 1] = {
-			text = "Unticks the destination's Follow selection, since the server selects what it spawns.",
-			colour = GREY,
-		}
-	end
+	lines[#lines + 1] = { text = "Click: at Destination.", colour = GREEN }
+	lines[#lines + 1] = { text = "Ctrl-click: the leader at your feet.", colour = GREEN }
 	return lines
 end
 
