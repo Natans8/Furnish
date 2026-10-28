@@ -422,22 +422,25 @@ end
 --- What each set holds, once worked out, by set id: the catalogue's names do not change.
 local holding = {}
 
---- What a set holds, by model, the most numerous first: a list of { name, count }, and how many
--- of its objects the client's catalogue does not name. Asked only once the catalogue is walked.
+--- What a set holds, by model name, the most numerous first: a list of { name, count }, and how
+-- many of its objects the client's catalogue does not name. Asked only once the catalogue is
+-- walked. Two files the catalogue names alike count as one.
 local function holds(set)
 	local known = holding[set.id]
 	if known then
 		return known[1], known[2]
 	end
-	local counts, unnamed = {}, 0
-	for _, row in ipairs(Rows.OfSet(set.id) or {}) do
-		local name = Console.ModelName(row.display)
+	local models, unnamed = Rows.Models(set.id)
+	local counts = {}
+	for _, model in ipairs(models or {}) do
+		local name = Client.FileName(model.file)
 		if name then
-			counts[name] = (counts[name] or 0) + 1
+			counts[name] = (counts[name] or 0) + model.count
 		else
-			unnamed = unnamed + 1
+			unnamed = unnamed + model.count
 		end
 	end
+	unnamed = models and unnamed or 0
 	local held = {}
 	for name, count in pairs(counts) do
 		held[#held + 1] = { name = name, count = count }

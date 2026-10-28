@@ -673,6 +673,19 @@ def test_with_both_that_may_lead_refused_the_rest_stand_loose(tmp_path: Path) ->
     assert (result.leader, result.joined, len(result.spawned)) == (None, 0, 1)
 
 
+def test_a_set_holds_each_model_it_draws_once_with_its_count(tmp_path: Path) -> None:
+    lua = lua_core(tmp_path)
+    models, unknown = lua.eval("Furnish.Rows.Models(Furnish.Sets.Pick(900, 1).id)")
+    assert ([(m.file, m.count) for m in models.values()], unknown) == ([(1001, 1), (1002, 1)], 0)
+    # A display the data names no file for is counted, not drawn.
+    lua.execute(
+        "local file = Furnish.Reader.ModelFile function Furnish.Reader.ModelFile(display)"
+        " if display == 20 then return nil end return file(display) end"
+    )
+    models, unknown = lua.eval("Furnish.Rows.Models(Furnish.Sets.Pick(900, 1).id)")
+    assert ([m.file for m in models.values()], unknown) == ([1002], 1)
+
+
 def test_rows_from_two_sets_spawn_as_one_collection(tmp_path: Path) -> None:
     lua = lua_core(tmp_path)
     sent = fake_server(lua)
