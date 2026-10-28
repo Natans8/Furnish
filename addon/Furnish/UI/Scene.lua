@@ -191,10 +191,10 @@ function Scene.New(frame, onLoad, onHover, onChoose, onSpawn)
 		local pressed = { button = button, x = x, y = y }
 		self.pressed = pressed
 		if button == "LeftButton" then
-			pressed.more, pressed.less = _G.IsShiftKeyDown(), _G.IsControlKeyDown()
+			pressed.shift, pressed.ctrl = _G.IsShiftKeyDown(), _G.IsControlKeyDown()
 			-- With shift or ctrl held, the press draws a band rather than turning the camera,
 			-- shift's adding to what was chosen as it was pressed and ctrl's taking away from it.
-			if pressed.more or pressed.less then
+			if pressed.shift or pressed.ctrl then
 				local kept = {}
 				for index, actor in ipairs(self.chosen) do
 					kept[index] = actor
@@ -695,7 +695,8 @@ local function leader(actors)
 end
 
 --- Note which chosen piece leads, where more than one is chosen: the one made to, or the one the
--- rule picks; and light the one that led and the one that leads afresh.
+-- rule picks; and light the one that led and the one that leads afresh. Every change to what is
+-- chosen or to which was made to lead comes here, so Leader and Chosen read it rather than rank.
 local function relead(self)
 	local led = self.leading
 	self.leading = self.chosen[2] and (self.lead or leader(self.chosen)) or nil
@@ -798,7 +799,7 @@ function Scene:Banded(pressed, x1, y1)
 	end
 	for _, box in ipairs(self.boxes) do
 		local actor, middle = box.actor, box.centre
-		if (kept[actor] == true) == (pressed.less == true) then
+		if (kept[actor] == true) == (pressed.ctrl == true) then
 			local depth = (middle[1] - eye[1]) * fx
 				+ (middle[2] - eye[2]) * fy
 				+ (middle[3] - eye[3]) * fz
@@ -810,7 +811,7 @@ function Scene:Banded(pressed, x1, y1)
 			end
 		end
 	end
-	if pressed.less then
+	if pressed.ctrl then
 		local gone, stays = {}, {}
 		for _, actor in ipairs(within) do
 			gone[actor] = true
@@ -841,19 +842,19 @@ end
 --- The piece that leads, as Draw was given it: the one a ctrl-click made lead, or the one the
 -- rule picks; and whether it was made to. Nil where none is chosen.
 function Scene:Leader()
-	if not self.chosen[1] then
+	local leads = self.leading or self.chosen[1]
+	if not leads then
 		return nil
 	end
-	local made = self.lead
-	return (made or leader(self.chosen)).source, made ~= nil
+	return leads.source, self.lead ~= nil
 end
 
 --- The pieces chosen, as Draw was given them, in the order they would spawn: the one that leads
 -- first, as Leader says it, then the rest in the order drawn.
 function Scene:Chosen()
 	local pieces = {}
-	if self.chosen[1] then
-		local leads = self.lead or leader(self.chosen)
+	local leads = self.leading or self.chosen[1]
+	if leads then
 		local rest = {}
 		for _, actor in ipairs(self.chosen) do
 			if actor ~= leads then
@@ -874,8 +875,7 @@ end
 --- A press let go where it was made is a click: the left button's chooses the piece under the
 -- pointer, as shift and ctrl say, and the right button's spawns it. A left press dragged with
 -- shift or ctrl drew a band, adding or taking away, which chose as it went and is read once more
--- where it was let go;
--- dragged without, it turned the camera, as the right button's panned it.
+-- where it was let go; dragged without, it turned the camera, as the right button's panned it.
 function Scene:Release(button)
 	self.dragged = nil
 	local pressed = self.pressed
@@ -896,14 +896,14 @@ function Scene:Release(button)
 	end
 	self.band:Hide()
 	if clicked then
-		self:Choose(self.hovered, pressed.more, pressed.less)
+		self:Choose(self.hovered, pressed.shift, pressed.ctrl)
 	elseif pressed.kept then
 		self:Banded(pressed, x, y)
 	end
 end
 
---- Draw the band from a shift press to the pointer, once the press has wandered past a click,
--- and choose what it holds.
+--- Draw the band from a shift or ctrl press to the pointer, once the press has wandered past a
+-- click, and choose what it makes of the pieces it holds.
 function Scene:Stretch(pressed)
 	local frame, band = self.frame, self.band
 	local scale = frame:GetEffectiveScale()
