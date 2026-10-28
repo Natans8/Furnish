@@ -1830,7 +1830,7 @@ local function followPointer()
 end
 
 --- Say in a tooltip at the pointer what the piece under it is, enough to place it by hand, set out
--- as the window's boxes are: its model, its set and the display it spawns by; its position and its
+-- as the window's boxes are: its model and the display it spawns by, its set; its position and its
 -- rotation, each a row of numbers under its axis words in their colours, as `.gob spawn` takes
 -- them; its scale where it is not its model's own; and what a click on it does. Nil takes the
 -- tooltip down.
@@ -1847,22 +1847,17 @@ local function showHovered(piece)
 	pieceTip = grid
 	grid:Clear()
 	grid:SetFrameStrata("TOOLTIP")
+	-- The model's name, and across from it the display it spawns by, as `.gob spawn` takes it, in
+	-- the regular font after its word, as an item's level stands across from its name.
 	local line = grid:AddHeader()
-	grid:SetCell(
-		line,
-		1,
-		Client.FileName(piece.file) or ("Model %d"):format(piece.file),
-		nil,
-		"LEFT",
-		4
-	)
+	local name = Client.FileName(piece.file) or ("Model %d"):format(piece.file)
+	grid:SetCell(line, 1, name, nil, "LEFT", 3)
 	grid:SetCellTextColor(line, 1, unpack(colours.title))
-	-- Its set, and beside it the display it spawns by, as `.gob spawn` takes it.
+	local id = ("%sID%s %d"):format(Chat.GREY, Chat.END, -piece.display)
+	grid:SetCell(line, 4, id, grid:GetFont(), "RIGHT")
 	line = grid:AddLine()
-	grid:SetCell(line, 1, piece.set, nil, "LEFT", 3)
+	grid:SetCell(line, 1, piece.set, nil, "LEFT", 4)
 	grid:SetCellTextColor(line, 1, unpack(colours.label))
-	grid:SetCell(line, 4, tostring(-piece.display))
-	grid:SetCellTextColor(line, 4, unpack(colours.label))
 	local roll, pitch, turn =
 		Transform.ToAngles({ x = piece.qx, y = piece.qy, z = piece.qz, w = piece.qw })
 	local pose = { x = piece.x, y = piece.y, z = piece.z, roll = roll, pitch = pitch, turn = turn }
