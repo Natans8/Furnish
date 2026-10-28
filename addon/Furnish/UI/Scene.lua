@@ -697,9 +697,11 @@ function Scene:Choose(actor, more)
 end
 
 --- Choose what a shift press kept and every loaded piece whose middle its band holds now, in
--- that order: read afresh each frame the band is stretched, so a piece lights as the band reaches
--- it and goes out as the band leaves it. The band's far corner is in screen pixels, as the pointer
--- is read, and the middles are where the scene draws them, those behind the camera left out.
+-- that order, the band's pieces in the order they were drawn, their sets' own, so which of them
+-- leads does not hang on which model loaded first. Read afresh each frame the band is stretched,
+-- so a piece lights as the band reaches it and goes out as the band leaves it. The band's far
+-- corner is in screen pixels, as the pointer is read, and the middles are where the scene draws
+-- them, those behind the camera left out.
 function Scene:Banded(pressed, x1, y1)
 	local frame = self.frame
 	local scale = frame:GetEffectiveScale()
@@ -707,7 +709,7 @@ function Scene:Banded(pressed, x1, y1)
 	local lowX, highX = math.min(pressed.x, x1) - left, math.max(pressed.x, x1) - left
 	local lowY, highY = math.min(pressed.y, y1) - bottom, math.max(pressed.y, y1) - bottom
 	local eye, fx, fy, fz = self:Eye()
-	local chosen, kept = {}, {}
+	local chosen, kept, within = {}, {}, {}
 	for index, actor in ipairs(pressed.kept) do
 		chosen[index], kept[actor] = actor, true
 	end
@@ -720,10 +722,16 @@ function Scene:Banded(pressed, x1, y1)
 			if depth > NEAR then
 				local x, y = frame:Project3DPointTo2D(middle[1], middle[2], middle[3])
 				if x and y and x >= lowX and x <= highX and y >= lowY and y <= highY then
-					chosen[#chosen + 1] = actor
+					within[#within + 1] = actor
 				end
 			end
 		end
+	end
+	table.sort(within, function(a, b)
+		return a.order < b.order
+	end)
+	for _, actor in ipairs(within) do
+		chosen[#chosen + 1] = actor
 	end
 	self:Settle(chosen)
 end
@@ -906,6 +914,7 @@ function Scene:Draw(pieces)
 			local offset = { piece.x - cx, piece.y - cy, piece.z - cz }
 			local turn = Transform.TurnOf(piece)
 			actor.piece = { offset = offset, turn = turn, scale = scale }
+			actor.order = placed
 			actor.source = piece
 			actor:SetOnModelLoadedCallback(Client.Guarded(loaded))
 			self:Load(actor)

@@ -1103,18 +1103,43 @@ def test_a_shift_drag_chooses_every_piece_whose_middle_its_band_holds(tmp_path: 
     assert lua.eval("ACTORS[3].SetSpellVisualKit") is None
 
 
-def core_scene_choosing(tmp_path: Path, *more: str) -> lua51.LuaRuntime:
+def test_a_bands_pieces_come_in_the_order_drawn_whatever_loaded_first(tmp_path: Path) -> None:
+    lua = core_scene_choosing(tmp_path, piece_at(8, (0, 6, 0), 1), backwards=True)
+    # The press is on the first box, the second cube's; the band is drawn past the first cube's.
+    x0, y0 = lua.eval("PRESS").values()
+    x, y = lua.eval("{ FRAME:Project3DPointTo2D(unpack(SCENE.boxes[2].centre)) }").values()
+    far_x, far_y = x + math.copysign(2, x - x0), y + math.copysign(2, y - y0)
+    lua.execute(
+        f"""
+        SHIFT, HELD.LeftButton = true, true
+        SCRIPTS.OnMouseDown(FRAME, 'LeftButton')
+        GetCursorPosition = function() return {far_x}, {far_y} end
+        SCENE:Tick(0)
+        """
+    )
+    # The second cube loaded first and so holds the first box, but the first drawn leads.
+    assert lua.eval("SCENE.boxes[1].actor.source.file") == 8
+    assert chosen(lua) == [7, 8]
+
+
+def core_scene_choosing(tmp_path: Path, *more: str, backwards: bool = False) -> lua51.LuaRuntime:
     """A scene of a cube at the origin, and any more given, projected as the scene's own lens
-    would, the pointer on the first cube, counting how often what is chosen is told."""
+    would, the pointer on the first cube, counting how often what is chosen is told; the models
+    load in the order drawn, or the last first."""
     lua = lua_core(tmp_path)
     lua.execute(RECORDING_SCENE)
     lua.execute(WIDER_LENS)
+    loads = (
+        "for i = #ACTORS, 1, -1 do LOAD(i) end"
+        if backwards
+        else "for i = 1, #ACTORS do LOAD(i) end"
+    )
     lua.execute(
         f"""
         TOLD_CHOSEN = 0
         SCENE = Furnish.Scene.New(FRAME, SAID, nil, function() TOLD_CHOSEN = TOLD_CHOSEN + 1 end)
         SCENE:Draw({{ {piece_at(7, (0, 0, 0), 1)} {"".join(more)} }})
-        for i = 1, #ACTORS do LOAD(i) end
+        {loads}
         SCENE:Tick(0)
         PRESS = {{ FRAME:Project3DPointTo2D(unpack(SCENE.boxes[1].centre)) }}
         GetCursorPosition = function() return PRESS[1], PRESS[2] end

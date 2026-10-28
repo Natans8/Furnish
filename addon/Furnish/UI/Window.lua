@@ -1930,9 +1930,15 @@ end
 
 --- What the pane's Spawn offers: where the pieces go, and that the destination is held there.
 local function spawnChosenLines()
-	local lines = {
-		{ text = "Where their sets would put them, as a group led by the first chosen." },
-	}
+	local pieces = stage:Chosen()
+	local lines = { { text = "Where their sets would put them." } }
+	if #pieces > 1 then
+		lines[#lines + 1] = { label = "Leads", value = pieceName(pieces[1]) }
+		lines[#lines + 1] = {
+			text = "The first chosen leads; a band's pieces follow their sets' order.",
+			colour = GREY,
+		}
+	end
 	if not spotPinned then
 		lines[#lines + 1] = {
 			text = "Unticks the destination's Follow selection, since the server selects what it spawns.",
