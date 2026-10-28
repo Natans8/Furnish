@@ -174,6 +174,8 @@ local list = frame.Sets
 local panel = frame.Doodad
 local offer = frame.Blueprint
 local preview = frame.Preview
+--- How wide the Preview pane is drawn, and so the narrowest its grip drags it to.
+local PREVIEW_WIDTH = preview:GetWidth()
 local provider, found, drawn =
 	_G.CreateDataProvider(), _G.CreateDataProvider(), _G.CreateDataProvider()
 
@@ -1756,11 +1758,49 @@ local function buildControls()
 	end
 end
 
+--- Hold the window by its top left corner, so a corner dragged is the one that moves: held by its
+-- centre, the window would grow on both sides and the corner leave the cursor.
+local function holdTopLeft()
+	local left, top = frame:GetLeft(), frame:GetTop()
+	frame:ClearAllPoints()
+	frame:SetPoint("TOPLEFT", _G.UIParent, "BOTTOMLEFT", left, top)
+end
+
+--- Let the Preview pane's corner drag it wider, as far as the screen's edge, and the window taller
+-- within the window's own bounds, the pane growing with it, so the two stay one column.
+local function buildPreviewGrip()
+	local grip = preview.Grip
+	grip:SetScript("OnMouseDown", function()
+		holdTopLeft()
+		local x, y = _G.GetCursorPosition()
+		local scale = preview:GetEffectiveScale()
+		local width, height = preview:GetWidth(), frame:GetHeight()
+		local _, least = frame:GetMinResize()
+		local _, most = frame:GetMaxResize()
+		grip:SetScript(
+			"OnUpdate",
+			Client.Guarded(function()
+				local nowX, nowY = _G.GetCursorPosition()
+				local widest = _G.UIParent:GetRight() - preview:GetLeft()
+				preview:SetWidth(
+					math.max(PREVIEW_WIDTH, math.min(widest, width + (nowX - x) / scale))
+				)
+				frame:SetHeight(math.max(least, math.min(most, height - (nowY - y) / scale)))
+			end)
+		)
+	end)
+	grip:SetScript("OnMouseUp", function()
+		grip:SetScript("OnUpdate", nil)
+		update()
+	end)
+end
+
 local function buildPreview()
 	preview.Label:SetText("Preview")
 	preview.Hint:SetText("Drag to turn, right-drag to pan, wheel to zoom.")
 	stage = Scene.New(preview.Scene, showLoading)
 	buildControls()
+	buildPreviewGrip()
 	preview.CloseButton:SetScript(
 		"OnClick",
 		Client.Guarded(function()
@@ -1859,11 +1899,7 @@ local function build()
 	frame:SetMinResize(MIN_WIDTH, MIN_HEIGHT)
 	frame:SetMaxResize(MIN_WIDTH * 2, MIN_HEIGHT * 2)
 	frame.Grip:SetScript("OnMouseDown", function()
-		-- Held by its centre, the frame would grow on both sides and the corner leave the cursor;
-		-- held by its top left corner, the corner dragged is the one that moves.
-		local left, top = frame:GetLeft(), frame:GetTop()
-		frame:ClearAllPoints()
-		frame:SetPoint("TOPLEFT", _G.UIParent, "BOTTOMLEFT", left, top)
+		holdTopLeft()
 		frame:StartSizing("BOTTOMRIGHT")
 	end)
 	frame.Grip:SetScript("OnMouseUp", function()

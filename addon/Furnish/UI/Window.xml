@@ -543,6 +543,17 @@
 							<Anchor point="TOPRIGHT" x="-5" y="-5"/>
 						</Anchors>
 					</Button>
+					<!-- Drags the pane wider and the window taller with it, as the window's own grip
+					     sizes the window. -->
+					<Button parentKey="Grip">
+						<Size x="16" y="16"/>
+						<Anchors>
+							<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
+						</Anchors>
+						<NormalTexture file="Interface\ChatFrame\UI-ChatIM-SizeGrabber-Up"/>
+						<PushedTexture file="Interface\ChatFrame\UI-ChatIM-SizeGrabber-Down"/>
+						<HighlightTexture file="Interface\ChatFrame\UI-ChatIM-SizeGrabber-Highlight" alphaMode="ADD"/>
+					</Button>
 					<ModelScene parentKey="Scene" inherits="ModelSceneMixinTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT" x="12" y="-72"/>
