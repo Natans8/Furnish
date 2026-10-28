@@ -386,10 +386,17 @@ function Scene:Hover(actor)
 	if actor == self.hovered then
 		return
 	end
-	if self.hovered then
-		-- The glow stays painted once its kit is taken off, nil or nought, so the piece's model
-		-- is loaded afresh, which draws it without.
-		self:Load(self.hovered)
+	local left = self.hovered
+	if left then
+		-- The glow stays painted once its kit is taken off, so what the kit painted is cleared too,
+		-- by the method Epsilon's client gives every scene actor. A client without it has the
+		-- model loaded afresh instead, which draws it without.
+		left:SetSpellVisualKit(nil)
+		if left.ClearAllEffects then
+			left:ClearAllEffects()
+		else
+			self:Load(left)
+		end
 	end
 	self.hovered = actor
 	if actor then

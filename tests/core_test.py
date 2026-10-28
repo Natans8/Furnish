@@ -888,19 +888,20 @@ def test_the_piece_under_the_pointer_is_marked_and_named(tmp_path: Path) -> None
     lua.execute("HOOKED.OnEnter() SCENE:Tick(0)")
     assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == (87979, False)
     assert lua.eval("HOVERS[#HOVERS]") == 7
-    # Off the cube, its model is loaded afresh where it stood, which takes the glow off, and the
-    # name goes.
+    # Off the cube, the kit comes off and what it painted is cleared, and the name goes.
+    lua.execute("GetCursorPosition = function() return 0, 100 end SCENE:Tick(0)")
+    assert tuple(lua.eval("ACTORS[1].SetSpellVisualKit").values()) == ()
+    assert lua.eval("ACTORS[1].ClearAllEffects") is not None
+    assert lua.eval("HOVERS[#HOVERS]") is False
+    # On a client whose actors lack the clearing method, the model is loaded afresh where it
+    # stood instead, back on the cube and then off the scene altogether.
     lua.execute(
-        "ACTORS[1].SetModelByFileID, ACTORS[1].SetPosition = nil, nil"
-        " GetCursorPosition = function() return 0, 100 end SCENE:Tick(0)"
+        "GetCursorPosition = function() return 100, 50 end SCENE:Tick(0)"
+        " rawset(ACTORS[1].actor, 'ClearAllEffects', false)"
+        " ACTORS[1].SetModelByFileID, ACTORS[1].SetPosition = nil, nil HOOKED.OnLeave()"
     )
     assert tuple(lua.eval("ACTORS[1].SetModelByFileID").values()) == (7,)
     assert tuple(lua.eval("ACTORS[1].SetPosition").values()) == (0, 0, 0)
-    assert lua.eval("HOVERS[#HOVERS]") is False
-    # Back on it, then off the scene altogether.
-    lua.execute("GetCursorPosition = function() return 100, 50 end SCENE:Tick(0)")
-    lua.execute("ACTORS[1].SetModelByFileID = nil HOOKED.OnLeave()")
-    assert tuple(lua.eval("ACTORS[1].SetModelByFileID").values()) == (7,)
     assert lua.eval("HOVERS[#HOVERS]") is False
 
 
