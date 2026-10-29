@@ -186,7 +186,7 @@ def test_the_help_names_every_command_and_word(tmp_path: Path) -> None:
     lua.eval("Furnish.Command.Hover")("word:merge", lua.eval("FAKE"))
     assert list(lua.eval("TIP").values()) == [
         "merge",
-        "join the selected gob's group, no pivot",
+        "Join the selected gob's group, no pivot.",
     ]
 
 

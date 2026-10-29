@@ -164,6 +164,10 @@ local CAPS = 24
 --- How far the source's words stand from its picture.
 local PICTURE_GAP = 8
 
+--- How far the source's ID row and the sets list rise where there is no picture to stand beside:
+-- the picture's room under the source's two lines, less the gap the rows keep from them.
+local NO_PICTURE_RISE = 40
+
 --- How many of a doodad's sets its panel shows before its list scrolls.
 local DOODAD_ROWS = 10
 
@@ -2017,10 +2021,15 @@ local function buildPreview()
 end
 
 --- Make room for the source's picture where Glimpse's WMO pictures are installed: its box shown,
--- and the rows beside it narrowed to leave it its width. Done once, since an addon is installed or
--- not for the whole session.
+-- and the rows beside it narrowed to leave it its width. Without them the ID row and the sets list
+-- rise into the room the picture would take, the list growing by as much. Done once, since an
+-- addon is installed or not for the whole session.
 local function buildPicture()
 	if not Previews.Pictured() then
+		for _, row in ipairs({ frame.SourceID, frame.Sets }) do
+			local point, relative, relativePoint, x, y = row:GetPoint(1)
+			row:SetPoint(point, relative, relativePoint, x, y + NO_PICTURE_RISE)
+		end
 		return
 	end
 	local box = frame.PictureBox

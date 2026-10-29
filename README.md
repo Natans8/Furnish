@@ -12,9 +12,9 @@ spawns its pieces one gob at a time, grouped so you can move the whole furnishin
 2. Unzip it into `World of Warcraft/_retail_/Interface/AddOns`, so `Furnish` and `Furnish_Data` sit
    side by side there.
 
-Furnish needs EpsilonLib, which Epsilon ships. [Glimpse](https://github.com/Natans8/Glimpse) is
-optional: with its WMO pictures installed, v0.3 or later, the window shows the WMO you are
-furnishing.
+Furnish needs EpsilonLib, which Epsilon ships. Optionally, with `Glimpse_WMO` installed, the
+window shows a picture of the WMO you are furnishing. `Glimpse_WMO` is the WMO pictures download
+of [Glimpse](https://github.com/Natans8/Glimpse), v0.3 or later, and needs Glimpse itself beside it.
 
 ## Quick start
 

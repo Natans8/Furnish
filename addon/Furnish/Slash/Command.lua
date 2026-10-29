@@ -267,7 +267,10 @@ function Command.Hover(words, tooltip)
 			opens,
 		})
 	elseif kind == "word" and WORD[value] then
-		return Chat.Tip(tooltip, value, { { text = WORD[value].hint } })
+		-- The hint is a fragment, as the help's line runs it on after the word; a tooltip says it
+		-- as a sentence.
+		local hint = WORD[value].hint
+		return Chat.Tip(tooltip, value, { { text = hint:gsub("^%l", string.upper) .. "." } })
 	end
 	local offered = Console.OfferIn(words)
 	if offered then
