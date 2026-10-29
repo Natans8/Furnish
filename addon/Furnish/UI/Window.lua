@@ -824,7 +824,7 @@ local function refresh()
 		name, detail, dim, empty = "No data", "", true, missing
 	elseif pinned and pinned.empty then
 		name, detail, dim = "Nothing kept", "", true
-		empty = "Search a WMO, or tick Follow selection."
+		empty = "Search a WMO, or tick Auto Update."
 	elseif pinned then
 		name, detail = pinned.name or ("Entry %d"):format(pinned.entry), "No sets"
 		empty = "Search another WMO."
@@ -1169,7 +1169,7 @@ local function followDestination(box)
 	refresh()
 end
 
---- Fill the destination once from a pose, and keep it there until Follow selection is ticked.
+--- Fill the destination once from a pose, and keep it there until Auto Update is ticked.
 local function fillDestination(pose)
 	if pose then
 		spot, spotPinned, spotFollowed = pose, true, false
@@ -1467,7 +1467,7 @@ end
 
 local function buildSource()
 	frame.SourceLabel:SetText("Source")
-	frame.SourceFollow.Label:SetText("Follow selection")
+	frame.SourceFollow.Label:SetText("Auto Update")
 	frame.SourceFollow:SetScript("OnClick", Client.Guarded(followSource))
 	hint(frame.SourceFollow, nil, {
 		{ text = "Ticked: follows the selected WMO." },
@@ -1601,7 +1601,7 @@ end
 
 local function buildDestination()
 	frame.DestinationLabel:SetText("Destination")
-	frame.DestinationFollow.Label:SetText("Follow selection")
+	frame.DestinationFollow.Label:SetText("Auto Update")
 	frame.DestinationFollow:SetScript("OnClick", Client.Guarded(followDestination))
 	hint(frame.DestinationFollow, nil, {
 		{

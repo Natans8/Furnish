@@ -138,7 +138,7 @@
 		</Layers>
 	</Button>
 
-	<!-- Follow selection: ticked, the block it stands in follows what is selected; unticked, it
+	<!-- Auto Update, as ObjectMover calls it: ticked, the block it stands in follows what is selected; unticked, it
 	     keeps what it shows. Its words stand to its left, so it sits at the right edge. -->
 	<CheckButton name="FurnishFollowTemplate" inherits="UICheckButtonTemplate" virtual="true">
 		<Size x="22" y="22"/>
