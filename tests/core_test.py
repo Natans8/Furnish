@@ -973,8 +973,8 @@ def test_a_piece_only_behind_another_is_not_pointed_at(tmp_path: Path) -> None:
     # A small piece further along the view than a cube, its middle outside the cube's box: the
     # cube, nearer, is what the pointer is on.
     lua = lua_core(tmp_path)
-    ahead = forward(math.radians(225), math.radians(35))
-    behind = tuple(3 * a for a in ahead)
+    x, y, z = forward(math.radians(225), math.radians(35))
+    behind = (3 * x, 3 * y, 3 * z)
     assert hovered_of(lua, piece_at(1, (0, 0, 0), 1) + piece_at(2, behind, 0.2)) == 1
 
 
