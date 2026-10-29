@@ -48,13 +48,47 @@ function Previews.Unpeek()
 	end
 end
 
---- Glimpse's WMO pictures, where they are installed with the door that finds one; nil otherwise.
+--- The first Glimpse release whose WMO pictures carry the door read here, `Picture(id, name)`
+-- answering a texture path, false for a WMO that draws nothing from outside, or nil.
+Previews.PICTURES_SINCE = { 0, 3 }
+
+--- A release's version as numbers, "v0.4" or "0.3.1" read as { 0, 4 } or { 0, 3, 1 }; nil for
+-- one with no number, as a copy run from Glimpse's source carries its unstamped token.
+local function versionOf(text)
+	if type(text) ~= "string" or not text:match("^v?%d") then
+		return nil
+	end
+	local numbers = {}
+	for number in text:gmatch("%d+") do
+		numbers[#numbers + 1] = tonumber(number)
+	end
+	return numbers
+end
+
+--- Whether a version is the least one given or later, a missing part counting as nought.
+local function atLeast(version, least)
+	for i = 1, math.max(#version, #least) do
+		local mine, theirs = version[i] or 0, least[i] or 0
+		if mine ~= theirs then
+			return mine > theirs
+		end
+	end
+	return true
+end
+
+--- Glimpse's WMO pictures, where a release that carries the door is installed; nil otherwise. A
+-- copy whose version is unstamped is read as current, since it is run from Glimpse's source.
 local function pictures()
 	local addon = _G.Glimpse_WMO
-	if type(addon) == "table" and type(addon.Picture) == "function" then
-		return addon
+	if not (type(addon) == "table" and type(addon.Picture) == "function") then
+		return nil
 	end
-	return nil
+	local metadata = _G.GetAddOnMetadata
+	local version = metadata and versionOf(metadata("Glimpse_WMO", "Version"))
+	if version and not atLeast(version, Previews.PICTURES_SINCE) then
+		return nil
+	end
+	return addon
 end
 
 --- Whether Glimpse's WMO pictures are installed, so a WMO's picture may be asked for.

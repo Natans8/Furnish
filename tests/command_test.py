@@ -980,6 +980,28 @@ Glimpse_WMO = {{
 """
 
 
+@pytest.mark.parametrize(
+    ("version", "read"),
+    [
+        ("v0.3", True),
+        ("v0.4", True),
+        ("0.3.1", True),
+        ("v1.0", True),
+        ("@project-version@", True),
+        ("v0.2", False),
+        ("0.2.9", False),
+    ],
+)
+def test_the_pictures_are_read_from_their_first_release_with_the_door(
+    tmp_path: Path, version: str, read: bool
+) -> None:
+    lua = command_lua(tmp_path)
+    lua.execute(PICTURES)
+    lua.execute(f"GetAddOnMetadata = function(name, field) return '{version}' end")
+    assert lua.eval("Furnish.Previews.Pictured()") is read
+    assert (lua.eval("Furnish.Previews.Picture(500, 'house')") == HOUSE_PICTURE) is read
+
+
 def test_a_wmo_s_picture_is_read_by_its_entry_and_its_name(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     assert lua.eval("Furnish.Previews.Pictured()") is False

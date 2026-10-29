@@ -13,7 +13,8 @@ spawns its pieces one gob at a time, grouped so you can move the whole furnishin
    side by side there.
 
 Furnish needs EpsilonLib, which Epsilon ships. [Glimpse](https://github.com/Natans8/Glimpse) is
-optional: with its WMO pictures installed, the window shows the WMO you are furnishing.
+optional: with its WMO pictures installed, v0.3 or later, the window shows the WMO you are
+furnishing.
 
 ## Quick start
 
