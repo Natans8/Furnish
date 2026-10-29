@@ -766,6 +766,15 @@ def test_the_group_a_run_selected_stands_for_its_wmo_read_fresh(tmp_path: Path) 
     assert run(lua, "list")[0] == PREFIX + "house has 2 sets:"
 
 
+def test_a_wmo_a_merge_made_lead_is_known_to_be_in_its_group(tmp_path: Path) -> None:
+    # Merged into the house standing alone, the run's group is led by the house; while that group
+    # stands for it, the house reads as in a group, so a window asks before the next set joins it.
+    lua = on_the_house_at_scale_one(tmp_path)
+    run(lua, "1 merge")
+    assert lua.eval("Furnish.Client.SelectedGroup()") == "500"
+    assert str(lua.eval("Furnish.Console.Selected().groupLeader")) == "500"
+
+
 def test_a_group_no_run_selected_is_still_refused(tmp_path: Path) -> None:
     lua = command_lua(tmp_path)
     lua.execute("SELECTED = 500")

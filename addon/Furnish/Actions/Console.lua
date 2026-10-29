@@ -472,6 +472,12 @@ local function finish(result, started, anchor, watched)
 	end
 	if result.joined > 0 and not result.deleted then
 		Client.Send()(Commands.SelectGroup(result.leader), nil, true)
+		-- The object the run was on leads the group where the run merged into it standing alone,
+		-- and its record, read before the run, does not say so yet; a window asks before joining
+		-- the group by it.
+		if anchor and tostring(anchor.guid) == tostring(result.leader) then
+			anchor.groupLeader = result.leader
+		end
 		anchored = anchor and { leader = tostring(result.leader), pose = anchor } or nil
 	end
 end
