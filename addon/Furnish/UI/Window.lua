@@ -201,6 +201,10 @@ end
 -- doodad `.doodad select` picked, in its own slot, imported or not, with the sets of the WMO it
 -- is; the source shown, or nil, and the gob entry its ID box holds; and the sets chosen, by index.
 local pinned, doodad, shown, shownEntry
+
+--- The source Auto Update last found in the selection, and that WMO's entry: kept while what is
+-- selected is not a WMO, so the source stays the last WMO selected.
+local followed
 local chosen = {}
 
 --- Whether the next source shown has its sets chosen afresh, even where it is the WMO shown
@@ -775,8 +779,7 @@ local function sourceEntry()
 			or (pinned.file and Reader.Load() and Reader.EntryOfFile(pinned.file))
 			or nil
 	end
-	local selected = Console.Selected()
-	return selected and selected.entry
+	return followed and followed.entry
 end
 
 --- Read the window afresh: the source and the destination follow the selection unless unticked.
@@ -785,17 +788,29 @@ local function refresh()
 		return
 	end
 	local before = shown
-	-- What is pinned, the doodad's WMO among them, or nil for the selected gob.
-	shown = not (pinned and pinned.empty) and Console.Source(pinned) or nil
+	-- What is pinned, the doodad's WMO among them; or the last WMO selected, kept while what is
+	-- selected is something else.
+	if pinned then
+		shown = not pinned.empty and Console.Source(pinned) or nil
+	else
+		local source = Console.Source()
+		if source then
+			local selected = Console.Selected()
+			followed = { source = source, entry = selected and selected.entry }
+		end
+		shown = followed and followed.source
+	end
 	if shown and (rechoose or not (before and before.file == shown.file)) then
 		rechoose = false
 		chooseFirst(shown.file, shown.sets)
 	end
 	if not spotPinned then
-		local selected = Console.Selected()
+		-- The selected object or group. A group's numbers come with its leader's record, and the
+		-- destination keeps its own until they do.
+		local selected = Console.Selected() or Console.Group()
 		if selected then
 			spot, spotFollowed = Pose.Copy(selected), true
-		elseif not spot or spotFollowed then
+		elseif not Client.SelectedGroup() and (not spot or spotFollowed) then
 			-- With nothing selected the destination takes where the player stands, read once so no number
 			-- is empty, and never again while it stays so: it does not follow the player, and Here
 			-- reads it afresh.
@@ -1470,7 +1485,7 @@ local function buildSource()
 	frame.SourceFollow.Label:SetText("Auto Update")
 	frame.SourceFollow:SetScript("OnClick", Client.Guarded(followSource))
 	hint(frame.SourceFollow, nil, {
-		{ text = "Ticked: follows the selected WMO." },
+		{ text = "Ticked: the last WMO you selected." },
 		{ text = "Unticked: stays as it is." },
 	})
 	-- Typed in and left, by Enter or a click away, the ID takes; Escape puts back the one shown.
@@ -1605,7 +1620,7 @@ local function buildDestination()
 	frame.DestinationFollow:SetScript("OnClick", Client.Guarded(followDestination))
 	hint(frame.DestinationFollow, nil, {
 		{
-			text = "Ticked: follows the selected gob.",
+			text = "Ticked: follows the selected object or group.",
 		},
 		{ text = "Unticked: stays as it is." },
 	})

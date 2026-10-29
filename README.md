@@ -30,14 +30,14 @@ Furnish reminds you once a session and leaves the choice to you.
 ## The window
 
 **Source**: the WMO the sets come from.
-- Follows the selected gob, or untick *Auto Update* to keep it.
+- Takes the last WMO you selected, or untick *Auto Update* to keep the one shown.
 - Type a gob entry into its ID box, or search a WMO by name.
 - A set the WMO already shows as part of its model is marked *baked*.
 - Click a set to choose it; ctrl- or shift-click to add or remove one.
 
 **Destination**: where the sets go, as numbers.
 - X, Y, Z, roll, pitch, turn and scale, in ObjectMover's colours.
-- Follows the selected gob, or untick *Auto Update* to keep what you typed.
+- Follows the selected object or group, or untick *Auto Update* to keep what you typed.
 - *Here* fills in where you stand; *Use selected gob* fills them in once.
 
 **Group leader**: what leads the spawned objects' group.
