@@ -391,7 +391,7 @@ end
 Console.OFFER = {
 	title = "Save as a blueprint?",
 	why = "Spawn it again instantly with one command.",
-	click = "Click: put it in the chat box; Enter sends it",
+	click = "Put it in the chat box; Enter sends it",
 }
 
 --- What a chat line's blueprint button carries before the name.
@@ -834,7 +834,7 @@ function Console.DescribeOffer(name, tooltip)
 	Chat.Tip(tooltip, Console.OFFER.title, {
 		{ text = Console.OFFER.why, colour = tip.label },
 		{ text = Console.OfferCommand(name) },
-		{ text = Console.OFFER.click, colour = tip.click },
+		{ click = "Click", value = Console.OFFER.click },
 	})
 end
 
@@ -964,10 +964,10 @@ function Console.Describe(request, tooltip, more)
 	end
 	local tip = Chat.TIP
 	Chat.Tip(tooltip, setName(set), {
-		{ text = about, colour = tip.label },
-		#said > 0 and { text = "with " .. table.concat(said, " and "), colour = tip.label } or {},
-		{ text = "Click: spawn on the selected gob", colour = tip.click },
-		{ text = "Ctrl-click: spawn at your feet", colour = tip.click },
+		{ text = about },
+		#said > 0 and { text = "With " .. table.concat(said, " and "), colour = tip.label } or {},
+		{ click = "Click", value = "Spawn on the selected gob" },
+		{ click = "Ctrl-click", value = "Spawn at your feet" },
 		more or {},
 	})
 end
@@ -977,7 +977,7 @@ end
 -- @param more a line of the door's own after the click, or nil
 function Console.DescribeImport(tooltip, more)
 	Chat.Tip(tooltip, Furnish.NAME, {
-		{ text = "Click: import this WMO and spawn its sets on it", colour = Chat.TIP.click },
+		{ click = "Click", value = "Import it and spawn its sets on it" },
 		more or {},
 	})
 end

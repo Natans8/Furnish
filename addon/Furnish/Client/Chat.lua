@@ -81,14 +81,35 @@ end
 -- player's to decide, so Furnish only says this and never turns it off.
 Chat.HIGHLIGHT = "Highlighting too many objects can crash the game"
 
---- Fill a tooltip that is owned already: a gold title, then each line, a { label, value } pair
--- drawn as two columns, or a { text, colour } line of its own, wrapped. Every tooltip Furnish
--- draws goes through here, so the same kind of line looks the same wherever it is.
+--- Fill a tooltip that is owned already. Every tooltip Furnish draws goes through here, so each
+-- kind of line looks the same wherever it is, and every one keeps to the house style:
+--   - The title names the control or the thing, in its own words.
+--   - What it does, or what it holds now, comes first, as one capitalised sentence with a full
+--     stop. A control with a state says the state it is in and what changing it does, never
+--     both states.
+--   - A fact is a { label, value } row: a short label, then the value, capitalised, no stop.
+--   - What a click does is a { click, value } row: the click in the click colour, then what it
+--     does, capitalised, no stop. A click is never written into a sentence.
+--   - A caveat or a consequence is a note, { text, colour }, one sentence, in grey; a warning in
+--     its own colour. One note where one will do.
+--   - What a command types comes last.
 function Chat.Tip(tooltip, title, lines)
 	local tip = Chat.TIP
 	tooltip:SetText(title, tip.title[1], tip.title[2], tip.title[3])
 	for _, line in ipairs(lines) do
-		if line.value then
+		if line.click then
+			local click, value = tip.click, tip.text
+			tooltip:AddDoubleLine(
+				line.click,
+				tostring(line.value),
+				click[1],
+				click[2],
+				click[3],
+				value[1],
+				value[2],
+				value[3]
+			)
+		elseif line.value then
 			local label, value = tip.label, tip.text
 			tooltip:AddDoubleLine(
 				line.label,

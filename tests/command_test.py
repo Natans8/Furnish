@@ -885,6 +885,7 @@ def test_resting_on_a_link_says_the_set_and_the_clicks(tmp_path: Path) -> None:
         TOOLTIP = {
           SetText = function(_, text) TIP[#TIP + 1] = text end,
           AddLine = function(_, text) TIP[#TIP + 1] = text end,
+          AddDoubleLine = function(_, left, right) TIP[#TIP + 1] = left .. " | " .. right end,
         }
         """
     )
@@ -892,10 +893,10 @@ def test_resting_on_a_link_says_the_set_and_the_clicks(tmp_path: Path) -> None:
     assert list(lua.eval("TIP").values()) == [
         "Full",
         "Set_Full, set 1 of house, 2 objects",
-        "with base",
-        "Click: spawn on the selected gob",
-        "Ctrl-click: spawn at your feet",
-        "Right-click: choose it in the window",
+        "With base",
+        "Click | Spawn on the selected gob",
+        "Ctrl-click | Spawn at your feet",
+        "Right-click | Choose it in the window",
     ]
 
 
@@ -918,7 +919,10 @@ def test_a_wmo_alone_waits_for_a_run_going_on(tmp_path: Path) -> None:
 # -- Previews through Glimpse ------------------------------------------------------------
 
 #: A tooltip that takes lines and keeps none.
-QUIET_TOOLTIP = "TOOLTIP = { SetText = function() end, AddLine = function() end }"
+QUIET_TOOLTIP = (
+    "TOOLTIP = { SetText = function() end, AddLine = function() end,"
+    " AddDoubleLine = function() end }"
+)
 
 #: The next Glimpse's preview door, noting what it is asked; today's Glimpse offers Provide alone.
 GLIMPSE = """

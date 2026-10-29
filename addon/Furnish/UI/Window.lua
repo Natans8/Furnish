@@ -726,6 +726,42 @@ local function spawn()
 	Console.Spawn(request())
 end
 
+--- What the main Spawn says it would do now: the sets, where they go and how they are grouped;
+-- while a run goes, what Stop does; and while it cannot spawn, nothing beyond its own words.
+local function spawnLines()
+	if run then
+		return { { text = "Stop the run. What it spawned stays." } }
+	end
+	local _, enabled = action()
+	if not enabled then
+		return {}
+	end
+	local names = {}
+	for _, set in ipairs(shown.sets) do
+		if chosen[set.index] then
+			names[#names + 1] = set.name
+		end
+	end
+	local onto = not spotPinned and selection()
+	local at = spot.position
+	local where = onto and ("On " .. onto.name) or ("At %.1f, %.1f, %.1f"):format(at.x, at.y, at.z)
+	local word = grouped()
+	local group
+	if word == "merge" then
+		local member = joinsGroup()
+		local from = selection()
+		group = member and ("Joins the group %s is in"):format(member.name)
+			or ("Led by " .. (from and from.name or "the selected gob"))
+	else
+		group = Console.Grouping(word).lead:gsub("^%l", string.upper)
+	end
+	return {
+		{ label = #names == 1 and "Set" or "Sets", value = table.concat(names, ", ") },
+		{ label = "Where", value = where },
+		{ label = "Group", value = group },
+	}
+end
+
 --- What is chosen when a WMO is first shown: the sets a doodad drew beyond the base set, which the
 -- WMO draws itself unless it comes unfurnished; where no doodad adds one, its first set beyond the
 -- base, and the base too where it comes unfurnished.
@@ -1050,8 +1086,8 @@ local function rowEnter(button)
 	elseif set.placed then
 		lines[#lines + 1] = { text = "The doodad drew it.", colour = GREEN }
 	end
-	lines[#lines + 1] = { text = "Click: choose only this set", colour = GREEN }
-	lines[#lines + 1] = { text = "Ctrl- or shift-click: add or remove this set", colour = GREEN }
+	lines[#lines + 1] = { click = "Click", value = "Choose only this set" }
+	lines[#lines + 1] = { click = "Ctrl- or shift-click", value = "Add or remove it" }
 	Chat.TipBeside(button, set.name, lines)
 end
 
@@ -1097,7 +1133,7 @@ local function resultEnter(button)
 	if wmo.blank then
 		lines[#lines + 1] = { text = "Unfurnished: it draws none of its sets.", colour = GREY }
 	end
-	lines[#lines + 1] = { text = "Click: show its sets", colour = GREEN }
+	lines[#lines + 1] = { click = "Click", value = "Show its sets" }
 	Chat.TipBeside(button, wmo.name, lines)
 	Previews.PeekWmo(wmo.name)
 end
@@ -1484,10 +1520,18 @@ local function buildSource()
 	frame.SourceLabel:SetText("Source")
 	frame.SourceFollow.Label:SetText("Auto Update")
 	frame.SourceFollow:SetScript("OnClick", Client.Guarded(followSource))
-	hint(frame.SourceFollow, nil, {
-		{ text = "Ticked: the last WMO you selected." },
-		{ text = "Unticked: stays as it is." },
-	})
+	hint(frame.SourceFollow, nil, function()
+		if pinned then
+			return {
+				{ label = "Keeps", value = shown and shown.name or "Nothing" },
+				{ text = "Tick to take the last WMO you select.", colour = GREY },
+			}
+		end
+		return {
+			{ label = "Follows", value = followed and followed.source.name or "No WMO yet" },
+			{ text = "The last WMO you selected. Untick to keep it.", colour = GREY },
+		}
+	end)
 	-- Typed in and left, by Enter or a click away, the ID takes; Escape puts back the one shown.
 	local id = frame.SourceID
 	id.Axis:SetText("ID")
@@ -1503,7 +1547,7 @@ local function buildSource()
 	id:HookScript("OnEditFocusLost", Client.Guarded(idChanged))
 	hint(id, "ID", {
 		{ text = "The gob entry of the source's WMO." },
-		{ text = "Type one to keep that WMO." },
+		{ text = "Type one to keep that WMO.", colour = GREY },
 	})
 	lightOnHover(id)
 	frame.SpawnSource:SetText("Spawn WMO")
@@ -1549,19 +1593,20 @@ end
 --- What a leader's tooltip says: what choosing it makes of the objects, and why it cannot lead
 -- where it cannot.
 local function leadLines(choice)
-	local turns = { text = "A group moves, turns and scales about its leader.", colour = GREY }
 	if choice.word == "nogroup" then
 		return { { text = "Each object stands alone." } }
 	elseif choice.word == "pivot" then
 		return {
 			{ text = "An invisible object at the destination leads." },
-			{ text = "One extra object spawns.", colour = GREY },
-			turns,
+			{
+				text = "One extra object spawns; the group moves, turns and scales about it.",
+				colour = GREY,
+			},
 		}
 	elseif choice.word == "first" then
 		return {
 			{ text = "The first object spawned leads." },
-			turns,
+			{ text = "The group moves, turns and scales about it.", colour = GREY },
 		}
 	end
 	local lines
@@ -1618,12 +1663,23 @@ local function buildDestination()
 	frame.DestinationLabel:SetText("Destination")
 	frame.DestinationFollow.Label:SetText("Auto Update")
 	frame.DestinationFollow:SetScript("OnClick", Client.Guarded(followDestination))
-	hint(frame.DestinationFollow, nil, {
-		{
-			text = "Ticked: follows the selected object or group.",
-		},
-		{ text = "Unticked: stays as it is." },
-	})
+	hint(frame.DestinationFollow, nil, function()
+		if spotPinned then
+			return {
+				{ text = "Keeps the numbers shown." },
+				{ text = "Tick to follow the selected object or group.", colour = GREY },
+			}
+		end
+		local from = selection()
+		local follows = "Where you stood"
+		if from then
+			follows = from.group and (from.name .. "'s group") or from.name
+		end
+		return {
+			{ label = "Follows", value = follows },
+			{ text = "The selected object or group. Untick to keep the numbers.", colour = GREY },
+		}
+	end)
 	for order, number in ipairs(NUMBERS) do
 		local box = frame[number.box]
 		box.number = number
@@ -1664,15 +1720,15 @@ local function buildDestination()
 	hint(frame.Here, nil, { { text = "Fill in where you stand and face, once." } }, "<set> here")
 	hint(frame.UseSelected, nil, function()
 		local from = selection()
-		if from and from.group then
+		if not from then
+			return { { text = "Select a gob or a group first." } }
+		elseif from.group then
 			return {
-				{
-					text = "Fill in the selected group's position, once.",
-				},
+				{ text = ("Fill in the position of %s's group, once."):format(from.name) },
 				{ text = "Level, since a group has no roll or pitch.", colour = GREY },
 			}
 		end
-		return { { text = "Fill in the selected gob's position, once." } }
+		return { { text = ("Fill in %s's position, once."):format(from.name) } }
 	end)
 
 	buildLeader()
@@ -1796,13 +1852,13 @@ local MODEL_CONTROLS = {
 		texture = "Interface\\Common\\help-i",
 		title = "Choosing pieces",
 		lines = {
-			{ label = "Click", value = "choose a piece" },
-			{ label = "Shift-click", value = "add or let go" },
-			{ label = "Ctrl-click", value = "make it lead" },
-			{ label = "Shift-drag", value = "add a band" },
-			{ label = "Ctrl-drag", value = "let a band go" },
-			{ label = "Right-click", value = "spawn it alone" },
-			{ label = "Ctrl+A", value = "choose every piece" },
+			{ click = "Click", value = "Choose a piece" },
+			{ click = "Shift-click", value = "Add or let go" },
+			{ click = "Ctrl-click", value = "Make it lead" },
+			{ click = "Shift-drag", value = "Add a band" },
+			{ click = "Ctrl-drag", value = "Let a band go" },
+			{ click = "Right-click", value = "Spawn it alone" },
+			{ click = "Ctrl+A", value = "Choose every piece" },
 		},
 	},
 }
@@ -1898,6 +1954,9 @@ local OFF_POINTER = 16
 --- The hovered piece's tooltip, drawn by LibQTip as a grid; nil while none shows.
 local pieceTip
 
+--- The clicks the piece's tooltip names: the click, and what it does.
+local PIECE_CLICKS = { { "Click", "Choose it" }, { "Right-click", "Spawn it alone" } }
+
 --- Stand the piece's tooltip just off the pointer, as the client's own does at the pointer.
 local function followPointer()
 	if not pieceTip then
@@ -1963,10 +2022,14 @@ local function showHovered(piece)
 		line = grid:AddLine("Scale", shownNumber(piece.scale))
 		grid:SetCellTextColor(line, 1, unpack(colours.label))
 	end
-	-- The two clicks a piece answers most; the rest are on the control bar's help.
-	line = grid:AddLine()
-	grid:SetCell(line, 1, "Click: choose. Right-click: spawn.", nil, "LEFT", 4)
-	grid:SetCellTextColor(line, 1, unpack(colours.click))
+	-- The two clicks a piece answers most, drawn as Chat.Tip draws a click; the rest are on the
+	-- control bar's help.
+	for _, click in ipairs(PIECE_CLICKS) do
+		line = grid:AddLine()
+		grid:SetCell(line, 1, click[1])
+		grid:SetCellTextColor(line, 1, unpack(colours.click))
+		grid:SetCell(line, 2, click[2], nil, "LEFT", 3)
+	end
 	followPointer()
 	grid:Show()
 end
@@ -2014,8 +2077,8 @@ local function spawnChosenLines()
 	if stage:Count() > 1 then
 		lines[1] = { label = "Leads", value = pieceName(stage:Leader()) }
 	end
-	lines[#lines + 1] = { text = "Click: at Destination.", colour = GREEN }
-	lines[#lines + 1] = { text = "Right-click: the leader at your feet.", colour = GREEN }
+	lines[#lines + 1] = { click = "Click", value = "At Destination" }
+	lines[#lines + 1] = { click = "Right-click", value = "The leader at your feet" }
 	return lines
 end
 
@@ -2095,7 +2158,7 @@ local function buildOffer()
 	hint(offer.Paste, nil, function()
 		return {
 			{ text = Console.OfferCommand(offer.Name:GetText()) },
-			{ text = Console.OFFER.click, colour = GREEN },
+			{ click = "Click", value = Console.OFFER.click },
 		}
 	end)
 end
@@ -2115,6 +2178,7 @@ local function buildFooter()
 	)
 	frame.Notice:SetScript("OnLeave", _G.GameTooltip_Hide)
 	frame.SpawnButton:SetScript("OnClick", Client.Guarded(spawn))
+	hint(frame.SpawnButton, nil, spawnLines)
 	frame.DeleteButton:SetText("Stop and delete")
 	frame.DeleteButton:SetScript(
 		"OnClick",

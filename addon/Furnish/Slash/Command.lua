@@ -210,9 +210,9 @@ end
 
 --- What a right-click on each kind of button does: opens the window on it.
 local OPENS = {
-	import = "Right-click: show it in the window",
-	list = "Right-click: show its sets in the window",
-	set = "Right-click: choose it in the window",
+	import = "Show it in the window",
+	list = "Show its sets in the window",
+	set = "Choose it in the window",
 }
 
 --- A click on a list's button spawns its set: plainly on the selected object, with ctrl at
@@ -258,12 +258,12 @@ end
 -- line's button does, or what a word in the help does.
 function Command.Hover(words, tooltip)
 	local kind, value = linked(words)
-	local opens = OPENS[kind] and { text = OPENS[kind], colour = Chat.TIP.click }
+	local opens = OPENS[kind] and { click = "Right-click", value = OPENS[kind] }
 	if kind == "import" then
 		return Console.DescribeImport(tooltip, opens)
 	elseif kind == "list" then
 		return Chat.Tip(tooltip, Furnish.NAME, {
-			{ text = "Click: list this WMO's sets", colour = Chat.TIP.click },
+			{ click = "Click", value = "List its sets" },
 			opens,
 		})
 	elseif kind == "word" and WORD[value] then
@@ -278,7 +278,7 @@ function Command.Hover(words, tooltip)
 	end
 	local request = Console.LinkRequest(words)
 	if request then
-		Console.Describe(request, tooltip, { text = OPENS.set, colour = Chat.TIP.click })
+		Console.Describe(request, tooltip, { click = "Right-click", value = OPENS.set })
 	end
 end
 

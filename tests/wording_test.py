@@ -37,6 +37,36 @@ def lines_saying(word: re.Pattern[str]) -> list[str]:
     ]
 
 
+#: A click written into a sentence, where a tooltip draws it as a row of its own.
+CLICK_IN_PROSE = re.compile(r'"(?:Shift-|Ctrl-|Right-|Ctrl- or shift-)?[Cc]lick:')
+
+#: A tooltip line or value that starts lowercase, or one that explains both states of a box.
+LOWERCASE_TIP = re.compile(r'\b(?:text|value) = "[a-z]|"(?:Ticked|Unticked):')
+
+#: The addon's own Lua, where its tooltips are written; the libraries it carries are not Furnish's.
+TOOLTIPS = [
+    path for path in sorted(ROOT.glob("addon/Furnish/**/*.lua")) if "Libs" not in path.parts
+]
+
+
+def tooltip_lines_matching(pattern: re.Pattern[str]) -> list[str]:
+    """Every line of the addon's own Lua that matches, as a path, a line number and the line."""
+    return [
+        f"{path.relative_to(ROOT)}:{number}: {line.strip()}"
+        for path in TOOLTIPS
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        if pattern.search(line)
+    ]
+
+
+def test_a_tooltip_draws_a_click_as_a_row_never_in_a_sentence() -> None:
+    assert tooltip_lines_matching(CLICK_IN_PROSE) == []
+
+
+def test_a_tooltip_line_starts_capitalised_and_says_the_state_it_is_in() -> None:
+    assert tooltip_lines_matching(LOWERCASE_TIP) == []
+
+
 def test_a_wmo_is_never_called_anything_else() -> None:
     assert lines_saying(FORBIDDEN) == []
 
