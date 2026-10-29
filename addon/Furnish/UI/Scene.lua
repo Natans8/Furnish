@@ -15,8 +15,8 @@
 -- Choosing follows the grammar the 3D editors share. A click chooses the piece under the pointer
 -- alone, and on nothing chooses none. A shift-click adds a piece or lets a chosen one go, and a
 -- shift-drag adds every piece whose middle its band holds, as it is drawn, while a ctrl-drag lets
--- go of every piece its band holds. A ctrl-click makes a piece lead, choosing it too. A right-click
--- spawns the pointed piece alone.
+-- go of every piece its band holds. A ctrl-click makes a piece lead, choosing it too, and Ctrl+A
+-- chooses every piece. A right-click spawns the pointed piece alone.
 -- What is chosen glows blue, the piece that leads green, the pointed piece yellow, and the scene says
 -- when that changes. Chosen lists them as they would spawn, the piece that leads first: the
 -- lowest-standing one, unless a ctrl-click has made another lead.
@@ -228,14 +228,30 @@ function Scene.New(frame, onLoad, onHover, onChoose, onSpawn)
 			self:Tick(elapsed)
 		end)
 	)
+	-- The keyboard is borrowed only while the pointer is on the scene, for Ctrl+A, and every other
+	-- key goes on to the game, so no movement key is ever caught.
 	frame:HookScript("OnEnter", function()
 		self.pointed = true
+		if not (_G.InCombatLockdown and _G.InCombatLockdown()) then
+			frame:EnableKeyboard(true)
+		end
 	end)
 	frame:HookScript(
 		"OnLeave",
 		Client.Guarded(function()
 			self.pointed = false
+			frame:EnableKeyboard(false)
 			self:Hover(nil)
+		end)
+	)
+	frame:SetScript(
+		"OnKeyDown",
+		Client.Guarded(function(_, key)
+			local all = key == "A" and _G.IsControlKeyDown()
+			frame:SetPropagateKeyboardInput(not all)
+			if all then
+				self:ChooseAll()
+			end
 		end)
 	)
 	frame:HookScript(
@@ -861,6 +877,18 @@ function Scene:Leader()
 		return nil
 	end
 	return leads.source, self.lead ~= nil
+end
+
+--- Choose every loaded piece, in the order drawn, as Ctrl+A does.
+function Scene:ChooseAll()
+	local all = {}
+	for index, box in ipairs(self.boxes) do
+		all[index] = box.actor
+	end
+	table.sort(all, function(a, b)
+		return a.order < b.order
+	end)
+	self:Settle(all)
 end
 
 --- The pieces chosen, as Draw was given them, in the order they would spawn: the one that leads

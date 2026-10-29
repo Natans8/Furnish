@@ -724,6 +724,8 @@ FRAME = {
   SetCameraNearClip = function() end, SetCameraFarClip = function() end,
   CreateCameraFromScene = function() end, EnableMouse = function() end,
   EnableMouseWheel = function() end,
+  EnableKeyboard = function(_, on) KEYBOARD = on end,
+  SetPropagateKeyboardInput = function(_, on) PROPAGATE = on end,
   HookScript = function(_, name, fn) HOOKED[name] = fn end,
   SetScript = function(_, name, fn) SCRIPTS[name] = fn end,
   GetCameraFieldOfView = function() return 2 * math.atan(0.5) end,
@@ -1201,6 +1203,20 @@ def test_a_right_click_spawns_the_pointed_piece_and_a_right_drag_does_not(tmp_pa
         " GetCursorPosition = function() return 0, 100 end SCRIPTS.OnMouseUp(FRAME, 'RightButton')"
     )
     assert lua.eval("SPAWNED") is None
+
+
+def test_ctrl_a_chooses_every_piece_and_lets_every_other_key_go_to_the_game(
+    tmp_path: Path,
+) -> None:
+    lua = core_scene_choosing(tmp_path, piece_at(8, (0, 6, 0), 1), piece_at(9, (0, -6, 0), 1))
+    # The keyboard is the scene's only while the pointer is on it.
+    assert lua.eval("KEYBOARD") is True
+    lua.execute("SCRIPTS.OnKeyDown(FRAME, 'W')")
+    assert lua.eval("PROPAGATE") is True and chosen(lua) == []
+    lua.execute("CTRL = true SCRIPTS.OnKeyDown(FRAME, 'A')")
+    assert lua.eval("PROPAGATE") is False and chosen(lua) == [7, 8, 9]
+    lua.execute("HOOKED.OnLeave()")
+    assert lua.eval("KEYBOARD") is False
 
 
 def core_scene_choosing(

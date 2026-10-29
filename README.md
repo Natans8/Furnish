@@ -72,6 +72,7 @@ Click a set and the preview opens beside the window, laying out its pieces.
 | shift-drag      | add every piece in a band                  |
 | ctrl-drag       | let go of every piece in a band            |
 | right-click     | spawn that piece alone                     |
+| ctrl+A          | choose every piece                         |
 
 The pointed piece glows yellow, chosen pieces azure, the leader green. The leader is the piece
 standing lowest, the widest among those level, unless you ctrl-clicked another. **Spawn** spawns

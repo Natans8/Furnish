@@ -1787,6 +1787,7 @@ local MODEL_CONTROLS = {
 			{ label = "Shift-drag", value = "add a band" },
 			{ label = "Ctrl-drag", value = "let a band go" },
 			{ label = "Right-click", value = "spawn it alone" },
+			{ label = "Ctrl+A", value = "choose every piece" },
 		},
 	},
 }
