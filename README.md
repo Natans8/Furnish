@@ -43,7 +43,8 @@ Furnish reminds you once a session and leaves the choice to you.
 **Group leader**: what leads the spawned objects' group.
 - *Pivot* (the default): one extra invisible object at the destination.
 - *First spawned*: the first object leads, nothing extra spawns.
-- *Selected gob*: the selected gob leads, or its group is joined.
+- *Selected gob*: the selected gob leads, or its group is joined; Spawn asks before joining a
+  group that exists, the selected gob's or a selected group.
 - *No group*: every object stands alone.
 
 **Spawning**

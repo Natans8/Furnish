@@ -358,11 +358,18 @@ local function grouped()
 	return lead
 end
 
---- The selected gob, where the objects would join a group it is in already, which Spawn asks
--- about first; a selected group is chosen as one, so it is not asked about.
+--- What the objects would join where the selection leads and is in a group already: the selected
+-- gob, or the selected group, named by its leader. Spawn asks about either first, since every run
+-- ends with a group selected and joining one by accident is easy.
 local function joinsGroup()
-	local selected = grouped() == "merge" and Console.Selected()
-	return selected and selected.groupLeader ~= 0 and selected or nil
+	if grouped() ~= "merge" then
+		return nil
+	end
+	local selected = Console.Selected()
+	if selected and selected.groupLeader ~= 0 then
+		return selected
+	end
+	return Console.Group()
 end
 
 --- Whether the selected gob draws a set already, as part of its model: its base set, unless
@@ -680,7 +687,7 @@ local function request()
 end
 
 _G.StaticPopupDialogs[JOIN] = {
-	text = "%s is in a group already, so the %s join it.",
+	text = "The %s join the group %s is in.",
 	button1 = "Spawn",
 	button2 = _G.CANCEL,
 	OnAccept = function(_, data)
@@ -692,8 +699,8 @@ _G.StaticPopupDialogs[JOIN] = {
 	preferredIndex = 3,
 }
 
---- Spawn the chosen sets, asking first where they would join a group the selected gob is in
--- already, the merge reading the selection when the answer comes; or stop the run.
+--- Spawn the chosen sets, asking first where they would join a group that exists already, the
+-- merge reading the selection when the answer comes; or stop the run.
 local function spawn()
 	if run then
 		return Console.Stop(false, WAYS)
@@ -705,7 +712,7 @@ local function spawn()
 	local member = joinsGroup()
 	if member then
 		local _, count = chosenSets()
-		local dialog = _G.StaticPopup_Show(JOIN, member.name, objects(count))
+		local dialog = _G.StaticPopup_Show(JOIN, objects(count), member.name)
 		if dialog then
 			dialog.data = request()
 		end
