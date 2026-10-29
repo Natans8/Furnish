@@ -6,13 +6,15 @@ readme = "README.md"
 license = "AGPL-3.0-or-later"
 authors = [{ name = "Natan Shick" }]
 requires-python = ">=3.14"
+# A floor only where the code needs that version, its reason beside it. uv.lock pins what
+# actually runs, and `uv sync --upgrade` moves every pin at once.
 dependencies = [
     # The spawn order's walk: the nearest placement left, at every step of every
     # set, which is millions of distances on the largest WMOs.
-    "numpy>=2.5.4",
+    "numpy",
     # Progress for the steps that take minutes: a walk over sixteen thousand
     # roots, a download of the display table.
-    "tqdm>=4.70.1",
+    "tqdm",
 ]
 
 [project.scripts]
@@ -24,11 +26,11 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "lupa>=2.8",
-    "mypy>=2.4.0",
-    "pytest>=9.1.1",
-    "ruff>=0.17.1",
-    "types-tqdm>=4.70.0.20260906",
+    "lupa>=2.1",  # the bundled Lua 5.1 module the tests import, lupa.lua51
+    "mypy",
+    "pytest",
+    "ruff",
+    "types-tqdm",
 ]
 
 [tool.pytest.ini_options]
