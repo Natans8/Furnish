@@ -455,8 +455,9 @@ local function warnings()
 		local text = ("%s's sets may not fit %s."):format(shown.name, onto.name)
 		said[#said + 1] = { text = text, colour = WARN }
 	end
-	-- A reminder, not a warning: whether highlighting is on is the player's call.
-	if #(chosenSets()) > 0 then
+	-- A reminder, not a warning: whether highlighting is on is the player's call. A finished run's
+	-- line outranks it, since the bar then says how that run went.
+	if #(chosenSets()) > 0 and not frame.Progress.ended then
 		said[#said + 1] = { text = Chat.HIGHLIGHT .. ".", colour = GREY }
 	end
 	return said
